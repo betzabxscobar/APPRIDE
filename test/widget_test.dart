@@ -124,4 +124,42 @@ void main() {
       throwsA(isA<AuthException>()),
     );
   });
+
+  test('Una cuenta administrativa entra sin importar el rol elegido',
+      () async {
+    final admin = await AuthService.instance.signIn(
+      email: 'alexyanez1119@gmail.com',
+      password: AuthService.temporaryAdminPassword,
+      expectedRole: UserRole.passenger,
+    );
+
+    expect(admin.role, UserRole.admin);
+    expect(admin.mustChangePassword, isTrue);
+
+    // Mientras no cambie la contraseña temporal no puede ver el listado.
+    expect(() => AuthService.instance.visibleUsers(),
+        throwsA(isA<AuthException>()));
+
+    final updated =
+        await AuthService.instance.changeInitialPassword('RideSegura2026');
+    expect(updated.mustChangePassword, isFalse);
+
+    // Un admin no ve a los superadmin; un superadmin sí.
+    final visibles = AuthService.instance.visibleUsers();
+    expect(visibles.any((user) => user.role.isSuperadmin), isFalse);
+    expect(visibles.any((user) => user.email == 'alexyanez1119@gmail.com'),
+        isTrue);
+  });
+
+  test('El primer acceso exige una contraseña de 10 caracteres', () async {
+    await AuthService.instance.signIn(
+      email: 'betzabxscobar@gmail.com',
+      password: AuthService.temporaryAdminPassword,
+    );
+
+    await expectLater(
+      AuthService.instance.changeInitialPassword('Corta123'),
+      throwsA(isA<AuthException>()),
+    );
+  });
 }

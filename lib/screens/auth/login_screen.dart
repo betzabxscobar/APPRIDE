@@ -219,6 +219,26 @@ class _DemoCredentials extends StatelessWidget {
               color: AppColors.inkMuted,
             ),
           ),
+          SizedBox(height: 10),
+          Text(
+            'Equipo administrativo',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ink,
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            'Entra con el correo de tu cuenta admin o superadmin.\n'
+            'Contraseña temporal: ${AuthService.temporaryAdminPassword}\n'
+            'Al primer ingreso se pide una contraseña definitiva.',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.5,
+              color: AppColors.inkMuted,
+            ),
+          ),
         ],
       ),
     );

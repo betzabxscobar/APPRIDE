@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
 
-/// Los dos roles que puede tener una cuenta en Ride.
+/// Roles de Ride. Son los mismos cuatro que maneja el backend de WEB-RIDE:
+/// `passenger`, `driver`, `admin` y `superadmin`.
+///
+/// Solo [selectable] se ofrece en la app: las cuentas administrativas no se
+/// registran desde aquí, las crea el equipo y llegan con contraseña temporal.
 enum UserRole {
   passenger(
     id: 'passenger',
@@ -19,6 +23,22 @@ enum UserRole {
     icon: Icons.drive_eta_outlined,
     accent: AppColors.green,
     accentSoft: AppColors.greenSoft,
+  ),
+  admin(
+    id: 'admin',
+    label: 'Administro',
+    description: 'Panel de gestión',
+    icon: Icons.shield_outlined,
+    accent: AppColors.purple,
+    accentSoft: AppColors.purpleSoft,
+  ),
+  superadmin(
+    id: 'superadmin',
+    label: 'Superadmin',
+    description: 'Control total',
+    icon: Icons.workspace_premium_outlined,
+    accent: AppColors.purple,
+    accentSoft: AppColors.purpleSoft,
   );
 
   const UserRole({
@@ -37,11 +57,24 @@ enum UserRole {
   final Color accent;
   final Color accentSoft;
 
+  /// Roles que una persona puede elegir al entrar o registrarse.
+  static const List<UserRole> selectable = [passenger, driver];
+
   bool get isDriver => this == UserRole.driver;
   bool get isPassenger => this == UserRole.passenger;
 
+  /// `admin` y `superadmin` comparten el panel; solo cambian los permisos.
+  bool get isAdministrative =>
+      this == UserRole.admin || this == UserRole.superadmin;
+  bool get isSuperadmin => this == UserRole.superadmin;
+
   /// Nombre del rol tal como se muestra dentro de la app.
-  String get displayName => isDriver ? 'Conductor' : 'Pasajero';
+  String get displayName => switch (this) {
+        UserRole.passenger => 'Pasajero',
+        UserRole.driver => 'Conductor',
+        UserRole.admin => 'Administrador',
+        UserRole.superadmin => 'Superadministrador',
+      };
 
   static UserRole fromId(String id) {
     return UserRole.values.firstWhere(

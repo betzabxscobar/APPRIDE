@@ -41,6 +41,19 @@ abstract final class Validators {
     return null;
   }
 
+  /// Contraseña definitiva de una cuenta administrativa: mínimo 10 caracteres,
+  /// igual que `/api/change-password` en WEB-RIDE.
+  static String? adminPassword(String? value) {
+    final vacio = required(value, campo: 'La contraseña');
+    if (vacio != null) return vacio;
+    if (value!.length < 10) return 'Usa al menos 10 caracteres';
+    if (!value.contains(RegExp(r'[A-Za-z]')) ||
+        !value.contains(RegExp(r'[0-9]'))) {
+      return 'Combina letras y números';
+    }
+    return null;
+  }
+
   static String? confirmPassword(String? value, String original) {
     if (value != original) return 'Las contraseñas no coinciden';
     return null;

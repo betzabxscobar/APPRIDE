@@ -111,7 +111,7 @@ class RoleSwitch extends StatelessWidget {
       ),
       child: Row(
         children: [
-          for (final role in UserRole.values)
+          for (final role in UserRole.selectable)
             Expanded(child: _Tab(
               role: role,
               selected: role == value,

@@ -2,6 +2,9 @@ import 'user_role.dart';
 import 'vehicle.dart';
 
 /// Usuario autenticado de Ride.
+///
+/// Los campos replican el perfil público que devuelve la API de WEB-RIDE
+/// (`/api/login`, `/api/register`, `/api/me`) sin el hash de la contraseña.
 class AppUser {
   const AppUser({
     required this.id,
@@ -11,6 +14,8 @@ class AppUser {
     required this.role,
     this.vehicle,
     this.isVerified = false,
+    this.mustChangePassword = false,
+    this.createdAt,
   });
 
   final String id;
@@ -23,6 +28,11 @@ class AppUser {
   final Vehicle? vehicle;
   final bool isVerified;
 
+  /// Las cuentas administrativas nacen con contraseña temporal y deben
+  /// reemplazarla antes de entrar al panel.
+  final bool mustChangePassword;
+  final DateTime? createdAt;
+
   /// Primer nombre, para saludos del tipo "¡Hola, Andrea!".
   String get firstName => name.trim().split(' ').first;
 
@@ -34,7 +44,12 @@ class AppUser {
     return (parts.first[0] + parts[1][0]).toUpperCase();
   }
 
-  AppUser copyWith({UserRole? role, Vehicle? vehicle, bool? isVerified}) {
+  AppUser copyWith({
+    UserRole? role,
+    Vehicle? vehicle,
+    bool? isVerified,
+    bool? mustChangePassword,
+  }) {
     return AppUser(
       id: id,
       name: name,
@@ -43,6 +58,8 @@ class AppUser {
       role: role ?? this.role,
       vehicle: vehicle ?? this.vehicle,
       isVerified: isVerified ?? this.isVerified,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+      createdAt: createdAt,
     );
   }
 
@@ -54,6 +71,8 @@ class AppUser {
         'role': role.id,
         'vehicle': vehicle?.toMap(),
         'isVerified': isVerified,
+        'mustChangePassword': mustChangePassword,
+        'createdAt': createdAt?.toIso8601String(),
       };
 
   factory AppUser.fromMap(Map<String, dynamic> map) => AppUser(
@@ -66,5 +85,9 @@ class AppUser {
             ? null
             : Vehicle.fromMap(Map<String, dynamic>.from(map['vehicle'] as Map)),
         isVerified: map['isVerified'] as bool? ?? false,
+        mustChangePassword: map['mustChangePassword'] as bool? ?? false,
+        createdAt: map['createdAt'] == null
+            ? null
+            : DateTime.tryParse(map['createdAt'] as String),
       );
 }

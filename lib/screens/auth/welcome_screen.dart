@@ -57,7 +57,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       const SizedBox(height: 14),
                       Row(
                         children: [
-                          for (final role in UserRole.values) ...[
+                          for (final role in UserRole.selectable) ...[
                             Expanded(
                               child: RoleCard(
                                 role: role,
@@ -65,7 +65,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                 onTap: () => setState(() => _role = role),
                               ),
                             ),
-                            if (role != UserRole.values.last)
+                            if (role != UserRole.selectable.last)
                               const SizedBox(width: 12),
                           ],
                         ],

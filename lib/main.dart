@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'core/app_theme.dart';
 import 'services/auth_service.dart';
+import 'screens/admin/admin_dashboard_screen.dart';
+import 'screens/auth/first_access_screen.dart';
 import 'screens/auth/welcome_screen.dart';
 import 'screens/home/driver_home_screen.dart';
 import 'screens/home/passenger_home_screen.dart';
@@ -40,6 +42,14 @@ class AuthGate extends StatelessWidget {
         final user = AuthService.instance.currentUser;
 
         if (user == null) return const WelcomeScreen();
+
+        // Cuentas administrativas: primero la contraseña definitiva, después
+        // el panel. Es el mismo orden que aplica WEB-RIDE.
+        if (user.role.isAdministrative) {
+          return user.mustChangePassword
+              ? FirstAccessScreen(key: ValueKey('first-${user.id}'), user: user)
+              : AdminDashboardScreen(key: ValueKey(user.id), user: user);
+        }
 
         return user.role.isDriver
             ? DriverHomeScreen(key: ValueKey(user.id), user: user)
