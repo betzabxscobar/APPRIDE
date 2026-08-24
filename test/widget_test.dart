@@ -1,30 +1,127 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ride/main.dart';
+import 'package:ride/models/user_role.dart';
+import 'package:ride/services/auth_service.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  tearDown(() async {
+    await AuthService.instance.signOut();
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  testWidgets('El botón Continuar se habilita al elegir un rol', (tester) async {
+    await tester.pumpWidget(const RideApp());
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    final continuar = find.widgetWithText(FilledButton, 'Continuar');
+    expect(tester.widget<FilledButton>(continuar).onPressed, isNull);
+
+    await tester.tap(find.text('Viajo'));
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(tester.widget<FilledButton>(continuar).onPressed, isNotNull);
+  });
+
+  testWidgets('Login de pasajero lleva al home de pasajero', (tester) async {
+    await tester.pumpWidget(const RideApp());
+
+    await tester.tap(find.text('Viajo'));
+    await tester.pump();
+
+    final continuar = find.widgetWithText(FilledButton, 'Continuar');
+    await tester.ensureVisible(continuar);
+    await tester.pump();
+    await tester.tap(continuar);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byType(TextFormField).first,
+      'pasajero@ride.app',
+    );
+    await tester.enterText(find.byType(TextFormField).last, 'Ride1234');
+    await tester.tap(find.widgetWithText(FilledButton, 'Iniciar sesión'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('¡Hola, Andrea!'), findsOneWidget);
+  });
+
+  testWidgets('El registro de conductor pide los datos del vehículo',
+      (tester) async {
+    await tester.pumpWidget(const RideApp());
+
+    await tester.tap(find.text('Conduzco'));
+    await tester.pump();
+
+    final continuar = find.widgetWithText(FilledButton, 'Continuar');
+    await tester.ensureVisible(continuar);
+    await tester.pump();
+    await tester.tap(continuar);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TextButton, 'Regístrate'));
+    await tester.pumpAndSettle();
+
+    // El formulario es un ListView perezoso: hay que desplazarse hasta la
+    // sección del vehículo para que se construya.
+    await tester.dragUntilVisible(
+      find.text('Tu vehículo'),
+      find.byType(ListView),
+      const Offset(0, -220),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tu vehículo'), findsOneWidget);
+    expect(find.text('Placa'), findsOneWidget);
+  });
+
+  testWidgets('El home de conductor muestra las oportunidades',
+      (tester) async {
+    // Sin await: el retardo simulado del servicio avanza con el reloj falso
+    // del test, que solo corre durante los pump().
+    final pendingSignIn = AuthService.instance.signIn(
+      email: 'conductor@ride.app',
+      password: 'Ride1234',
+      expectedRole: UserRole.driver,
+    );
+
+    await tester.pumpWidget(const RideApp());
+    await tester.pumpAndSettle();
+    await pendingSignIn;
+
+    expect(find.text('Modo conductor'), findsOneWidget);
+    expect(find.text('Toyota Corolla · 2021'), findsOneWidget);
+    expect(find.text('PDC-1234'), findsOneWidget);
+
+    await tester.dragUntilVisible(
+      find.widgetWithText(FilledButton, 'Aceptar ruta').first,
+      find.byType(ListView),
+      const Offset(0, -220),
+    );
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(FilledButton, 'Aceptar ruta'), findsWidgets);
+  });
+
+  test('Login rechaza el rol equivocado', () async {
+    await expectLater(
+      AuthService.instance.signIn(
+        email: 'pasajero@ride.app',
+        password: 'Ride1234',
+        expectedRole: UserRole.driver,
+      ),
+      throwsA(isA<AuthException>()),
+    );
+  });
+
+  test('No se puede registrar dos veces el mismo correo', () async {
+    await expectLater(
+      AuthService.instance.register(
+        name: 'Andrea Salazar',
+        email: 'PASAJERO@ride.app',
+        phone: '0991234567',
+        password: 'Ride1234',
+        role: UserRole.passenger,
+      ),
+      throwsA(isA<AuthException>()),
+    );
   });
 }
