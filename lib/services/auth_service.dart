@@ -33,11 +33,6 @@ class AuthService extends ChangeNotifier {
 
   static const Duration _latency = Duration(milliseconds: 900);
 
-  /// Contraseña temporal con la que se entregan las cuentas administrativas
-  /// mientras la autenticación es local. En WEB-RIDE la genera al azar
-  /// `scripts/crear-cuentas-administrativas.mjs`.
-  static const String temporaryAdminPassword = 'Ride-Temporal2026';
-
   /// Longitud mínima de la contraseña definitiva de una cuenta administrativa,
   /// igual que en `/api/change-password`.
   static const int adminPasswordMinLength = 10;
@@ -76,28 +71,63 @@ class AuthService extends ChangeNotifier {
     ..._administrativeAccounts(),
   };
 
+  /// Equipo administrativo con sus credenciales temporales.
+  ///
+  /// Son las mismas que generó `scripts/crear-cuentas-administrativas.mjs` en
+  /// WEB-RIDE el 2026-08-24, una distinta por persona. Están escritas aquí
+  /// porque la autenticación todavía es local: cuando exista la base de datos
+  /// se leen de Supabase y estas líneas se borran.
+  ///
+  /// `mustChangePassword` va en `false` a propósito: el cambio de contraseña
+  /// no se puede persistir sin base de datos, así que por ahora cada cuenta
+  /// entra directo a su panel. Al conectar Supabase se pone en `true` y vuelve
+  /// a aparecer [FirstAccessScreen].
   static Map<String, _Account> _administrativeAccounts() {
-    const team = <(String, String, UserRole)>[
-      ('Betzabe Escobar', 'betzabxscobar@gmail.com', UserRole.superadmin),
-      ('Diego Zurita', 'dandreszurtaf23@gmail.com', UserRole.superadmin),
-      ('Alex Yánez', 'alexyanez1119@gmail.com', UserRole.admin),
-      ('Mayuri Remache', 'mayuriremache0@gmail.com', UserRole.admin),
-      ('Javier Conforme', 'javierconforme18@gmail.com', UserRole.admin),
+    const team = <({String name, String email, UserRole role, String password})>[
+      (
+        name: 'Betzabe Escobar',
+        email: 'betzabxscobar@gmail.com',
+        role: UserRole.superadmin,
+        password: 'Ride-ffS_Yf028WHB!',
+      ),
+      (
+        name: 'Diego Zurita',
+        email: 'dandreszurtaf23@gmail.com',
+        role: UserRole.superadmin,
+        password: 'Ride-p80Pt7EoEooS!',
+      ),
+      (
+        name: 'Alex Yánez',
+        email: 'alexyanez1119@gmail.com',
+        role: UserRole.admin,
+        password: 'Ride-CkqHITiz95tB!',
+      ),
+      (
+        name: 'Mayuri Remache',
+        email: 'mayuriremache0@gmail.com',
+        role: UserRole.admin,
+        password: 'Ride-cPSllOM2gdOa!',
+      ),
+      (
+        name: 'Javier Conforme',
+        email: 'javierconforme18@gmail.com',
+        role: UserRole.admin,
+        password: 'Ride-R3JntuNSP--2!',
+      ),
     ];
 
     return {
       for (final (index, member) in team.indexed)
-        member.$2: _Account(
-          password: temporaryAdminPassword,
+        member.email: _Account(
+          password: member.password,
           user: AppUser(
             id: 'admin-${index + 1}',
-            name: member.$1,
-            email: member.$2,
+            name: member.name,
+            email: member.email,
             phone: 'ADMIN',
-            role: member.$3,
+            role: member.role,
             isVerified: true,
-            mustChangePassword: true,
-            createdAt: DateTime(2026, 2, 3),
+            createdAt: DateTime(2026, 8, 24),
           ),
         ),
     };
@@ -159,6 +189,7 @@ class AuthService extends ChangeNotifier {
       if (_accounts.containsKey(key)) {
         throw const AuthException('Este correo ya tiene una cuenta.');
       }
+
       final user = AppUser(
         id: 'u-${DateTime.now().microsecondsSinceEpoch}',
         name: name.trim(),
@@ -177,7 +208,10 @@ class AuthService extends ChangeNotifier {
 
   /// Primer acceso administrativo: reemplaza la contraseña temporal.
   ///
-  /// Equivale a `/api/change-password` del backend web.
+  /// Equivale a `/api/change-password` del backend web. Hoy no se llega a este
+  /// flujo: sin base de datos la contraseña nueva se perdería al cerrar la
+  /// app, así que el equipo entra directo con su credencial temporal. El
+  /// método queda listo para cuando exista Supabase.
   Future<AppUser> changeInitialPassword(String password) async {
     return _run(() async {
       final user = _currentUser;
@@ -195,13 +229,13 @@ class AuthService extends ChangeNotifier {
           '$adminPasswordMinLength caracteres',
         );
       }
-      if (password == temporaryAdminPassword) {
+      final account = _accounts[user.email]!;
+      if (password == account.password) {
         throw const AuthException(
           'Elige una contraseña distinta a la temporal',
         );
       }
 
-      final account = _accounts[user.email]!;
       final updated = user.copyWith(mustChangePassword: false);
       account
         ..password = password

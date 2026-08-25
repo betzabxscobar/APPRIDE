@@ -169,34 +169,67 @@ void main() {
     );
   });
 
-  test('Una cuenta administrativa entra a su panel', () async {
-    final admin = await AuthService.instance.signIn(
-      email: 'alexyanez1119@gmail.com',
-      password: AuthService.temporaryAdminPassword,
-    );
+  test('Cada cuenta del equipo entra con su credencial y su rol', () async {
+    const equipo = <String, (String, UserRole)>{
+      'betzabxscobar@gmail.com': ('Ride-ffS_Yf028WHB!', UserRole.superadmin),
+      'dandreszurtaf23@gmail.com': ('Ride-p80Pt7EoEooS!', UserRole.superadmin),
+      'alexyanez1119@gmail.com': ('Ride-CkqHITiz95tB!', UserRole.admin),
+      'mayuriremache0@gmail.com': ('Ride-cPSllOM2gdOa!', UserRole.admin),
+      'javierconforme18@gmail.com': ('Ride-R3JntuNSP--2!', UserRole.admin),
+    };
 
-    expect(admin.role, UserRole.admin);
-    expect(admin.mustChangePassword, isTrue);
+    for (final entrada in equipo.entries) {
+      final (password, role) = entrada.value;
+      final user = await AuthService.instance.signIn(
+        email: entrada.key,
+        password: password,
+      );
 
-    // Mientras no cambie la contraseña temporal no puede ver el listado.
-    expect(() => AuthService.instance.visibleUsers(),
-        throwsA(isA<AuthException>()));
-
-    final updated =
-        await AuthService.instance.changeInitialPassword('RideSegura2026');
-    expect(updated.mustChangePassword, isFalse);
-
-    // Un admin no ve a los superadmin; un superadmin sí.
-    final visibles = AuthService.instance.visibleUsers();
-    expect(visibles.any((user) => user.role.isSuperadmin), isFalse);
-    expect(visibles.any((user) => user.email == 'alexyanez1119@gmail.com'),
-        isTrue);
+      expect(user.role, role, reason: entrada.key);
+      // Sin base de datos no hay cambio de contraseña: entran directo.
+      expect(user.mustChangePassword, isFalse, reason: entrada.key);
+      await AuthService.instance.signOut();
+    }
   });
 
-  test('El primer acceso exige una contraseña de 10 caracteres', () async {
+  test('La credencial de una cuenta no sirve para otra', () async {
+    await expectLater(
+      AuthService.instance.signIn(
+        email: 'alexyanez1119@gmail.com',
+        password: 'Ride-p80Pt7EoEooS!',
+      ),
+      throwsA(isA<AuthException>()),
+    );
+  });
+
+  test('Un admin no ve a los superadmin; un superadmin sí', () async {
+    await AuthService.instance.signIn(
+      email: 'alexyanez1119@gmail.com',
+      password: 'Ride-CkqHITiz95tB!',
+    );
+    final desdeAdmin = AuthService.instance.visibleUsers();
+    expect(desdeAdmin.any((user) => user.role.isSuperadmin), isFalse);
+    expect(desdeAdmin.any((user) => user.email == 'alexyanez1119@gmail.com'),
+        isTrue);
+
+    await AuthService.instance.signOut();
+
     await AuthService.instance.signIn(
       email: 'betzabxscobar@gmail.com',
-      password: AuthService.temporaryAdminPassword,
+      password: 'Ride-ffS_Yf028WHB!',
+    );
+    expect(
+      AuthService.instance.visibleUsers().any((user) => user.role.isSuperadmin),
+      isTrue,
+    );
+  });
+
+  test('El cambio de contraseña sigue exigiendo 10 caracteres', () async {
+    // El flujo no se usa todavía, pero la regla debe seguir vigente para
+    // cuando la base de datos permita guardar la contraseña definitiva.
+    await AuthService.instance.signIn(
+      email: 'betzabxscobar@gmail.com',
+      password: 'Ride-ffS_Yf028WHB!',
     );
 
     await expectLater(
