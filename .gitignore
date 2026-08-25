@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Credenciales temporales del equipo administrativo. Nunca se versionan:
+# se entregan por separado y se pasan al compilar con --dart-define-from-file.
+# La plantilla sin valores sí se versiona.
+/config/credenciales-administrativas.json

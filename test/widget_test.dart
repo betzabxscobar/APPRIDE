@@ -7,7 +7,51 @@ import 'package:ride/screens/auth/auth_screen.dart';
 import 'package:ride/services/auth_service.dart';
 import 'package:ride/widgets/auth_shell.dart';
 
+/// Credenciales del equipo administrativo, leídas de las mismas variables de
+/// compilación que usa [AuthService]. Quedan vacías si las pruebas se corren
+/// sin `--dart-define-from-file=config/credenciales-administrativas.json`, y
+/// entonces los casos que dependen de ellas se marcan como omitidos.
+const _equipo = <String, (String, UserRole)>{
+  'betzabxscobar@gmail.com': (
+    String.fromEnvironment('RIDE_ADMIN_BETZABE'),
+    UserRole.superadmin,
+  ),
+  'dandreszurtaf23@gmail.com': (
+    String.fromEnvironment('RIDE_ADMIN_DIEGO'),
+    UserRole.superadmin,
+  ),
+  'alexyanez1119@gmail.com': (
+    String.fromEnvironment('RIDE_ADMIN_ALEX'),
+    UserRole.admin,
+  ),
+  'mayuriremache0@gmail.com': (
+    String.fromEnvironment('RIDE_ADMIN_MAYURI'),
+    UserRole.admin,
+  ),
+  'javierconforme18@gmail.com': (
+    String.fromEnvironment('RIDE_ADMIN_JAVIER'),
+    UserRole.admin,
+  ),
+};
+
+const _sinCredenciales =
+    'Corre las pruebas con --dart-define-from-file='
+    'config/credenciales-administrativas.json';
+
 void main() {
+  /// Cuentas del equipo que sí traen contraseña en esta compilación.
+  final configuradas = _equipo.entries
+      .where((entrada) => entrada.value.$1.isNotEmpty)
+      .toList();
+
+  /// Primera cuenta configurada con el rol pedido, si existe.
+  MapEntry<String, (String, UserRole)>? cuentaCon(UserRole role) {
+    for (final entrada in configuradas) {
+      if (entrada.value.$2 == role) return entrada;
+    }
+    return null;
+  }
+
   tearDown(() async {
     await AuthService.instance.signOut();
   });
@@ -170,15 +214,7 @@ void main() {
   });
 
   test('Cada cuenta del equipo entra con su credencial y su rol', () async {
-    const equipo = <String, (String, UserRole)>{
-      'betzabxscobar@gmail.com': ('Ride-ffS_Yf028WHB!', UserRole.superadmin),
-      'dandreszurtaf23@gmail.com': ('Ride-p80Pt7EoEooS!', UserRole.superadmin),
-      'alexyanez1119@gmail.com': ('Ride-CkqHITiz95tB!', UserRole.admin),
-      'mayuriremache0@gmail.com': ('Ride-cPSllOM2gdOa!', UserRole.admin),
-      'javierconforme18@gmail.com': ('Ride-R3JntuNSP--2!', UserRole.admin),
-    };
-
-    for (final entrada in equipo.entries) {
+    for (final entrada in configuradas) {
       final (password, role) = entrada.value;
       final user = await AuthService.instance.signIn(
         email: entrada.key,
@@ -190,51 +226,61 @@ void main() {
       expect(user.mustChangePassword, isFalse, reason: entrada.key);
       await AuthService.instance.signOut();
     }
-  });
+  }, skip: configuradas.isEmpty ? _sinCredenciales : null);
 
   test('La credencial de una cuenta no sirve para otra', () async {
+    final primera = configuradas.first;
+    final segunda = configuradas.last;
+
     await expectLater(
       AuthService.instance.signIn(
-        email: 'alexyanez1119@gmail.com',
-        password: 'Ride-p80Pt7EoEooS!',
+        email: primera.key,
+        password: segunda.value.$1,
       ),
       throwsA(isA<AuthException>()),
     );
-  });
+  }, skip: configuradas.length < 2 ? _sinCredenciales : null);
 
   test('Un admin no ve a los superadmin; un superadmin sí', () async {
+    final admin = cuentaCon(UserRole.admin)!;
+    final superadmin = cuentaCon(UserRole.superadmin)!;
+
     await AuthService.instance.signIn(
-      email: 'alexyanez1119@gmail.com',
-      password: 'Ride-CkqHITiz95tB!',
+      email: admin.key,
+      password: admin.value.$1,
     );
     final desdeAdmin = AuthService.instance.visibleUsers();
     expect(desdeAdmin.any((user) => user.role.isSuperadmin), isFalse);
-    expect(desdeAdmin.any((user) => user.email == 'alexyanez1119@gmail.com'),
-        isTrue);
+    expect(desdeAdmin.any((user) => user.email == admin.key), isTrue);
 
     await AuthService.instance.signOut();
 
     await AuthService.instance.signIn(
-      email: 'betzabxscobar@gmail.com',
-      password: 'Ride-ffS_Yf028WHB!',
+      email: superadmin.key,
+      password: superadmin.value.$1,
     );
     expect(
       AuthService.instance.visibleUsers().any((user) => user.role.isSuperadmin),
       isTrue,
     );
-  });
+  },
+      skip: cuentaCon(UserRole.admin) == null ||
+              cuentaCon(UserRole.superadmin) == null
+          ? _sinCredenciales
+          : null);
 
   test('El cambio de contraseña sigue exigiendo 10 caracteres', () async {
     // El flujo no se usa todavía, pero la regla debe seguir vigente para
     // cuando la base de datos permita guardar la contraseña definitiva.
+    final cuenta = configuradas.first;
     await AuthService.instance.signIn(
-      email: 'betzabxscobar@gmail.com',
-      password: 'Ride-ffS_Yf028WHB!',
+      email: cuenta.key,
+      password: cuenta.value.$1,
     );
 
     await expectLater(
       AuthService.instance.changeInitialPassword('Corta123'),
       throwsA(isA<AuthException>()),
     );
-  });
+  }, skip: configuradas.isEmpty ? _sinCredenciales : null);
 }

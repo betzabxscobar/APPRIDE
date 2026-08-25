@@ -1,0 +1,8 @@
+{
+  "_comentario": "Plantilla. Copia este archivo como credenciales-administrativas.json (git lo ignora), pon las contraseñas reales y compila con --dart-define-from-file=config/credenciales-administrativas.json. Sin ese archivo la app funciona igual, solo que sin cuentas administrativas.",
+  "RIDE_ADMIN_BETZABE": "",
+  "RIDE_ADMIN_DIEGO": "",
+  "RIDE_ADMIN_ALEX": "",
+  "RIDE_ADMIN_MAYURI": "",
+  "RIDE_ADMIN_JAVIER": ""
+}

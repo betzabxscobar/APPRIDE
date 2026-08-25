@@ -71,12 +71,19 @@ class AuthService extends ChangeNotifier {
     ..._administrativeAccounts(),
   };
 
-  /// Equipo administrativo con sus credenciales temporales.
+  /// Equipo administrativo.
   ///
-  /// Son las mismas que generó `scripts/crear-cuentas-administrativas.mjs` en
-  /// WEB-RIDE el 2026-08-24, una distinta por persona. Están escritas aquí
-  /// porque la autenticación todavía es local: cuando exista la base de datos
-  /// se leen de Supabase y estas líneas se borran.
+  /// Las contraseñas temporales del equipo **no** viven en el código: entran
+  /// al compilar, desde un archivo que git ignora.
+  ///
+  /// ```sh
+  /// flutter build apk --release \
+  ///   --dart-define-from-file=config/credenciales-administrativas.json
+  /// ```
+  ///
+  /// Sin ese archivo la app compila igual, pero ninguna cuenta administrativa
+  /// queda registrada: quien intente entrar recibe el mismo mensaje que un
+  /// correo inexistente. Ver `config/credenciales-administrativas.example.json`.
   ///
   /// `mustChangePassword` va en `false` a propósito: el cambio de contraseña
   /// no se puede persistir sin base de datos, así que por ahora cada cuenta
@@ -88,48 +95,49 @@ class AuthService extends ChangeNotifier {
         name: 'Betzabe Escobar',
         email: 'betzabxscobar@gmail.com',
         role: UserRole.superadmin,
-        password: 'Ride-ffS_Yf028WHB!',
+        password: String.fromEnvironment('RIDE_ADMIN_BETZABE'),
       ),
       (
         name: 'Diego Zurita',
         email: 'dandreszurtaf23@gmail.com',
         role: UserRole.superadmin,
-        password: 'Ride-p80Pt7EoEooS!',
+        password: String.fromEnvironment('RIDE_ADMIN_DIEGO'),
       ),
       (
         name: 'Alex Yánez',
         email: 'alexyanez1119@gmail.com',
         role: UserRole.admin,
-        password: 'Ride-CkqHITiz95tB!',
+        password: String.fromEnvironment('RIDE_ADMIN_ALEX'),
       ),
       (
         name: 'Mayuri Remache',
         email: 'mayuriremache0@gmail.com',
         role: UserRole.admin,
-        password: 'Ride-cPSllOM2gdOa!',
+        password: String.fromEnvironment('RIDE_ADMIN_MAYURI'),
       ),
       (
         name: 'Javier Conforme',
         email: 'javierconforme18@gmail.com',
         role: UserRole.admin,
-        password: 'Ride-R3JntuNSP--2!',
+        password: String.fromEnvironment('RIDE_ADMIN_JAVIER'),
       ),
     ];
 
     return {
       for (final (index, member) in team.indexed)
-        member.email: _Account(
-          password: member.password,
-          user: AppUser(
-            id: 'admin-${index + 1}',
-            name: member.name,
-            email: member.email,
-            phone: 'ADMIN',
-            role: member.role,
-            isVerified: true,
-            createdAt: DateTime(2026, 8, 24),
+        if (member.password.isNotEmpty)
+          member.email: _Account(
+            password: member.password,
+            user: AppUser(
+              id: 'admin-${index + 1}',
+              name: member.name,
+              email: member.email,
+              phone: 'ADMIN',
+              role: member.role,
+              isVerified: true,
+              createdAt: DateTime(2026, 8, 24),
+            ),
           ),
-        ),
     };
   }
 
