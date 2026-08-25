@@ -1,7 +1,7 @@
 /// Validaciones de formularios en español, compartidas por login y registro.
 abstract final class Validators {
   static final RegExp _email = RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$');
-  static final RegExp _phone = RegExp(r'^[0-9+\s-]{7,15}$');
+  static final RegExp _phone = RegExp(r'^[0-9+\s-]{8,15}$');
   static final RegExp _plate = RegExp(r'^[A-Z]{3}-?[0-9]{3,4}$');
 
   static String? required(String? value, {String campo = 'Este campo'}) {
@@ -30,14 +30,11 @@ abstract final class Validators {
     return null;
   }
 
+  /// Misma regla que `/api/register` en WEB-RIDE: mínimo 8 caracteres.
   static String? password(String? value) {
     final vacio = required(value, campo: 'La contraseña');
     if (vacio != null) return vacio;
     if (value!.length < 8) return 'Usa al menos 8 caracteres';
-    if (!value.contains(RegExp(r'[A-Za-z]')) ||
-        !value.contains(RegExp(r'[0-9]'))) {
-      return 'Combina letras y números';
-    }
     return null;
   }
 
@@ -47,10 +44,6 @@ abstract final class Validators {
     final vacio = required(value, campo: 'La contraseña');
     if (vacio != null) return vacio;
     if (value!.length < 10) return 'Usa al menos 10 caracteres';
-    if (!value.contains(RegExp(r'[A-Za-z]')) ||
-        !value.contains(RegExp(r'[0-9]'))) {
-      return 'Combina letras y números';
-    }
     return null;
   }
 

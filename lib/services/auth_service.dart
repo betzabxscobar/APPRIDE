@@ -112,14 +112,12 @@ class AuthService extends ChangeNotifier {
 
   /// Inicia sesión.
   ///
-  /// Si se envía [expectedRole] se valida que la cuenta tenga ese rol, para
-  /// que quien eligió "Conduzco" no entre por error a la vista de pasajero.
-  /// Las cuentas administrativas ignoran ese filtro: entran a su panel sin
-  /// importar la pestaña seleccionada.
+  /// Igual que `/api/login` en WEB-RIDE: solo correo y contraseña. El rol no
+  /// se elige al entrar, lo define la cuenta y con él la app decide si abre el
+  /// home de pasajero, el de conductor o el panel administrativo.
   Future<AppUser> signIn({
     required String email,
     required String password,
-    UserRole? expectedRole,
   }) async {
     return _run(() async {
       final key = _normalize(email);
@@ -127,25 +125,19 @@ class AuthService extends ChangeNotifier {
 
       // Mismo mensaje genérico del backend web: no revela si el correo existe.
       if (account == null || account.password != password) {
-        throw const AuthException('Correo o contraseña incorrectos');
+        throw const AuthException('Correo o contraseña incorrectos.');
       }
 
-      final user = account.user;
-      if (expectedRole != null &&
-          !user.role.isAdministrative &&
-          user.role != expectedRole) {
-        throw AuthException(
-          'Esta cuenta está registrada como ${user.role.displayName}. '
-          'Cambia de opción para continuar.',
-        );
-      }
-
-      _currentUser = user;
-      return user;
+      _currentUser = account.user;
+      return account.user;
     });
   }
 
-  /// Crea una cuenta nueva. [vehicle] es obligatorio si [role] es conductor.
+  /// Crea una cuenta nueva.
+  ///
+  /// Pide los mismos datos que `/api/register`: nombre, correo, teléfono,
+  /// contraseña y rol. El vehículo del conductor se registra después, desde su
+  /// perfil, para no alargar el formulario de alta.
   Future<AppUser> register({
     required String name,
     required String email,
@@ -165,12 +157,8 @@ class AuthService extends ChangeNotifier {
         );
       }
       if (_accounts.containsKey(key)) {
-        throw const AuthException('Este correo ya tiene una cuenta');
+        throw const AuthException('Este correo ya tiene una cuenta.');
       }
-      if (role.isDriver && vehicle == null) {
-        throw const AuthException('Registra los datos de tu vehículo');
-      }
-
       final user = AppUser(
         id: 'u-${DateTime.now().microsecondsSinceEpoch}',
         name: name.trim(),

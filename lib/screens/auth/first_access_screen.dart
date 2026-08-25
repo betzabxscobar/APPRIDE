@@ -6,12 +6,13 @@ import '../../core/validators.dart';
 import '../../models/app_user.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/auth_feedback.dart';
+import '../../widgets/auth_widgets.dart';
 import '../../widgets/ride_logo.dart';
 import '../../widgets/ride_text_field.dart';
 
 /// Primer acceso administrativo: obliga a reemplazar la contraseña temporal
 /// antes de entrar al panel. Es el equivalente del `FirstAccessForm` de
-/// WEB-RIDE y consume el mismo flujo de `/api/change-password`.
+/// WEB-RIDE y aplica las mismas reglas que `/api/change-password`.
 class FirstAccessScreen extends StatefulWidget {
   const FirstAccessScreen({super.key, required this.user});
 
@@ -58,139 +59,140 @@ class _FirstAccessScreenState extends State<FirstAccessScreen> {
     }
   }
 
-  Future<void> _signOut() async {
-    await AuthService.instance.signOut();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.welcomeGradient),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(gradient: AppColors.brandPanel),
         child: SafeArea(
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-              children: [
-                const Center(child: RideMark(size: 52)),
-                const SizedBox(height: 24),
-                Center(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
                   child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: const BoxDecoration(
-                      color: AppColors.purpleSoft,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.shield_outlined,
-                      color: AppColors.purple,
-                      size: 26,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  'PRIMER ACCESO ADMINISTRATIVO',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    letterSpacing: 1.2,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.purple,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Crea tu contraseña personal',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Hola, ${widget.user.name}. Por seguridad debes reemplazar '
-                  'la contraseña temporal antes de entrar al panel.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    height: 1.4,
-                    color: AppColors.inkMuted,
-                  ),
-                ),
-                const SizedBox(height: 28),
-                RidePasswordField(
-                  label: 'Nueva contraseña',
-                  hint: 'Mínimo 10 caracteres',
-                  controller: _passwordController,
-                  validator: Validators.adminPassword,
-                  enabled: !_submitting,
-                ),
-                const SizedBox(height: 16),
-                RidePasswordField(
-                  label: 'Confirmar contraseña',
-                  hint: 'Repite tu contraseña',
-                  controller: _confirmController,
-                  validator: (v) => Validators.confirmPassword(
-                    v,
-                    _passwordController.text,
-                  ),
-                  textInputAction: TextInputAction.done,
-                  enabled: !_submitting,
-                  onSubmitted: (_) => _submit(),
-                ),
-                const SizedBox(height: 20),
-                if (_error != null) ...[
-                  ErrorBanner(message: _error!),
-                  const SizedBox(height: 16),
-                ],
-                FilledButton(
-                  onPressed: _submitting ? null : _submit,
-                  child: _submitting
-                      ? const ButtonSpinner()
-                      : const Text('Guardar y entrar'),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: _submitting ? null : _signOut,
-                  child: const Text('Cerrar sesión'),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(AppTheme.radius),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: const Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 18,
-                        color: AppColors.inkMuted,
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'La contraseña temporal deja de funcionar apenas '
-                          'guardes la nueva.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            height: 1.4,
-                            color: AppColors.inkMuted,
-                          ),
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x3D000000),
+                          blurRadius: 70,
+                          offset: Offset(0, 24),
                         ),
+                      ],
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: RideWordmark(markSize: 37, fontSize: 22),
+                          ),
+                          const SizedBox(height: 30),
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: AppColors.greenSoft,
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                '◇',
+                                style: TextStyle(
+                                  fontSize: 25,
+                                  color: Color(0xFF1BA68C),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          const AuthEyebrow(
+                            'PRIMER ACCESO ADMINISTRATIVO',
+                            color: Color(0xFF188CB7),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8, bottom: 12),
+                            child: Text(
+                              'Crea tu contraseña personal',
+                              style: AppTheme.display(30, height: 1.2),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 24),
+                            child: Text(
+                              'Hola, ${widget.user.name}. Por seguridad debes '
+                              'reemplazar la contraseña temporal antes de '
+                              'entrar al panel.',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                height: 1.6,
+                                color: AppColors.inkMuted,
+                              ),
+                            ),
+                          ),
+                          RidePasswordField(
+                            label: 'Nueva contraseña',
+                            hint: 'Mínimo 10 caracteres',
+                            controller: _passwordController,
+                            validator: Validators.adminPassword,
+                            enabled: !_submitting,
+                          ),
+                          const SizedBox(height: 15),
+                          RidePasswordField(
+                            label: 'Confirmar contraseña',
+                            hint: 'Repite tu contraseña',
+                            controller: _confirmController,
+                            validator: (v) => Validators.confirmPassword(
+                              v,
+                              _passwordController.text,
+                            ),
+                            textInputAction: TextInputAction.done,
+                            enabled: !_submitting,
+                            onSubmitted: (_) => _submit(),
+                          ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 15),
+                            ErrorBanner(message: _error!),
+                          ],
+                          const SizedBox(height: 15),
+                          PrimaryAction(
+                            label: _submitting
+                                ? 'Guardando…'
+                                : 'Guardar y entrar',
+                            loading: _submitting,
+                            onPressed: _submit,
+                          ),
+                          const SizedBox(height: 18),
+                          Center(
+                            child: InkWell(
+                              onTap: _submitting
+                                  ? null
+                                  : () => AuthService.instance.signOut(),
+                              child: const Padding(
+                                padding: EdgeInsets.all(4),
+                                child: Text(
+                                  'Cerrar sesión',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF748491),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),

@@ -11,7 +11,7 @@ enum UserRole {
   passenger(
     id: 'passenger',
     label: 'Viajo',
-    description: 'Necesito un viaje',
+    description: 'Quiero solicitar viajes',
     icon: Icons.person_outline,
     accent: AppColors.primary,
     accentSoft: AppColors.primarySoft,
@@ -19,7 +19,7 @@ enum UserRole {
   driver(
     id: 'driver',
     label: 'Conduzco',
-    description: 'Ofrezco viajes',
+    description: 'Quiero ofrecer viajes',
     icon: Icons.drive_eta_outlined,
     accent: AppColors.green,
     accentSoft: AppColors.greenSoft,

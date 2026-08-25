@@ -4,7 +4,7 @@ import 'core/app_theme.dart';
 import 'services/auth_service.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/auth/first_access_screen.dart';
-import 'screens/auth/welcome_screen.dart';
+import 'screens/auth/auth_screen.dart';
 import 'screens/home/driver_home_screen.dart';
 import 'screens/home/passenger_home_screen.dart';
 
@@ -28,9 +28,10 @@ class RideApp extends StatelessWidget {
 
 /// Decide qué pantalla mostrar según la sesión y el rol activo.
 ///
-/// Las pantallas de login/registro se abren encima de [WelcomeScreen] y al
-/// autenticarse hacen `popUntil(isFirst)`, de modo que esta raíz vuelve a
-/// construirse ya con el usuario listo.
+/// Mientras no hay sesión se muestra [AuthScreen], que alterna bienvenida,
+/// login y registro dentro de la misma pantalla igual que `App.tsx` en
+/// WEB-RIDE. Al autenticarse, [AuthService] notifica y esta raíz reconstruye
+/// con el usuario listo.
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -41,7 +42,7 @@ class AuthGate extends StatelessWidget {
       builder: (context, _) {
         final user = AuthService.instance.currentUser;
 
-        if (user == null) return const WelcomeScreen();
+        if (user == null) return const AuthScreen();
 
         // Cuentas administrativas: primero la contraseña definitiva, después
         // el panel. Es el mismo orden que aplica WEB-RIDE.
