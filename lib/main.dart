@@ -59,15 +59,26 @@ class AuthGate extends StatelessWidget {
 
         // Cuentas administrativas: primero la contraseña definitiva, después
         // el panel. Es el mismo orden que aplica WEB-RIDE.
-        if (user.role.isAdministrative) {
-          return user.mustChangePassword
-              ? FirstAccessScreen(key: ValueKey('first-${user.id}'), user: user)
-              : AdminDashboardScreen(key: ValueKey(user.id), user: user);
+        if (user.role.isAdministrative && user.mustChangePassword) {
+          return FirstAccessScreen(key: ValueKey('first-${user.id}'), user: user);
         }
 
-        return user.role.isDriver
-            ? DriverHomeScreen(key: ValueKey(user.id), user: user)
-            : PassengerHomeScreen(key: ValueKey(user.id), user: user);
+        // La pantalla la decide la vista activa, no el rol: un administrador
+        // puede estar mirando la interfaz de pasajero o de conductor. El rol
+        // real de la cuenta no cambia nunca.
+        final view = AuthService.instance.activeView;
+
+        if (view.isAdministrative) {
+          return AdminDashboardScreen(
+            key: ValueKey('admin-${user.id}-${view.id}'),
+            user: user,
+            viewAs: view,
+          );
+        }
+
+        return view.isDriver
+            ? DriverHomeScreen(key: ValueKey('driver-${user.id}'), user: user)
+            : PassengerHomeScreen(key: ValueKey('passenger-${user.id}'), user: user);
       },
     );
   }
