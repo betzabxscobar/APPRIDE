@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../widgets/auth_shell.dart';
+import 'forgot_password_screen.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 import 'welcome_screen.dart';
@@ -10,7 +11,7 @@ import 'welcome_screen.dart';
 /// Es el mismo estado `screen` que maneja `App.tsx` en WEB-RIDE: bienvenida,
 /// inicio de sesión y registro viven en una sola pantalla y se intercambian
 /// dentro del panel del formulario.
-enum AuthStep { welcome, login, register }
+enum AuthStep { welcome, login, register, forgot }
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -37,6 +38,11 @@ class _AuthScreenState extends State<AuthScreen> {
             key: const ValueKey(AuthStep.login),
             onBack: () => _go(AuthStep.welcome),
             onRegister: () => _go(AuthStep.register),
+            onForgotPassword: () => _go(AuthStep.forgot),
+          ),
+        AuthStep.forgot => ForgotPasswordBox(
+            key: const ValueKey(AuthStep.forgot),
+            onBack: () => _go(AuthStep.login),
           ),
         AuthStep.register => RegisterBox(
             key: const ValueKey(AuthStep.register),
