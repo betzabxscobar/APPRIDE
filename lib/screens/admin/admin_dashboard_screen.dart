@@ -43,14 +43,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _loadUsers();
   }
 
-  void _loadUsers() {
+  bool _loadingUsers = true;
+
+  Future<void> _loadUsers() async {
+    setState(() => _loadingUsers = true);
     try {
+      final users = await AuthService.instance.visibleUsers();
+      if (!mounted) return;
       setState(() {
-        _users = AuthService.instance.visibleUsers();
+        _users = users;
         _error = null;
       });
     } on AuthException catch (e) {
+      if (!mounted) return;
       setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _loadingUsers = false);
     }
   }
 
@@ -117,13 +125,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               user: widget.user,
               users: _users,
               error: _error,
+              loading: _loadingUsers,
               passengers: _countOf(UserRole.passenger),
               drivers: _countOf(UserRole.driver),
               administrators: _countOf(UserRole.admin) +
                   _countOf(UserRole.superadmin),
               onSeeAll: () => setState(() => _section = _Section.usuarios),
             ),
-          _Section.usuarios => _UserList(users: _users, error: _error),
+          _Section.usuarios =>
+            _UserList(users: _users, error: _error, loading: _loadingUsers),
           _ => _Placeholder(
               section: _section,
               onBack: () => setState(() => _section = _Section.resumen),
@@ -308,6 +318,7 @@ class _Overview extends StatelessWidget {
     required this.user,
     required this.users,
     required this.error,
+    required this.loading,
     required this.passengers,
     required this.drivers,
     required this.administrators,
@@ -317,6 +328,7 @@ class _Overview extends StatelessWidget {
   final AppUser user;
   final List<AppUser> users;
   final String? error;
+  final bool loading;
   final int passengers;
   final int drivers;
   final int administrators;
@@ -436,12 +448,14 @@ class _Overview extends StatelessWidget {
         const SizedBox(height: 24),
         _Card(
           title: 'Usuarios registrados',
-          subtitle: 'Información del servicio local actual.',
+          subtitle: 'Información obtenida desde Supabase.',
           action: TextButton(onPressed: onSeeAll, child: const Text('Ver todos')),
           child: Column(
             children: [
               if (error != null)
                 _Note(error!)
+              else if (loading)
+                const _Note('Cargando usuarios…')
               else if (users.isEmpty)
                 const _Note('Todavía no hay cuentas registradas.')
               else
@@ -457,10 +471,15 @@ class _Overview extends StatelessWidget {
 }
 
 class _UserList extends StatelessWidget {
-  const _UserList({required this.users, required this.error});
+  const _UserList({
+    required this.users,
+    required this.error,
+    required this.loading,
+  });
 
   final List<AppUser> users;
   final String? error;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -468,6 +487,12 @@ class _UserList extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.all(20),
         child: _Note(error!),
+      );
+    }
+    if (loading) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: _Note('Cargando usuarios…'),
       );
     }
 
