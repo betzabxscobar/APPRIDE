@@ -199,7 +199,7 @@ class _AdminDrawer extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.asset(
-                      'assets/fonts/logo.png',
+                      'assets/images/logo.png',
                       width: 42,
                       height: 42,
                       fit: BoxFit.cover,

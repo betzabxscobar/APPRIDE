@@ -13,7 +13,7 @@ class RideMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Image.asset(
-      'assets/fonts/logo.png',
+      'assets/images/logo.png',
       width: size,
       height: size,
       fit: BoxFit.contain,
