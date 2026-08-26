@@ -8,6 +8,7 @@ import 'package:ride/models/vehicle.dart';
 import 'package:ride/screens/auth/auth_screen.dart';
 import 'package:ride/services/auth_service.dart';
 import 'package:ride/widgets/auth_shell.dart';
+import 'package:ride/widgets/panel_switcher.dart';
 
 /// Pruebas de la app tras conectar Supabase.
 ///
@@ -180,7 +181,66 @@ void main() {
     });
   });
 
+  group('Acceso entre paneles', () {
+    test('El superadmin llega a los cuatro paneles', () {
+      expect(UserRole.superadmin.viewsAllowed(), [
+        UserRole.superadmin,
+        UserRole.admin,
+        UserRole.passenger,
+        UserRole.driver,
+      ]);
+    });
+
+    test('El admin NO puede abrir la vista de superadmin', () {
+      final vistas = UserRole.admin.viewsAllowed();
+      expect(vistas.contains(UserRole.superadmin), isFalse);
+      // Sí conserva su panel y las dos vistas operativas.
+      expect(vistas, [UserRole.admin, UserRole.passenger, UserRole.driver]);
+    });
+
+    test('Ningún rol no administrativo alcanza un panel administrativo', () {
+      for (final rol in [UserRole.passenger, UserRole.driver]) {
+        final vistas = rol.viewsAllowed(hasVehicle: true);
+        expect(vistas.any((v) => v.isAdministrative), isFalse, reason: rol.id);
+      }
+    });
+
+    test('Todos pueden volver a su propio panel', () {
+      for (final rol in UserRole.values) {
+        expect(rol.viewsAllowed(hasVehicle: true), contains(rol),
+            reason: rol.id);
+      }
+    });
+
+    test('Un pasajero sin vehículo no puede abrir la vista de chofer', () {
+      expect(UserRole.passenger.viewsAllowed(), [UserRole.passenger]);
+      expect(UserRole.passenger.viewsAllowed(hasVehicle: true),
+          [UserRole.passenger, UserRole.driver]);
+    });
+  });
+
+  group('Etiquetas de panel', () {
+    test('Cada vista se nombra como pantalla, no como rol', () {
+      // Importa la distinción: un superadmin que abre la vista de pasajero no
+      // pasa a ser pasajero, solo mira esa pantalla.
+      expect(panelLabel(UserRole.superadmin), 'Panel de superadmin');
+      expect(panelLabel(UserRole.admin), 'Panel de administración');
+      expect(panelLabel(UserRole.passenger), 'Vista de usuario');
+      expect(panelLabel(UserRole.driver), 'Vista de chofer');
+    });
+  });
+
   group('AuthService', () {
+    test('Sin sesión no hay vistas disponibles', () {
+      expect(AuthService.instance.availableViews, isEmpty);
+    });
+
+    test('Sin sesión, cambiar de vista no hace nada', () {
+      // No debe lanzar: simplemente no hay nada que cambiar.
+      AuthService.instance.switchView(UserRole.admin);
+      expect(AuthService.instance.isViewingOtherPanel, isFalse);
+    });
+
     test('El registro rechaza roles administrativos antes de salir a la red',
         () async {
       // La validación es local, así que no necesita sesión ni conexión: el
