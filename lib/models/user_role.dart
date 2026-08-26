@@ -76,6 +76,28 @@ enum UserRole {
         UserRole.superadmin => 'Superadministrador',
       };
 
+  /// Vistas a las que puede entrar una cuenta con este rol.
+  ///
+  /// Es la regla central del cambio de panel, aparte a propósito para poder
+  /// probarla sin sesión:
+  ///
+  /// - `superadmin`: su panel, el panel visto como admin, usuario y chofer.
+  /// - `admin`: su panel, usuario y chofer. **Nunca** la vista de superadmin.
+  /// - `driver`: chofer y usuario.
+  /// - `passenger`: usuario, y chofer solo si ya registró un vehículo.
+  ///
+  /// Esto decide qué se ofrece en pantalla. Los permisos sobre los datos los
+  /// sigue resolviendo RLS con el rol real de la cuenta.
+  List<UserRole> viewsAllowed({bool hasVehicle = false}) {
+    return switch (this) {
+      UserRole.superadmin => const [superadmin, admin, passenger, driver],
+      UserRole.admin => const [admin, passenger, driver],
+      UserRole.driver => const [driver, passenger],
+      UserRole.passenger =>
+        hasVehicle ? const [passenger, driver] : const [passenger],
+    };
+  }
+
   static UserRole fromId(String id) {
     return UserRole.values.firstWhere(
       (role) => role.id == id,

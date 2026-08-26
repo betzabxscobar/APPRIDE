@@ -61,6 +61,7 @@ class AuthService extends ChangeNotifier {
     _client.auth.onAuthStateChange.listen((state) {
       if (state.event == sb.AuthChangeEvent.signedOut) {
         _currentUser = null;
+        _activeView = null;
         notifyListeners();
       }
     });
@@ -235,30 +236,77 @@ class AuthService extends ChangeNotifier {
       await _client.auth.signOut();
     } finally {
       _currentUser = null;
+      _activeView = null;
       _setLoading(false);
     }
   }
 
-  /// Cambia el modo activo de la sesión (Modo conductor / Modo pasajero).
-  ///
-  /// Es un cambio local: no toca `profiles.role`. El trigger
-  /// `prevent_role_self_edit()` impide que nadie se cambie el rol a sí mismo,
-  /// que es justo lo que evita una escalada de privilegios. Al cerrar sesión
-  /// la app vuelve al rol que tiene la cuenta en la base.
-  void switchRole(UserRole role) {
+  // ---------------------------------------------------------------------------
+  // Vista activa
+  //
+  // El rol real de la cuenta (`currentUser.role`) sale de `public.profiles` y
+  // NUNCA se toca aquí: el trigger `prevent_role_self_edit()` impide que nadie
+  // se cambie el rol a sí mismo, y las políticas RLS resuelven los permisos con
+  // `current_user_role()`, que lee esa tabla.
+  //
+  // Lo que cambia es solo qué pantalla se muestra. Un admin que abre la vista
+  // de pasajero sigue siendo admin para la base de datos; ve la interfaz con
+  // sus propios datos, no con los de otra persona.
+  // ---------------------------------------------------------------------------
+
+  UserRole? _activeView;
+
+  /// Pantalla que se está mostrando. Por defecto, la que corresponde al rol.
+  UserRole get activeView => _activeView ?? _currentUser?.role ?? UserRole.passenger;
+
+  /// `true` cuando se está viendo una pantalla distinta a la del rol real.
+  bool get isViewingOtherPanel {
     final user = _currentUser;
-    if (user == null || user.role == role) return;
-    if (user.role.isAdministrative || role.isAdministrative) {
-      throw const AuthException(
-        'Las cuentas administrativas no cambian de modo',
+    return user != null && _activeView != null && _activeView != user.role;
+  }
+
+  /// Vistas a las que puede entrar la sesión actual, en orden de presentación.
+  ///
+  /// - `superadmin`: su panel, el panel visto como admin, pasajero y conductor.
+  /// - `admin`: su panel, pasajero y conductor. Nunca la vista de superadmin.
+  /// - `driver`: conductor y pasajero.
+  /// - `passenger`: pasajero, y conductor solo si ya registró un vehículo.
+  List<UserRole> get availableViews {
+    final user = _currentUser;
+    if (user == null) return const [];
+
+    return user.role.viewsAllowed(hasVehicle: user.vehicle != null);
+  }
+
+  /// Cambia la pantalla activa dentro de lo que permite el rol real.
+  void switchView(UserRole view) {
+    final user = _currentUser;
+    if (user == null || activeView == view) return;
+
+    if (!availableViews.contains(view)) {
+      // El caso que más importa: un admin no puede abrir la vista de
+      // superadmin. La comprobación es genérica para no dejar huecos.
+      throw AuthException(
+        view.isAdministrative
+            ? 'Tu cuenta no tiene acceso a ese panel'
+            : 'No puedes abrir esa vista',
       );
     }
-    if (role.isDriver && user.vehicle == null) {
+
+    if (view.isDriver && !user.role.isAdministrative && user.vehicle == null) {
       throw const AuthException(
         'Para conducir necesitas registrar tu vehículo primero',
       );
     }
-    _currentUser = user.copyWith(role: role);
+
+    _activeView = view == user.role ? null : view;
+    notifyListeners();
+  }
+
+  /// Vuelve a la pantalla que corresponde al rol real de la cuenta.
+  void resetView() {
+    if (_activeView == null) return;
+    _activeView = null;
     notifyListeners();
   }
 
