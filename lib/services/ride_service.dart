@@ -186,11 +186,17 @@ class RideService {
   Future<void> cancelar(String viajeId) =>
       _rpc<void>('cancelar_viaje', {'p_viaje_id': viajeId});
 
-  Future<void> reportarPosicion(String viajeId, double lat, double lng) =>
+  /// Reporta dónde está el chofer.
+  ///
+  /// El viaje es opcional a propósito: un chofer en línea sin viaje asignado
+  /// también necesita ser localizable, porque la difusión de solicitudes solo
+  /// le llega si tiene una posición reciente. Cuando sí hay viaje, además queda
+  /// el rastro en `public.ubicaciones`.
+  Future<void> reportarPosicion(double lat, double lng, [String? viajeId]) =>
       _rpc<void>('reportar_posicion', {
-        'p_viaje_id': viajeId,
         'p_lat': lat,
         'p_lng': lng,
+        'p_viaje_id': viajeId,
       });
 
   /// Pone al chofer en línea o fuera de línea.
