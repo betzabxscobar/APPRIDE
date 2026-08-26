@@ -2,6 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Ubicacion: punto de recogida del pasajero y posicion del chofer. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Ride usa tu ubicacion para saber donde recogerte y seguir el viaje en tiempo real.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
