@@ -48,3 +48,7 @@ app.*.map.json
 # se entregan por separado y se pasan al compilar con --dart-define-from-file.
 # La plantilla sin valores sí se versiona.
 /config/credenciales-administrativas.json
+
+# Configuracion local de herramientas de desarrollo. Lleva rutas absolutas de
+# la maquina de cada quien, asi que no sirve compartirla.
+.claude/
