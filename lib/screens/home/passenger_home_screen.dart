@@ -5,6 +5,8 @@ import '../../core/app_colors.dart';
 import '../../core/app_theme.dart';
 import '../../models/app_user.dart';
 import '../../models/trip.dart';
+import '../../screens/notifications/notifications_screen.dart';
+import '../../screens/payments/payment_methods_screen.dart';
 import '../../screens/trips/request_trip_screen.dart';
 import '../../screens/trips/trip_tracking_screen.dart';
 import '../../services/ride_service.dart';
@@ -102,6 +104,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                     ],
                   ),
                 ),
+                const NotificationsBell(),
                 IconButton(
                   onPressed: () => showAccountSheet(context, user),
                   icon: const Icon(Icons.person_outline),
@@ -154,6 +157,19 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                 label: const Text('Pedir un viaje'),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(52),
+                ),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const PaymentMethodsScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.account_balance_wallet_outlined, size: 19),
+                label: const Text('Métodos de pago'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
                 ),
               ),
             ],

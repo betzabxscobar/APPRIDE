@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
@@ -5,7 +7,10 @@ import '../../core/app_colors.dart';
 import '../../core/app_theme.dart';
 import '../../models/app_user.dart';
 import '../../models/trip.dart';
+import '../../screens/driver/driver_profile_screen.dart';
+import '../../screens/notifications/notifications_screen.dart';
 import '../../screens/trips/driver_trips_screen.dart';
+import '../../services/location_service.dart';
 import '../../services/ride_service.dart';
 import '../../widgets/panel_switcher.dart';
 import '../../widgets/ride_card.dart';
@@ -42,6 +47,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   @override
   void dispose() {
+    _latido?.cancel();
     final canal = _canal;
     if (canal != null) RideService.instance.cerrarCanal(canal);
     super.dispose();
@@ -51,7 +57,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     try {
       final estado = await RideService.instance.estadoConductor();
       final activo = await RideService.instance.viajeActivo();
-      if (mounted) setState(() { _estado = estado; _activo = activo; });
+      if (mounted) {
+        setState(() { _estado = estado; _activo = activo; });
+        _ajustarLatido();
+      }
     } catch (_) {
       // Sin conexión la pantalla sigue usable.
     }
@@ -69,6 +78,52 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     } finally {
       if (mounted) setState(() => _cambiando = false);
     }
+  }
+
+  Timer? _latido;
+
+  /// Mientras el chofer está en línea, la app reporta su posición cada minuto.
+  ///
+  /// No es un adorno: la política `viajes_difusion_conductores` solo le muestra
+  /// solicitudes si tiene una posición de los últimos 10 minutos. Sin este
+  /// latido, se pondría «en línea» y no le llegaría ningún viaje.
+  void _ajustarLatido() {
+    final debeReportar = _estado.disponible && _estado.puedeTrabajar;
+
+    if (!debeReportar) {
+      _latido?.cancel();
+      _latido = null;
+      return;
+    }
+    if (_latido != null) return;
+
+    _reportarPosicion();
+    _latido = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _reportarPosicion(),
+    );
+  }
+
+  Future<void> _reportarPosicion() async {
+    try {
+      final pos = await LocationService.instance.posicionActual();
+      await RideService.instance.reportarPosicion(
+        pos.lat,
+        pos.lng,
+        _activo?.id,
+      );
+    } catch (_) {
+      // Si el GPS falla puntualmente no se interrumpe la jornada: el siguiente
+      // latido lo reintenta. Lo que sí se nota es que dejan de llegar viajes,
+      // y para eso está el aviso de la pantalla.
+    }
+  }
+
+  Future<void> _abrirPerfil() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const DriverProfileScreen()),
+    );
+    await _cargar();
   }
 
   Future<void> _abrirViajes() async {
@@ -205,6 +260,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 minimumSize: const Size.fromHeight(50),
               ),
             ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _abrirPerfil,
+              icon: const Icon(Icons.badge_outlined, size: 19),
+              label: Text(
+                _estado.puedeTrabajar
+                    ? 'Mi vehículo y documentos'
+                    : 'Completar mi cuenta de chofer',
+              ),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(46),
+              ),
+            ),
             const SizedBox(height: 18),
             Row(
               children: [
@@ -226,6 +294,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   ),
                 ),
                 const Spacer(),
+                const NotificationsBell(),
                 IconButton(
                   onPressed: () => showAccountSheet(context, user),
                   icon: const Icon(Icons.person_outline),
