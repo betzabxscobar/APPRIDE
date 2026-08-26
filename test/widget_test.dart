@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ride/main.dart';
 import 'package:ride/models/app_user.dart';
+import 'package:ride/models/fleet.dart';
 import 'package:ride/models/trip.dart';
 import 'package:ride/models/user_role.dart';
 import 'package:ride/models/vehicle.dart';
@@ -230,6 +231,73 @@ void main() {
       expect(TripStatus.aceptado.progreso,
           lessThan(TripStatus.enCurso.progreso));
       expect(TripStatus.finalizado.progreso, 1);
+    });
+  });
+
+  group('Flota y documentos', () {
+    test('Los tres tipos coinciden con el CHECK de la base', () {
+      expect(DocumentType.values.map((d) => d.id).toList(),
+          ['licencia', 'SOAT', 'matricula']);
+    });
+
+    test('Los estados coinciden con el CHECK de la base', () {
+      expect(DocumentStatus.values.map((d) => d.id).toList(),
+          ['pendiente', 'aprobado', 'rechazado']);
+    });
+
+    test('Un tipo o estado desconocido no rompe la app', () {
+      expect(DocumentType.fromId('pasaporte'), DocumentType.licencia);
+      expect(DocumentStatus.fromId('raro'), DocumentStatus.pendiente);
+    });
+
+    test('El resumen del vehículo se arma para mostrarlo al pasajero', () {
+      const v = FleetVehicle(
+        id: 'v-1', placa: 'ABC-1234', marca: 'Kia', modelo: 'Rio',
+        anio: 2022, activo: true, color: 'Blanco',
+      );
+      expect(v.resumen, 'Kia Rio · 2022');
+    });
+  });
+
+  group('Métodos de pago', () {
+    test('El efectivo se describe sin exponer nada', () {
+      const m = PaymentMethod(id: 'm-1', tipo: 'efectivo', predeterminado: true);
+      expect(m.esEfectivo, isTrue);
+      expect(m.label, 'Efectivo');
+      expect(m.descripcion, 'Pagas al llegar');
+    });
+
+    test('De la tarjeta solo se muestran los últimos caracteres del token', () {
+      // Nunca es un número de tarjeta: la base rechaza cualquier cosa con
+      // forma de PAN. Aun así, del token tampoco se enseña todo.
+      const m = PaymentMethod(
+        id: 'm-2', tipo: 'tarjeta', predeterminado: false,
+        detalle: 'tok_abc123XYZ9',
+      );
+      expect(m.descripcion, '···· XYZ9');
+      expect(m.descripcion.contains('tok_abc'), isFalse);
+    });
+
+    test('Un token muy corto no se recorta a la fuerza', () {
+      const m = PaymentMethod(
+        id: 'm-3', tipo: 'tarjeta', predeterminado: false, detalle: 'ab',
+      );
+      expect(m.descripcion, 'Tarjeta guardada');
+    });
+  });
+
+  group('Notificaciones', () {
+    AppNotification aviso(Duration antiguedad) => AppNotification(
+          id: 'n-1', titulo: 'Chofer asignado', mensaje: 'Va en camino',
+          leida: false, fecha: DateTime.now().subtract(antiguedad),
+        );
+
+    test('El texto relativo se adapta a la antigüedad', () {
+      expect(aviso(const Duration(seconds: 20)).cuando, 'ahora');
+      expect(aviso(const Duration(minutes: 5)).cuando, 'hace 5 min');
+      expect(aviso(const Duration(hours: 3)).cuando, 'hace 3 h');
+      expect(aviso(const Duration(days: 1, hours: 1)).cuando, 'ayer');
+      expect(aviso(const Duration(days: 4)).cuando, 'hace 4 días');
     });
   });
 
