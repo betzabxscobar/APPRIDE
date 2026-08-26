@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../../core/app_colors.dart';
+import '../../core/app_theme.dart';
 import '../../models/app_user.dart';
+import '../../models/trip.dart';
+import '../../screens/trips/driver_trips_screen.dart';
+import '../../services/ride_service.dart';
 import '../../widgets/panel_switcher.dart';
 import '../../widgets/ride_card.dart';
 import 'account_sheet.dart';
@@ -18,7 +23,60 @@ class DriverHomeScreen extends StatefulWidget {
 }
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
-  bool _available = true;
+  sb.RealtimeChannel? _canal;
+  DriverState _estado = const DriverState.sinCuenta();
+  Trip? _activo;
+  bool _cambiando = false;
+
+  /// Refleja el estado real guardado en `public.conductores`, no una bandera
+  /// local: antes el interruptor cambiaba de color sin que el servidor se
+  /// enterara, así que la pantalla mentía.
+  bool get _available => _estado.disponible;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+    _canal = RideService.instance.escucharViajes(_cargar);
+  }
+
+  @override
+  void dispose() {
+    final canal = _canal;
+    if (canal != null) RideService.instance.cerrarCanal(canal);
+    super.dispose();
+  }
+
+  Future<void> _cargar() async {
+    try {
+      final estado = await RideService.instance.estadoConductor();
+      final activo = await RideService.instance.viajeActivo();
+      if (mounted) setState(() { _estado = estado; _activo = activo; });
+    } catch (_) {
+      // Sin conexión la pantalla sigue usable.
+    }
+  }
+
+  Future<void> _cambiarDisponibilidad(bool valor) async {
+    setState(() => _cambiando = true);
+    try {
+      await RideService.instance.cambiarDisponibilidad(valor);
+      await _cargar();
+    } on RideException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _cambiando = false);
+    }
+  }
+
+  Future<void> _abrirViajes() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const DriverTripsScreen()),
+    );
+    await _cargar();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,12 +119,93 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     value: _available,
                     activeThumbColor: Colors.white,
                     activeTrackColor: AppColors.primary,
-                    onChanged: (v) => setState(() => _available = v),
+                    onChanged: (_cambiando || !_estado.puedeTrabajar)
+                        ? null
+                        : _cambiarDisponibilidad,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
+            if (!_estado.puedeTrabajar && _estado.motivoBloqueo.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(
+                  color: AppColors.purpleSoft,
+                  borderRadius: BorderRadius.circular(AppTheme.radius),
+                ),
+                child: Text(
+                  _estado.motivoBloqueo,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
+            if (_activo != null) ...[
+              InkWell(
+                onTap: _abrirViajes,
+                borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _activo!.status.color.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                    border: Border.all(
+                      color: _activo!.status.color.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.local_taxi, size: 19, color: _activo!.status.color),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _activo!.status.label,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: _activo!.status.color,
+                              ),
+                            ),
+                            Text(
+                              'Hacia ${_activo!.destinoTexto}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.inkMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right,
+                          size: 21, color: AppColors.inkMuted),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
+            FilledButton.icon(
+              onPressed: _abrirViajes,
+              icon: const Icon(Icons.list_alt, size: 20),
+              label: Text(
+                _activo != null ? 'Ver mi viaje' : 'Ver solicitudes de viaje',
+              ),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+              ),
+            ),
+            const SizedBox(height: 18),
             Row(
               children: [
                 Container(

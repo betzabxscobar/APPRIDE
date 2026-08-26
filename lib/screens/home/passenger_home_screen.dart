@@ -1,20 +1,74 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../../core/app_colors.dart';
+import '../../core/app_theme.dart';
 import '../../models/app_user.dart';
+import '../../models/trip.dart';
+import '../../screens/trips/request_trip_screen.dart';
+import '../../screens/trips/trip_tracking_screen.dart';
+import '../../services/ride_service.dart';
 import '../../widgets/panel_switcher.dart';
 import '../../widgets/ride_card.dart';
 import 'account_sheet.dart';
 
-/// Home del rol pasajero. Por ahora es la maqueta estática del diseño:
-/// el flujo de reserva se implementa en la siguiente etapa.
-class PassengerHomeScreen extends StatelessWidget {
+/// Home del rol pasajero: punto de entrada para pedir un viaje y seguirlo.
+class PassengerHomeScreen extends StatefulWidget {
   const PassengerHomeScreen({super.key, required this.user});
 
   final AppUser user;
 
   @override
+  State<PassengerHomeScreen> createState() => _PassengerHomeScreenState();
+}
+
+class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
+  sb.RealtimeChannel? _canal;
+  Trip? _activo;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+    // Si el chofer cambia el estado del viaje, la tarjeta se actualiza sola.
+    _canal = RideService.instance.escucharViajes(_cargar);
+  }
+
+  @override
+  void dispose() {
+    final canal = _canal;
+    if (canal != null) RideService.instance.cerrarCanal(canal);
+    super.dispose();
+  }
+
+  Future<void> _cargar() async {
+    try {
+      final viaje = await RideService.instance.viajeActivo();
+      if (mounted) setState(() => _activo = viaje);
+    } catch (_) {
+      // Sin conexión la pantalla sigue usable; el viaje aparece al reintentar.
+    }
+  }
+
+  Future<void> _pedirViaje() async {
+    final id = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const RequestTripScreen()),
+    );
+    if (id == null || !mounted) return;
+    await _abrirSeguimiento(id);
+  }
+
+  Future<void> _abrirSeguimiento(String viajeId) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => TripTrackingScreen(viajeId: viajeId)),
+    );
+    await _cargar();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final user = widget.user;
+
     return Scaffold(
       // Solo aparece si un administrador está mirando esta pantalla; para un
       // pasajero de verdad no ocupa espacio.
@@ -56,27 +110,53 @@ class PassengerHomeScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            RideCard(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Column(
-                children: [
-                  const _DestinationRow(
-                    icon: Icons.place_outlined,
-                    label: '¿A dónde quieres llegar?',
-                  ),
-                  const Divider(height: 1),
-                  _DestinationRow(
-                    icon: Icons.schedule,
-                    label: 'Agregar destino frecuente',
-                    trailing: const Icon(
-                      Icons.chevron_right,
-                      size: 20,
-                      color: AppColors.inkMuted,
-                    ),
-                  ),
-                ],
+            if (_activo != null) ...[
+              _ViajeEnCurso(
+                viaje: _activo!,
+                onAbrir: () => _abrirSeguimiento(_activo!.id),
               ),
-            ),
+              const SizedBox(height: 18),
+            ] else ...[
+              InkWell(
+                onTap: _pedirViaje,
+                borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                child: RideCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Column(
+                    children: [
+                      const _DestinationRow(
+                        icon: Icons.place_outlined,
+                        label: '¿A dónde quieres llegar?',
+                        trailing: Icon(
+                          Icons.chevron_right,
+                          size: 20,
+                          color: AppColors.inkMuted,
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      _DestinationRow(
+                        icon: Icons.my_location,
+                        label: 'Usar mi ubicación como punto de partida',
+                        trailing: const Icon(
+                          Icons.chevron_right,
+                          size: 20,
+                          color: AppColors.inkMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: _pedirViaje,
+                icon: const Icon(Icons.local_taxi, size: 20),
+                label: const Text('Pedir un viaje'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
+              ),
+            ],
             const SizedBox(height: 18),
             const _SafePointCard(),
             const SizedBox(height: 22),
@@ -314,6 +394,69 @@ class _PassengerNavBar extends StatelessWidget {
           label: 'Cuenta',
         ),
       ],
+    );
+  }
+}
+
+/// Tarjeta del viaje en marcha, con acceso directo al seguimiento.
+class _ViajeEnCurso extends StatelessWidget {
+  const _ViajeEnCurso({required this.viaje, required this.onAbrir});
+
+  final Trip viaje;
+  final VoidCallback onAbrir;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onAbrir,
+      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: viaje.status.color.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+          border: Border.all(color: viaje.status.color.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: viaje.status.color,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    viaje.status.label,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w800,
+                      color: viaje.status.color,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Hacia ${viaje.destinoTexto}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.inkMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, size: 22, color: AppColors.inkMuted),
+          ],
+        ),
+      ),
     );
   }
 }
