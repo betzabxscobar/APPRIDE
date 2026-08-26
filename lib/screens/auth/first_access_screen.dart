@@ -90,7 +90,7 @@ class _FirstAccessScreenState extends State<FirstAccessScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Align(
+                          Align(
                             alignment: Alignment.centerLeft,
                             child: RideWordmark(markSize: 37, fontSize: 22),
                           ),

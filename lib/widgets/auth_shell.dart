@@ -54,7 +54,7 @@ class _FormPanel extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const RideWordmark(markSize: 35, fontSize: 22),
+                    RideWordmark(markSize: 35, fontSize: 22),
                     const SizedBox(height: 38),
                     child,
                   ],
@@ -138,7 +138,7 @@ class BrandPanel extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const RideWordmark(color: Colors.white),
+                      RideWordmark(color: Colors.white),
                       SizedBox(height: height * 0.12),
                       _Headline(size: headline),
                       const SizedBox(height: 25),
