@@ -9,6 +9,7 @@ import 'screens/auth/first_access_screen.dart';
 import 'screens/auth/auth_screen.dart';
 import 'screens/home/driver_home_screen.dart';
 import 'screens/home/passenger_home_screen.dart';
+import 'screens/home/welcome_home_screen.dart';
 import 'screens/splash/splash_screen.dart';
 
 Future<void> main() async {
@@ -57,7 +58,13 @@ class _AppRootState extends State<_AppRoot> {
         onDone: () => setState(() => _showSplash = false),
       );
     }
-    return const AuthGate();
+    return WelcomeHomeScreen(
+      onContinue: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AuthGate()),
+        );
+      },
+    );
   }
 }
 
