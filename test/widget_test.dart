@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ride/main.dart';
 import 'package:ride/models/app_user.dart';
+import 'package:ride/models/trip.dart';
 import 'package:ride/models/user_role.dart';
 import 'package:ride/models/vehicle.dart';
 import 'package:ride/screens/auth/auth_screen.dart';
@@ -178,6 +179,57 @@ void main() {
       expect(cambiado.email, original.email);
       expect(cambiado.role, UserRole.driver);
       expect(cambiado.vehicle?.plate, 'ABC-1234');
+    });
+  });
+
+  group('Estados del viaje', () {
+    test('Los nueve estados coinciden con el enum de Postgres', () {
+      // Deben ser exactamente los valores de public.enum_estado_viaje.
+      expect(TripStatus.values.map((e) => e.id).toList(), [
+        'SOLICITADO',
+        'BUSCANDO_CONDUCTOR',
+        'ACEPTADO',
+        'CONDUCTOR_EN_CAMINO',
+        'CONDUCTOR_EN_ORIGEN',
+        'EN_CURSO',
+        'FINALIZADO',
+        'CANCELADO',
+        'SIN_CONDUCTOR',
+      ]);
+    });
+
+    test('Solo finalizado, cancelado y sin chofer cierran el viaje', () {
+      final finales =
+          TripStatus.values.where((e) => e.esFinal).map((e) => e.id).toSet();
+      expect(finales, {'FINALIZADO', 'CANCELADO', 'SIN_CONDUCTOR'});
+    });
+
+    test('Un viaje en curso ya no se puede cancelar', () {
+      // La persona va a bordo: cancelar ahí no tiene sentido, y la funcion
+      // cancelar_viaje() lo rechaza igual del lado del servidor.
+      expect(TripStatus.enCurso.sePuedeCancelar, isFalse);
+      expect(TripStatus.finalizado.sePuedeCancelar, isFalse);
+      expect(TripStatus.solicitado.sePuedeCancelar, isTrue);
+      expect(TripStatus.conductorEnOrigen.sePuedeCancelar, isTrue);
+    });
+
+    test('Solo hay chofer que mostrar desde que acepta y hasta que cierra', () {
+      expect(TripStatus.buscandoConductor.tieneConductor, isFalse);
+      expect(TripStatus.aceptado.tieneConductor, isTrue);
+      expect(TripStatus.enCurso.tieneConductor, isTrue);
+      expect(TripStatus.finalizado.tieneConductor, isFalse);
+    });
+
+    test('Un estado desconocido no rompe la app', () {
+      expect(TripStatus.fromId('ALGO_RARO'), TripStatus.solicitado);
+    });
+
+    test('El progreso avanza con el recorrido', () {
+      expect(TripStatus.solicitado.progreso,
+          lessThan(TripStatus.aceptado.progreso));
+      expect(TripStatus.aceptado.progreso,
+          lessThan(TripStatus.enCurso.progreso));
+      expect(TripStatus.finalizado.progreso, 1);
     });
   });
 
