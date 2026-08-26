@@ -31,6 +31,39 @@ class ErrorBanner extends StatelessWidget {
   }
 }
 
+/// Aviso informativo del formulario.
+///
+/// Mismo bloque que [ErrorBanner] pero en verde: se usa cuando la operación
+/// salió bien y solo falta un paso, como el correo de confirmación tras
+/// registrarse. Mostrar eso en rojo haría creer que el registro falló.
+class NoticeBanner extends StatelessWidget {
+  const NoticeBanner({super.key, required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.greenSoft,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.green),
+      ),
+      child: Text(
+        message,
+        style: const TextStyle(
+          fontSize: 11,
+          height: 1.45,
+          color: AppColors.ink,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
 /// Indicador de carga con el tamaño correcto para ir dentro de un botón.
 class ButtonSpinner extends StatelessWidget {
   const ButtonSpinner({super.key});

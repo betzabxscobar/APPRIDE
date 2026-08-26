@@ -32,6 +32,10 @@ class _RegisterBoxState extends State<RegisterBox> {
   bool _submitting = false;
   String? _error;
 
+  /// Aviso de éxito que no es un error: la cuenta se creó y solo falta que la
+  /// persona abra el correo de confirmación.
+  String? _notice;
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -48,10 +52,13 @@ class _RegisterBoxState extends State<RegisterBox> {
     setState(() {
       _submitting = true;
       _error = null;
+      _notice = null;
     });
 
     try {
-      // Al crear la cuenta la sesión queda abierta y la raíz muestra el home.
+      // Si el proyecto no exige confirmar el correo, la sesión queda abierta
+      // y la raíz muestra el home. Si la exige, `register` lanza
+      // EmailConfirmationRequired: la cuenta existe, pero falta el correo.
       await AuthService.instance.register(
         name: _nameController.text,
         email: _emailController.text,
@@ -59,6 +66,10 @@ class _RegisterBoxState extends State<RegisterBox> {
         password: _passwordController.text,
         role: _role,
       );
+    } on EmailConfirmationRequired catch (e) {
+      if (!mounted) return;
+      // No es un fallo: el registro funcionó. Va en verde, no en rojo.
+      setState(() => _notice = e.message);
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
@@ -85,6 +96,7 @@ class _RegisterBoxState extends State<RegisterBox> {
               onChanged: (role) => setState(() {
                 _role = role;
                 _error = null;
+                _notice = null;
               }),
             ),
             const SizedBox(height: 15),
@@ -129,6 +141,10 @@ class _RegisterBoxState extends State<RegisterBox> {
               onSubmitted: (_) => _submit(),
               autofillHints: const [AutofillHints.newPassword],
             ),
+            if (_notice != null) ...[
+              const SizedBox(height: 14),
+              NoticeBanner(message: _notice!),
+            ],
             if (_error != null) ...[
               const SizedBox(height: 15),
               ErrorBanner(message: _error!),
