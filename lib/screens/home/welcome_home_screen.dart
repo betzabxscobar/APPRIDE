@@ -26,7 +26,7 @@ class WelcomeHomeScreen extends StatelessWidget {
           SizedBox(
             width: size.width,
             height: size.height * 0.60,
-            child: _HeroVisual(),
+            child: const _HeroVisual(),
           ),
 
           // ── Contenido inferior ──
@@ -93,8 +93,60 @@ class WelcomeHomeScreen extends StatelessWidget {
   }
 }
 
-/// Widget hero con imagen de fondo, logo arriba, y personajes superpuestos.
-class _HeroVisual extends StatelessWidget {
+/// Widget hero con imagen de fondo, logo arriba, y personajes superpuestos
+/// con animación de entrada.
+class _HeroVisual extends StatefulWidget {
+  const _HeroVisual();
+
+  @override
+  State<_HeroVisual> createState() => _HeroVisualState();
+}
+
+class _HeroVisualState extends State<_HeroVisual>
+    with TickerProviderStateMixin {
+  late final AnimationController _girlCtrl;
+  late final AnimationController _boyCtrl;
+  late final AnimationController _carCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _girlCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _boyCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _carCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+
+    // Iniciar animaciones con efecto cascada
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) _girlCtrl.forward();
+    });
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _boyCtrl.forward();
+    });
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) _carCtrl.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _girlCtrl.dispose();
+    _boyCtrl.dispose();
+    _carCtrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
@@ -171,40 +223,70 @@ class _HeroVisual extends StatelessWidget {
             ),
           ),
 
-          // ── Chica a la izquierda ──
+          // ── Chica animada (entra desde la izquierda) ──
           Positioned(
             left: 10,
             bottom: 0,
-            child: Image.asset(
-              'assets/images/ChicaDibujo.png',
-              width: 130,
-              fit: BoxFit.contain,
-            ),
-          ),
-
-          // ── Carro al centro-derecha ──
-          Positioned(
-            left: 0,
-            right: -40,
-            bottom: 0,
-            child: Align(
-              alignment: Alignment.bottomRight,
-              child: Image.asset(
-                'assets/images/carroDibujo.png',
-                width: 220,
+            child: AnimatedBuilder(
+              animation: _girlCtrl,
+              builder: (context, child) {
+                final value = Curves.easeOut.transform(_girlCtrl.value);
+                return Transform.translate(
+                  offset: Offset(-200 * (1 - value), 0),
+                  child: child,
+                );
+              },
+              child: const Image(
+                image: AssetImage('assets/images/ChicaDibujo.png'),
+                width: 130,
                 fit: BoxFit.contain,
               ),
             ),
           ),
 
-          // ── Chico a la derecha ──
+          // ── Carro animado (entra desde la derecha) ──
+          Positioned(
+            left: 0,
+            right: 40,
+            bottom: -60,
+            child: Align(
+              alignment: Alignment.bottomRight,
+              child: AnimatedBuilder(
+                animation: _carCtrl,
+                builder: (context, child) {
+                  final value = Curves.easeOut.transform(_carCtrl.value);
+                  return Transform.translate(
+                    offset: Offset(300 * (1 - value), 0),
+                    child: child,
+                  );
+                },
+                child: const Image(
+                  image: AssetImage('assets/images/carroDibujo.png'),
+                  width: 220,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          ),
+
+          // ── Chico animado (entra desde la derecha) ──
           Positioned(
             right: 10,
             bottom: 0,
-            child: Image.asset(
-              'assets/images/ChicoDibujo.png',
-              width: 130,
-              fit: BoxFit.contain,
+            child: AnimatedBuilder(
+              animation: _boyCtrl,
+              builder: (context, child) {
+                final value = Curves.easeOut.transform(_boyCtrl.value);
+                return Transform.translate(
+                  offset: Offset(200 * (1 - value), 0),
+                  child: child,
+                );
+              },
+              child: const Image(
+                image: AssetImage('assets/images/ChicoDibujo.png'),
+                width: 130,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
         ],
