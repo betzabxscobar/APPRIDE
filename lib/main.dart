@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/app_theme.dart';
+import 'core/supabase_config.dart';
 import 'services/auth_service.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/auth/first_access_screen.dart';
@@ -8,7 +10,17 @@ import 'screens/auth/auth_screen.dart';
 import 'screens/home/driver_home_screen.dart';
 import 'screens/home/passenger_home_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // La sesion queda guardada en el dispositivo: al reabrir la app se restaura
+  // sola y el token se refresca solo.
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    publishableKey: SupabaseConfig.publishableKey,
+  );
+  await AuthService.instance.bootstrap();
+
   runApp(const RideApp());
 }
 
@@ -31,7 +43,8 @@ class RideApp extends StatelessWidget {
 /// Mientras no hay sesión se muestra [AuthScreen], que alterna bienvenida,
 /// login y registro dentro de la misma pantalla igual que `App.tsx` en
 /// WEB-RIDE. Al autenticarse, [AuthService] notifica y esta raíz reconstruye
-/// con el usuario listo.
+/// con el usuario listo. La sesión se restaura en `main()` antes del primer
+/// frame, así que aquí no hace falta pantalla de carga.
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
