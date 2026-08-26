@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_colors.dart';
 import '../../models/app_user.dart';
-import '../../models/user_role.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/panel_switcher.dart';
 
 /// Hoja inferior con el perfil, el cambio de rol y el cierre de sesión.
 Future<void> showAccountSheet(BuildContext context, AppUser user) {
@@ -22,20 +22,6 @@ class _AccountSheet extends StatelessWidget {
   const _AccountSheet({required this.user});
 
   final AppUser user;
-
-  UserRole get _otherRole =>
-      user.role.isDriver ? UserRole.passenger : UserRole.driver;
-
-  void _switchRole(BuildContext context) {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      AuthService.instance.switchRole(_otherRole);
-      Navigator.of(context).pop();
-    } on AuthException catch (e) {
-      Navigator.of(context).pop();
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,20 +91,8 @@ class _AccountSheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 20),
-            OutlinedButton.icon(
-              onPressed: () => _switchRole(context),
-              icon: Icon(_otherRole.icon, size: 20),
-              label: Text('Cambiar a ${_otherRole.displayName.toLowerCase()}'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
-                foregroundColor: AppColors.ink,
-                side: const BorderSide(color: AppColors.border),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
+            PanelSwitcher(onSwitched: () => Navigator.of(context).pop()),
+            const SizedBox(height: 4),
             FilledButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();

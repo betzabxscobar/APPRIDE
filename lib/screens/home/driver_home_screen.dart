@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_colors.dart';
 import '../../models/app_user.dart';
+import '../../widgets/panel_switcher.dart';
 import '../../widgets/ride_card.dart';
 import 'account_sheet.dart';
 
@@ -24,6 +25,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final user = widget.user;
 
     return Scaffold(
+      appBar: const ViewingAsBar(),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),

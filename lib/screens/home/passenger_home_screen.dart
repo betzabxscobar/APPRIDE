@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_colors.dart';
 import '../../models/app_user.dart';
+import '../../widgets/panel_switcher.dart';
 import '../../widgets/ride_card.dart';
 import 'account_sheet.dart';
 
@@ -15,6 +16,9 @@ class PassengerHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Solo aparece si un administrador está mirando esta pantalla; para un
+      // pasajero de verdad no ocupa espacio.
+      appBar: const ViewingAsBar(),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),

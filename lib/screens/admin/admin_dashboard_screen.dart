@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../models/app_user.dart';
 import '../../models/user_role.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/panel_switcher.dart';
 
 /// Secciones del panel, las mismas de la barra lateral de WEB-RIDE.
 enum _Section {
@@ -24,9 +25,20 @@ enum _Section {
 /// mismas métricas, mismo listado de cuentas y las mismas reglas de
 /// visibilidad entre `admin` y `superadmin`.
 class AdminDashboardScreen extends StatefulWidget {
-  const AdminDashboardScreen({super.key, required this.user});
+  const AdminDashboardScreen({
+    super.key,
+    required this.user,
+    required this.viewAs,
+  });
 
   final AppUser user;
+
+  /// Panel que se está mostrando: `admin` o `superadmin`.
+  ///
+  /// Un superadmin puede abrir el panel *visto como admin* para revisar qué
+  /// alcance tiene ese rol. Su cuenta sigue siendo superadmin — esto solo
+  /// cambia lo que se presenta.
+  final UserRole viewAs;
 
   @override
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
@@ -51,7 +63,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final users = await AuthService.instance.visibleUsers();
       if (!mounted) return;
       setState(() {
-        _users = users;
+        // Al mirar el panel *como admin*, RLS sigue enviando a los superadmin
+        // porque el rol real de la cuenta no cambió. Se ocultan aquí para que
+        // la previsualización sea fiel a lo que vería un admin de verdad.
+        //
+        // Es filtrado de presentación, no de seguridad: la barrera real son
+        // las políticas RLS, que sí aplican para una cuenta admin auténtica.
+        _users = widget.viewAs.isSuperadmin
+            ? users
+            : users.where((u) => !u.role.isSuperadmin).toList();
         _error = null;
       });
     } on AuthException catch (e) {
@@ -62,7 +82,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  bool get _isSuperadmin => widget.user.role.isSuperadmin;
+  /// Manda la vista, no el rol: si un superadmin abrió el panel como admin,
+  /// la pantalla se comporta como la de un admin.
+  bool get _isSuperadmin => widget.viewAs.isSuperadmin;
   String get _accessName =>
       _isSuperadmin ? 'SUPERADMINISTRACIÓN' : 'ADMINISTRACIÓN';
 
@@ -112,6 +134,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       drawer: _AdminDrawer(
         user: widget.user,
         accessName: _accessName,
+        showPanelSwitcher: true,
         active: _section,
         onSelect: (section) {
           Navigator.of(context).pop();
@@ -148,6 +171,7 @@ class _AdminDrawer extends StatelessWidget {
   const _AdminDrawer({
     required this.user,
     required this.accessName,
+    required this.showPanelSwitcher,
     required this.active,
     required this.onSelect,
     required this.onSignOut,
@@ -155,6 +179,7 @@ class _AdminDrawer extends StatelessWidget {
 
   final AppUser user;
   final String accessName;
+  final bool showPanelSwitcher;
   final _Section active;
   final ValueChanged<_Section> onSelect;
   final Future<void> Function() onSignOut;
@@ -251,6 +276,15 @@ class _AdminDrawer extends StatelessWidget {
                 ],
               ),
             ),
+            if (showPanelSwitcher) ...[
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: PanelSwitcher(
+                  onSwitched: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ],
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
               child: Container(
