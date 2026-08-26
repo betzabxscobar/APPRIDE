@@ -126,7 +126,7 @@ class _HeroVisual extends StatelessWidget {
 
           // ── Logo arriba al centro ──
           Positioned(
-            top: 60,
+            top: 20,
             left: 0,
             right: 0,
             child: Center(
@@ -134,10 +134,47 @@ class _HeroVisual extends StatelessWidget {
             ),
           ),
 
+          // ── Título "RIDE" ──
+          Positioned(
+            top: 120,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Text(
+                'RIDE',
+                style: AppTheme.display(
+                  42,
+                  color: AppColors.ink,
+                  letterSpacing: 2,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+
+          // ── Subtítulo ──
+          Positioned(
+            top: 170,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Text(
+                'Muévete a tu manera',
+                style: AppTheme.display(
+                  16,
+                  color: AppColors.inkMuted,
+                  letterSpacing: 0,
+                  height: 1.3,
+                  weight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+
           // ── Chica a la izquierda ──
           Positioned(
             left: 10,
-            bottom: 30,
+            bottom: 0,
             child: Image.asset(
               'assets/images/ChicaDibujo.png',
               width: 130,
@@ -145,15 +182,16 @@ class _HeroVisual extends StatelessWidget {
             ),
           ),
 
-          // ── Carro al centro ──
+          // ── Carro al centro-derecha ──
           Positioned(
             left: 0,
-            right: 0,
-            bottom: 20,
-            child: Center(
+            right: -40,
+            bottom: 0,
+            child: Align(
+              alignment: Alignment.bottomRight,
               child: Image.asset(
                 'assets/images/carroDibujo.png',
-                width: 200,
+                width: 220,
                 fit: BoxFit.contain,
               ),
             ),
@@ -162,7 +200,7 @@ class _HeroVisual extends StatelessWidget {
           // ── Chico a la derecha ──
           Positioned(
             right: 10,
-            bottom: 30,
+            bottom: 0,
             child: Image.asset(
               'assets/images/ChicoDibujo.png',
               width: 130,
