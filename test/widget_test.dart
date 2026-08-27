@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 
 import 'package:ride/core/app_theme.dart';
 import 'package:ride/models/app_user.dart';
 import 'package:ride/models/fleet.dart';
 import 'package:ride/services/geocoding_service.dart';
 import 'package:ride/services/h3_service.dart';
+import 'package:ride/services/routing_service.dart';
+import 'package:ride/widgets/ride_map.dart';
 import 'package:ride/models/trip.dart';
 import 'package:ride/models/user_role.dart';
 import 'package:ride/models/vehicle.dart';
 import 'package:ride/screens/auth/auth_screen.dart';
+import 'package:ride/screens/home/account_sheet.dart';
 import 'package:ride/services/auth_service.dart';
 import 'package:ride/widgets/auth_shell.dart';
 import 'package:ride/widgets/panel_switcher.dart';
@@ -134,6 +139,148 @@ void main() {
       // administrativas las provisiona el equipo, no el formulario público.
       expect(find.text('Administro'), findsNothing);
       expect(find.text('Superadmin'), findsNothing);
+    });
+  });
+
+  group('Rutas', () {
+    Ruta ruta({double metros = 5070, int segundos = 462}) => Ruta(
+          puntos: const [],
+          metros: metros,
+          duracion: Duration(seconds: segundos),
+        );
+
+    test('La distancia larga se muestra en kilometros', () {
+      expect(ruta().distanciaTexto, '5,1 km');
+    });
+
+    test('Por debajo del kilometro se muestra en metros', () {
+      expect(ruta(metros: 850).distanciaTexto, '850 m');
+    });
+
+    test('La duracion pasa a horas cuando toca', () {
+      expect(ruta(segundos: 462).duracionTexto, '7 min');
+      expect(ruta(segundos: 3900).duracionTexto, '1 h 5 min');
+      expect(ruta(segundos: 7200).duracionTexto, '2 h');
+    });
+  });
+
+  group('Zoom del mapa', () {
+    testWidgets('Al acercarse mas alla de z19 se siguen viendo teselas',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: const Scaffold(
+            body: RideMap(centro: LatLng(-2.1709, -79.9224), zoom: 15),
+          ),
+        ),
+      );
+
+      final capa = tester.widget<TileLayer>(find.byType(TileLayer));
+
+      // OSM solo sirve hasta z19: de ahi en adelante flutter_map reutiliza esa
+      // tesela y la escala.
+      expect(capa.maxNativeZoom, 19);
+
+      // `maxZoom` es hasta donde se DIBUJA la capa. Fijarlo en 19 dejaba el
+      // mapa en negro al hacer mas zoom, que es justo el fallo que esto cuida.
+      expect(capa.maxZoom, double.infinity);
+
+      // flutter_map abre una cache en disco que en las pruebas no existe.
+      tester.takeException();
+    });
+  });
+
+  group('Eleccion de ruta', () {
+    Ruta ruta({required double km, required int min}) => Ruta(
+          puntos: const [],
+          metros: km * 1000,
+          duracion: Duration(minutes: min),
+        );
+
+    test('Sin rutas no hay nada que elegir', () {
+      expect(RoutingService.elegirMejor(const []), isNull);
+    });
+
+    test('A igual tiempo se queda con la mas corta', () {
+      // El caso real medido en Quito: OSRM devolvia 9,29 km y 10,39 km con los
+      // mismos 22,6 min, y ordenadas asi. Quedarse con la primera por serlo es
+      // jugarsela.
+      final elegida = RoutingService.elegirMejor([
+        ruta(km: 10.39, min: 22),
+        ruta(km: 9.29, min: 22),
+      ])!;
+      expect(elegida.metros, 9290);
+    });
+
+    test('No acepta una ruta mucho mas lenta por ser corta', () {
+      // 6 km pero el doble de tiempo: es un atajo por calles malas.
+      final elegida = RoutingService.elegirMejor([
+        ruta(km: 8, min: 15),
+        ruta(km: 6, min: 30),
+      ])!;
+      expect(elegida.metros, 8000);
+    });
+
+    test('Acepta un poco mas de tiempo si recorta bastante', () {
+      // 5 % mas lenta, dentro del margen del 10 %, y 2 km mas corta.
+      final elegida = RoutingService.elegirMejor([
+        ruta(km: 12, min: 20),
+        ruta(km: 10, min: 21),
+      ])!;
+      expect(elegida.metros, 10000);
+    });
+  });
+
+  group('Hoja de cuenta', () {
+    const usuario = AppUser(
+      id: 'u1',
+      name: 'Diego Andres',
+      email: 'diego@ride.app',
+      phone: '0999999999',
+      role: UserRole.superadmin,
+    );
+
+    testWidgets('En una pantalla corta el contenido se desplaza, no desborda',
+        (tester) async {
+      // 200 px de alto: el avatar, el correo, la insignia y el boton ya no
+      // caben. Es la misma situacion que provocaba una cuenta de superadmin,
+      // que ve tres paneles en el selector y desbordaba por abajo cortando
+      // «Cerrar sesion».
+      tester.view.physicalSize = const Size(390 * 3, 200 * 3);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () => showAccountSheet(context, usuario),
+                  child: const Text('abrir'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+
+      // Un desbordamiento de layout llega como excepcion del framework.
+      expect(tester.takeException(), isNull);
+
+      // Y el contenido tiene que poder desplazarse para que quepa.
+      expect(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.byType(Scrollable),
+        ),
+        findsWidgets,
+      );
     });
   });
 
