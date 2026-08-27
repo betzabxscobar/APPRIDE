@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
 import '../core/app_theme.dart';
+import '../core/ride_colors.dart';
 
 /// Isotipo de Ride: el hexágono con la "R".
 ///
@@ -76,12 +77,15 @@ class RideWordmark extends StatelessWidget {
     super.key,
     this.markSize = 52,
     this.fontSize = 28,
-    this.color = AppColors.ink,
+    this.color,
   });
 
   final double markSize;
   final double fontSize;
-  final Color color;
+
+  /// Color de la palabra "Ride". Si no se indica, sigue el tema: sobre el
+  /// héroe de marca se pasa blanco a mano.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +98,7 @@ class RideWordmark extends StatelessWidget {
           'Ride',
           style: AppTheme.display(
             fontSize,
-            color: color,
+            color: color ?? context.ride.ink,
             letterSpacing: -0.5,
             height: 1,
           ),

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../core/app_colors.dart';
+import '../core/app_theme.dart';
+import '../core/ride_colors.dart';
 
-/// Mensaje de error del formulario, igual al bloque `.error` de WEB-RIDE.
+/// Mensaje de error del formulario.
 class ErrorBanner extends StatelessWidget {
   const ErrorBanner({super.key, required this.message});
 
@@ -10,23 +11,14 @@ class ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.errorBackground,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.errorBorder),
-      ),
-      child: Text(
-        message,
-        style: const TextStyle(
-          fontSize: 11,
-          height: 1.45,
-          color: AppColors.errorInk,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+    final ride = context.ride;
+
+    return _Banner(
+      icon: Icons.error_outline,
+      background: ride.dangerSoft,
+      border: ride.danger.withValues(alpha: 0.4),
+      foreground: ride.dangerInk,
+      message: message,
     );
   }
 }
@@ -43,22 +35,60 @@ class NoticeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return _Banner(
+      icon: Icons.check_circle_outline,
+      background: ride.successSoft,
+      border: ride.success.withValues(alpha: 0.45),
+      foreground: ride.isDark ? ride.success : ride.ink,
+      message: message,
+    );
+  }
+}
+
+class _Banner extends StatelessWidget {
+  const _Banner({
+    required this.icon,
+    required this.background,
+    required this.border,
+    required this.foreground,
+    required this.message,
+  });
+
+  final IconData icon;
+  final Color background;
+  final Color border;
+  final Color foreground;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: AppColors.greenSoft,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.green),
+        color: background,
+        borderRadius: BorderRadius.circular(AppTheme.radiusField),
+        border: Border.all(color: border),
       ),
-      child: Text(
-        message,
-        style: const TextStyle(
-          fontSize: 11,
-          height: 1.45,
-          color: AppColors.ink,
-          fontWeight: FontWeight.w600,
-        ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: foreground),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: AppText.small,
+                height: 1.45,
+                color: foreground,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

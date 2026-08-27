@@ -4,12 +4,22 @@ import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
 import '../core/app_theme.dart';
+import '../core/ride_colors.dart';
 import 'ride_logo.dart';
 
-/// Estructura de las pantallas de autenticación, igual que `.auth-page` en
-/// WEB-RIDE: panel de marca oscuro a la izquierda y panel del formulario a la
-/// derecha. Bajo 850 px de ancho el panel de marca se oculta y solo queda la
-/// marca pequeña arriba a la izquierda, tal como hace el `@media` de la web.
+/// Estructura de las pantallas de autenticación.
+///
+/// Son dos diseños distintos, no uno que se encoge:
+///
+/// * **Ancho (≥850 px)**, escritorio y tablet: el `.auth-page` de WEB-RIDE, con
+///   el panel de marca oscuro a la izquierda y el formulario a la derecha.
+/// * **Angosto**, el teléfono: la marca ocupa el fondo entero y el formulario
+///   sube en una hoja redondeada, como en cualquier app móvil.
+///
+/// Antes el móvil era el caso degradado del diseño web: se ocultaba el panel de
+/// marca y quedaba una tarjeta blanca sobre fondo casi blanco, sin identidad y
+/// con tipografías pensadas para leerse en un monitor. Ahora el teléfono tiene
+/// su propia composición y es la marca la que da el fondo.
 class AuthShell extends StatelessWidget {
   const AuthShell({super.key, required this.child});
 
@@ -22,7 +32,7 @@ class AuthShell extends StatelessWidget {
         builder: (context, constraints) {
           final wide = constraints.maxWidth >= AppTheme.wideBreakpoint;
 
-          if (!wide) return _FormPanel(compact: true, child: child);
+          if (!wide) return _MobileAuthLayout(child: child);
 
           return Row(
             children: [
@@ -37,38 +47,197 @@ class AuthShell extends StatelessWidget {
   }
 }
 
-class _FormPanel extends StatelessWidget {
-  const _FormPanel({required this.child, this.compact = false});
+/// Composición de teléfono: héroe de marca arriba, hoja con el formulario
+/// abajo.
+///
+/// La hoja se apoya sobre el héroe y lo tapa al desplazarse, así que un
+/// formulario largo como el registro se come el héroe en vez de pelear con él
+/// por el espacio.
+class _MobileAuthLayout extends StatelessWidget {
+  const _MobileAuthLayout({required this.child});
 
   final Widget child;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
+    final padding = MediaQuery.paddingOf(context);
+
     return DecoratedBox(
-      decoration: const BoxDecoration(gradient: AppColors.formPanel),
-      child: SafeArea(
-        child: compact
-            ? SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const RideWordmark(markSize: 35, fontSize: 22),
-                    const SizedBox(height: 38),
-                    child,
-                  ],
+      decoration: BoxDecoration(gradient: ride.hero),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // El alto que reporta el `body` ya descuenta el teclado, así que al
+          // escribir el héroe se encoge solo y el campo enfocado sigue a la
+          // vista.
+          final heroHeight =
+              padding.top + (constraints.maxHeight * 0.30).clamp(170.0, 280.0);
+
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                SizedBox(
+                  height: heroHeight,
+                  child: _MobileHero(topInset: padding.top),
                 ),
-              )
-            : Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 48,
-                    vertical: 40,
+                _MobileSheet(
+                  // Sin este mínimo, un paso corto como la bienvenida dejaría
+                  // la hoja a media pantalla y el degradado asomando debajo.
+                  minHeight: constraints.maxHeight - heroHeight,
+                  bottomInset: padding.bottom,
+                  child: child,
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Cabecera de marca del teléfono: la misma aurora, ruta y ciudad del panel de
+/// escritorio, recortadas al alto de una cabecera.
+class _MobileHero extends StatelessWidget {
+  const _MobileHero({required this.topInset});
+
+  final double topInset;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height = constraints.maxHeight;
+
+        return ClipRect(
+          child: Stack(
+            children: [
+              Positioned(
+                left: -120,
+                top: -140,
+                child: Container(
+                  width: 320,
+                  height: 320,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [Color(0x387DDBEE), Color(0x007DDBEE)],
+                      stops: [0, 0.68],
+                    ),
                   ),
-                  child: Center(child: child),
                 ),
               ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: height * 0.6,
+                child: const _CityArt(),
+              ),
+              // Velo entre la ilustración y el texto. Sin él, el trazo de la
+              // ruta y los edificios cruzan por encima del titular y no hay
+              // manera de leerlo.
+              const Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.center,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x0004121B), Color(0xE604121B)],
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(24, topInset + 16, 24, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const RideWordmark(
+                      markSize: 40,
+                      fontSize: 24,
+                      color: Colors.white,
+                    ),
+                    Text(
+                      'Muévete con libertad.',
+                      style: AppTheme.display(
+                        AppText.h2,
+                        color: Colors.white,
+                        letterSpacing: -0.8,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Hoja blanca (u oscura) donde vive el formulario.
+class _MobileSheet extends StatelessWidget {
+  const _MobileSheet({
+    required this.child,
+    required this.minHeight,
+    required this.bottomInset,
+  });
+
+  final Widget child;
+  final double minHeight;
+  final double bottomInset;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(minHeight: minHeight > 0 ? minHeight : 0),
+      padding: EdgeInsets.fromLTRB(24, 28, 24, 32 + bottomInset),
+      decoration: BoxDecoration(
+        color: ride.surface,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusSheet),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: ride.shadow,
+            blurRadius: 32,
+            offset: const Offset(0, -10),
+          ),
+        ],
+      ),
+      // Centrado, no pegado arriba: en pasos cortos como la bienvenida el
+      // formulario ocupa poco y dejaba media hoja en blanco debajo.
+      child: Align(alignment: Alignment.center, child: child),
+    );
+  }
+}
+
+/// Columna del formulario en escritorio (`.form-panel`).
+class _FormPanel extends StatelessWidget {
+  const _FormPanel({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return ColoredBox(
+      color: ride.surface,
+      child: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
+            child: Center(child: child),
+          ),
+        ),
       ),
     );
   }

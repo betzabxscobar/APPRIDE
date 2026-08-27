@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
 import '../core/app_theme.dart';
+import '../core/ride_colors.dart';
 import '../models/user_role.dart';
 
-/// Tarjeta que contiene un formulario de autenticación (`.auth-box`).
+/// Contenedor de un formulario de autenticación.
 ///
 /// Aparece con la misma animación de entrada que la web:
 /// `translateY(12px) scale(.99)` → posición final en 450 ms.
@@ -50,8 +51,8 @@ class _AuthCardState extends State<AuthCard>
             child: child,
           ),
         ),
-        // `width: min(100%,450px)`: el ancho debe ser explícito para que los
-        // hijos (botones, campos) ocupen toda la tarjeta.
+        // El ancho debe ser explícito para que los hijos (botones, campos)
+        // ocupen toda la columna.
         child: LayoutBuilder(
           builder: (context, constraints) => SizedBox(
             width: constraints.maxWidth.isFinite
@@ -71,28 +72,28 @@ class _AuthCardState extends State<AuthCard>
 
 /// Etiqueta pequeña sobre el título (`.eyebrow`).
 class AuthEyebrow extends StatelessWidget {
-  const AuthEyebrow(this.text, {super.key, this.color = AppColors.eyebrow});
+  const AuthEyebrow(this.text, {super.key, this.color});
 
   final String text;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     return Text(
       text,
       style: TextStyle(
-        fontSize: 10,
+        fontSize: AppText.micro,
         fontWeight: FontWeight.w800,
-        letterSpacing: 1.6,
-        color: color,
+        letterSpacing: 1.4,
+        color: color ?? context.ride.accent,
       ),
     );
   }
 }
 
-/// Título del formulario (`.auth-box h2`).
+/// Título del formulario.
 class AuthHeading extends StatelessWidget {
-  const AuthHeading(this.text, {super.key, this.size = 36});
+  const AuthHeading(this.text, {super.key, this.size = AppText.h1});
 
   final String text;
   final double size;
@@ -100,15 +101,23 @@ class AuthHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Text(text, style: AppTheme.display(size)),
+      padding: const EdgeInsets.only(top: 10, bottom: 8),
+      child: Text(
+        text,
+        style: AppTheme.display(
+          size,
+          color: context.ride.ink,
+          letterSpacing: -0.9,
+          height: 1.2,
+        ),
+      ),
     );
   }
 }
 
-/// Bajada del formulario (`.auth-box > p`).
+/// Bajada del formulario.
 class AuthLead extends StatelessWidget {
-  const AuthLead(this.text, {super.key, this.bottomSpacing = 28});
+  const AuthLead(this.text, {super.key, this.bottomSpacing = 26});
 
   final String text;
   final double bottomSpacing;
@@ -119,10 +128,10 @@ class AuthLead extends StatelessWidget {
       padding: EdgeInsets.only(bottom: bottomSpacing),
       child: Text(
         text,
-        style: const TextStyle(
-          fontSize: 14,
+        style: TextStyle(
+          fontSize: AppText.body,
           height: 1.5,
-          color: AppColors.inkMuted,
+          color: context.ride.inkMuted,
         ),
       ),
     );
@@ -146,19 +155,20 @@ class PrimaryAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
     final enabled = onPressed != null && !loading;
     final radius = BorderRadius.circular(AppTheme.radiusAction);
 
     return Opacity(
-      opacity: enabled ? 1 : 0.6,
+      opacity: enabled ? 1 : 0.55,
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: AppColors.primaryAction,
           borderRadius: radius,
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.2),
-              blurRadius: 28,
+              color: AppColors.primary.withValues(alpha: ride.isDark ? 0.4 : 0.3),
+              blurRadius: 24,
               offset: const Offset(0, 10),
             ),
           ],
@@ -169,33 +179,43 @@ class PrimaryAction extends StatelessWidget {
           child: InkWell(
             onTap: enabled ? onPressed : null,
             borderRadius: radius,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 14),
-              child: SizedBox(
-                height: 24,
+            child: SizedBox(
+              height: AppTheme.tapTarget,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
                     Text(
                       label,
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: AppText.body,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
                       ),
                     ),
-                    if (showArrow)
-                      const Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          '→',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: loading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                                color: Colors.white,
+                              ),
+                            )
+                          : showArrow
+                              ? const Text(
+                                  '→',
+                                  style: TextStyle(
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                    ),
                   ],
                 ),
               ),
@@ -207,7 +227,7 @@ class PrimaryAction extends StatelessWidget {
   }
 }
 
-/// Botón secundario blanco con borde (`.secondary-action`).
+/// Botón secundario con borde (`.secondary-action`).
 class SecondaryAction extends StatelessWidget {
   const SecondaryAction({super.key, required this.label, this.onPressed});
 
@@ -216,27 +236,29 @@ class SecondaryAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
     final radius = BorderRadius.circular(AppTheme.radiusAction);
 
     return Material(
-      color: AppColors.surface,
+      color: ride.surfaceAlt,
       borderRadius: radius,
       child: InkWell(
         onTap: onPressed,
         borderRadius: radius,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 15),
+          height: AppTheme.tapTarget,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: radius,
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: ride.border, width: 1.4),
           ),
           child: Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 15,
+            style: TextStyle(
+              fontSize: AppText.body,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF24394A),
+              color: ride.ink,
             ),
           ),
         ),
@@ -246,6 +268,9 @@ class SecondaryAction extends StatelessWidget {
 }
 
 /// Enlace "← Volver" (`.back`).
+///
+/// Con área de toque propia: como texto suelto de 12 px era de los controles
+/// más difíciles de acertar de toda la app.
 class BackLink extends StatelessWidget {
   const BackLink({super.key, this.onPressed});
 
@@ -253,23 +278,31 @@ class BackLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
+
     return Align(
       alignment: Alignment.centerLeft,
-      child: InkWell(
-        onTap: onPressed,
-        child: const Padding(
-          padding: EdgeInsets.only(right: 8, bottom: 4),
-          child: Text(
-            '← Volver',
-            style: TextStyle(fontSize: 12, color: AppColors.backLink),
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: IconButton(
+          onPressed: onPressed,
+          iconSize: 22,
+          color: ride.inkMuted,
+          tooltip: 'Volver',
+          style: IconButton.styleFrom(
+            backgroundColor: ride.surfaceAlt,
+            minimumSize: const Size(48, 48),
           ),
+          icon: const Icon(Icons.arrow_back),
         ),
       ),
     );
   }
 }
 
-/// Pie del formulario: texto gris + enlace (`.form-footer`).
+/// Pie del formulario: texto + enlace (`.form-footer`).
 class AuthFooter extends StatelessWidget {
   const AuthFooter({
     super.key,
@@ -284,27 +317,19 @@ class AuthFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
+
     return Padding(
-      padding: const EdgeInsets.only(top: 22),
+      padding: const EdgeInsets.only(top: 18),
       child: Wrap(
         alignment: WrapAlignment.center,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Text(
-            '$text ',
-            style: const TextStyle(fontSize: 11, color: AppColors.footerText),
+            text,
+            style: TextStyle(fontSize: AppText.small, color: ride.inkMuted),
           ),
-          InkWell(
-            onTap: onAction,
-            child: Text(
-              actionLabel,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: AppColors.link,
-              ),
-            ),
-          ),
+          TextButton(onPressed: onAction, child: Text(actionLabel)),
         ],
       ),
     );
@@ -326,8 +351,8 @@ class RolePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // `IntrinsicHeight` iguala el alto de las dos tarjetas, como hace la
-    // cuadrícula de la web, sin pedir alto infinito dentro del scroll.
+    // `IntrinsicHeight` iguala el alto de las dos tarjetas sin pedir alto
+    // infinito dentro del scroll.
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -340,7 +365,7 @@ class RolePicker extends StatelessWidget {
                 onTap: enabled ? () => onChanged(role) : null,
               ),
             ),
-            if (role != UserRole.selectable.last) const SizedBox(width: 10),
+            if (role != UserRole.selectable.last) const SizedBox(width: 12),
           ],
         ],
       ),
@@ -357,43 +382,47 @@ class _RoleOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(11);
+    final ride = context.ride;
+    final radius = BorderRadius.circular(AppTheme.radiusAction);
+    final accent = selected ? ride.accent : ride.inkMuted;
 
     return Material(
-      color: selected ? AppColors.primarySoft : AppColors.surface,
+      color: selected ? ride.accentSoft : ride.surfaceAlt,
       borderRadius: radius,
       child: InkWell(
         onTap: onTap,
         borderRadius: radius,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.all(13),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: radius,
             border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
-              width: selected ? 1.6 : 1,
+              color: selected ? ride.accent : ride.border,
+              width: selected ? 1.8 : 1.4,
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              Icon(role.icon, size: 22, color: accent),
+              const SizedBox(height: 10),
               Text(
                 role.label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF243B4C),
+                style: TextStyle(
+                  fontSize: AppText.h3,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? ride.accent : ride.ink,
                 ),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 4),
               Text(
                 role.description,
-                style: const TextStyle(
-                  fontSize: 10,
-                  height: 1.3,
-                  color: AppColors.rolePickerHint,
+                style: TextStyle(
+                  fontSize: AppText.label,
+                  height: 1.35,
+                  color: ride.inkMuted,
                 ),
               ),
             ],

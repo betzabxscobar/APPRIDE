@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/app_colors.dart';
 import '../../core/app_theme.dart';
+import '../../core/ride_colors.dart';
 import '../../core/validators.dart';
 import '../../models/app_user.dart';
 import '../../services/auth_service.dart';
@@ -61,21 +61,23 @@ class _FirstAccessScreenState extends State<FirstAccessScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
+
     return Scaffold(
       body: DecoratedBox(
-        decoration: const BoxDecoration(gradient: AppColors.brandPanel),
+        decoration: BoxDecoration(gradient: ride.hero),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(16),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 480),
                   child: Container(
-                    padding: const EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(20),
+                      color: ride.surface,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusSheet),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x3D000000),
@@ -92,48 +94,47 @@ class _FirstAccessScreenState extends State<FirstAccessScreen> {
                         children: [
                           const Align(
                             alignment: Alignment.centerLeft,
-                            child: RideWordmark(markSize: 37, fontSize: 22),
+                            child: RideWordmark(markSize: 40, fontSize: 24),
                           ),
-                          const SizedBox(height: 30),
+                          const SizedBox(height: 28),
                           Container(
-                            width: 52,
-                            height: 52,
+                            width: 56,
+                            height: 56,
                             decoration: BoxDecoration(
-                              color: AppColors.greenSoft,
-                              borderRadius: BorderRadius.circular(15),
+                              color: ride.successSoft,
+                              borderRadius:
+                                  BorderRadius.circular(AppTheme.radiusAction),
                             ),
-                            child: const Center(
-                              child: Text(
-                                '◇',
-                                style: TextStyle(
-                                  fontSize: 25,
-                                  color: Color(0xFF1BA68C),
-                                ),
+                            child: Icon(
+                              Icons.lock_outline,
+                              size: 27,
+                              color: ride.success,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          const AuthEyebrow('PRIMER ACCESO ADMINISTRATIVO'),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10, bottom: 10),
+                            child: Text(
+                              'Crea tu contraseña personal',
+                              style: AppTheme.display(
+                                AppText.h1,
+                                color: ride.ink,
+                                letterSpacing: -0.9,
+                                height: 1.2,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 18),
-                          const AuthEyebrow(
-                            'PRIMER ACCESO ADMINISTRATIVO',
-                            color: Color(0xFF188CB7),
-                          ),
                           Padding(
-                            padding: const EdgeInsets.only(top: 8, bottom: 12),
-                            child: Text(
-                              'Crea tu contraseña personal',
-                              style: AppTheme.display(30, height: 1.2),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 24),
+                            padding: const EdgeInsets.only(bottom: 26),
                             child: Text(
                               'Hola, ${widget.user.name}. Por seguridad debes '
                               'reemplazar la contraseña temporal antes de '
                               'entrar al panel.',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                height: 1.6,
-                                color: AppColors.inkMuted,
+                              style: TextStyle(
+                                fontSize: AppText.body,
+                                height: 1.55,
+                                color: ride.inkMuted,
                               ),
                             ),
                           ),
@@ -169,22 +170,16 @@ class _FirstAccessScreenState extends State<FirstAccessScreen> {
                             loading: _submitting,
                             onPressed: _submit,
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 10),
                           Center(
-                            child: InkWell(
-                              onTap: _submitting
+                            child: TextButton(
+                              onPressed: _submitting
                                   ? null
                                   : () => AuthService.instance.signOut(),
-                              child: const Padding(
-                                padding: EdgeInsets.all(4),
-                                child: Text(
-                                  'Cerrar sesión',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF748491),
-                                  ),
-                                ),
+                              style: TextButton.styleFrom(
+                                foregroundColor: ride.inkMuted,
                               ),
+                              child: const Text('Cerrar sesión'),
                             ),
                           ),
                         ],

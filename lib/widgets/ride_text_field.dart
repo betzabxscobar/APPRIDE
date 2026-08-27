@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../core/app_colors.dart';
+import '../core/app_theme.dart';
+import '../core/ride_colors.dart';
 
 /// Campo del formulario de autenticación.
 ///
-/// Reproduce `.auth-box label` + `.auth-box input` de WEB-RIDE: etiqueta
-/// pequeña en mayúscula de peso 700 sobre una caja blanca de borde suave.
+/// Etiqueta encima y caja de 56 px de alto. La web los tenía a 13 px de texto
+/// y 10 px de radio, medidas de escritorio: en el teléfono el texto quedaba
+/// chico para escribir y las esquinas casi rectas.
 class RideTextField extends StatelessWidget {
   const RideTextField({
     super.key,
@@ -49,14 +51,14 @@ class RideTextField extends StatelessWidget {
         enabled: enabled,
         autofillHints: autofillHints,
         onFieldSubmitted: onSubmitted,
-        style: const TextStyle(fontSize: 13, color: AppColors.ink),
+        style: TextStyle(fontSize: AppText.body, color: context.ride.ink),
         decoration: InputDecoration(hintText: hint),
       ),
     );
   }
 }
 
-/// Campo de contraseña con el botón de texto "Ver" / "Ocultar" del diseño web.
+/// Campo de contraseña con el botón de ver / ocultar.
 class RidePasswordField extends StatefulWidget {
   const RidePasswordField({
     super.key,
@@ -88,6 +90,8 @@ class _RidePasswordFieldState extends State<RidePasswordField> {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
+
     return _FieldWrapper(
       label: widget.label,
       child: TextFormField(
@@ -98,26 +102,18 @@ class _RidePasswordFieldState extends State<RidePasswordField> {
         textInputAction: widget.textInputAction,
         onFieldSubmitted: widget.onSubmitted,
         autofillHints: widget.autofillHints,
-        style: const TextStyle(fontSize: 13, color: AppColors.ink),
+        style: TextStyle(fontSize: AppText.body, color: ride.ink),
         decoration: InputDecoration(
           hintText: widget.hint,
-          suffixIconConstraints: const BoxConstraints(minWidth: 58),
-          suffixIcon: Align(
-            alignment: Alignment.centerRight,
-            widthFactor: 1,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: InkWell(
-                onTap: () => setState(() => _obscure = !_obscure),
-                child: Text(
-                  _obscure ? 'Ver' : 'Ocultar',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF168FBC),
-                  ),
-                ),
-              ),
+          // Un icono con área de toque propia en vez del "Ver" de 10 px que
+          // venía de la web: con el pulgar era casi imposible acertarle.
+          suffixIcon: IconButton(
+            onPressed: () => setState(() => _obscure = !_obscure),
+            iconSize: 22,
+            color: ride.inkMuted,
+            tooltip: _obscure ? 'Ver contraseña' : 'Ocultar contraseña',
+            icon: Icon(
+              _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
             ),
           ),
         ),
@@ -138,13 +134,13 @@ class _FieldWrapper extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 7),
+          padding: const EdgeInsets.only(bottom: 8, left: 2),
           child: Text(
             label,
-            style: const TextStyle(
-              fontSize: 11,
+            style: TextStyle(
+              fontSize: AppText.label,
               fontWeight: FontWeight.w700,
-              color: AppColors.fieldLabel,
+              color: context.ride.inkMuted,
             ),
           ),
         ),
