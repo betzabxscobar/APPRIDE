@@ -88,6 +88,7 @@ class RideService {
     required double destinoLat,
     required double destinoLng,
     required String destinoTexto,
+    double? distanciaKm,
     String? tarifaId,
   }) async {
     // El disco de celdas se calcula aquí porque una política RLS no puede
@@ -102,6 +103,9 @@ class RideService {
       'p_destino_lng': destinoLng,
       'p_destino_texto': destinoTexto,
       'p_tarifa_id': tarifaId,
+      // La misma distancia con la que se calculó el precio que la persona
+      // acaba de aceptar. Sin esto el viaje se guardaría con otro importe.
+      'p_distancia_km': distanciaKm,
       'p_origen_celda_h3_7': h3.celda(origenLat, origenLng),
       'p_celdas_difusion': h3.disco(origenLat, origenLng),
     });

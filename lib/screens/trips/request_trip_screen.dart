@@ -209,6 +209,9 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
         destinoLat: d.lat,
         destinoLng: d.lng,
         destinoTexto: d.completo,
+        // La del recorrido real, si llegó a calcularse: es la que produjo el
+        // precio del botón.
+        distanciaKm: _ruta == null ? null : _ruta!.metros / 1000,
       );
 
       // El historial se guarda después de que el viaje existe: si fallara,
