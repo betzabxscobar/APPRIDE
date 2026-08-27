@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
-import '../../core/app_colors.dart';
 import '../../core/app_theme.dart';
+import '../../core/ride_colors.dart';
 import '../../models/trip.dart';
 import '../../services/ride_service.dart';
+import '../../services/routing_service.dart';
 import '../../widgets/auth_feedback.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/ride_map.dart';
@@ -111,7 +112,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            style: FilledButton.styleFrom(backgroundColor: context.ride.danger),
             child: const Text('Sí, cancelar'),
           ),
         ],
@@ -168,8 +169,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                         onPressed: _ocupado ? null : _cancelar,
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size.fromHeight(50),
-                          foregroundColor: AppColors.danger,
-                          side: const BorderSide(color: AppColors.danger),
+                          foregroundColor: context.ride.danger,
+                          side: BorderSide(color: context.ride.danger),
                         ),
                         child: Text(
                           _ocupado ? 'Cancelando…' : 'Cancelar viaje',
@@ -242,7 +243,7 @@ class _EstadoActual extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             estado.hint,
-            style: const TextStyle(fontSize: 13, color: AppColors.ink),
+            style: TextStyle(fontSize: 13, color: context.ride.ink),
           ),
           const SizedBox(height: 14),
           ClipRRect(
@@ -272,14 +273,14 @@ class _Ruta extends StatelessWidget {
         children: [
           _Fila(
             icono: Icons.my_location,
-            color: AppColors.primary,
+            color: context.ride.accent,
             titulo: 'Origen',
             valor: viaje.origenTexto,
           ),
           const Divider(height: 22),
           _Fila(
             icono: Icons.place_outlined,
-            color: AppColors.green,
+            color: context.ride.success,
             titulo: 'Destino',
             valor: viaje.destinoTexto,
           ),
@@ -314,20 +315,20 @@ class _Fila extends StatelessWidget {
             children: [
               Text(
                 titulo.toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 9,
                   letterSpacing: 1.1,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.inkMuted,
+                  color: context.ride.inkMuted,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 valor,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.ink,
+                  color: context.ride.ink,
                 ),
               ),
             ],
@@ -355,13 +356,13 @@ class _TarjetaConductor extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: AppColors.greenSoft,
+            backgroundColor: context.ride.successSoft,
             child: Text(
               iniciales,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
-                color: AppColors.green,
+                color: context.ride.success,
               ),
             ),
           ),
@@ -372,18 +373,18 @@ class _TarjetaConductor extends StatelessWidget {
               children: [
                 Text(
                   nombre,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    color: context.ride.ink,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   viaje.vehiculoResumen,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.inkMuted,
+                    color: context.ride.inkMuted,
                   ),
                 ),
                 if (viaje.conductorCalificacion != null) ...[
@@ -394,10 +395,10 @@ class _TarjetaConductor extends StatelessWidget {
                       const SizedBox(width: 3),
                       Text(
                         viaje.conductorCalificacion!.toStringAsFixed(1),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.ink,
+                          color: context.ride.ink,
                         ),
                       ),
                     ],
@@ -410,17 +411,17 @@ class _TarjetaConductor extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
-                color: AppColors.background,
+                color: context.ride.background,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: context.ride.border),
               ),
               child: Text(
                 viaje.vehiculoPlaca!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.6,
-                  color: AppColors.ink,
+                  color: context.ride.ink,
                 ),
               ),
             ),
@@ -442,24 +443,24 @@ class _TarjetaPrecio extends StatelessWidget {
     return RideCard(
       child: Row(
         children: [
-          const Icon(Icons.payments_outlined, size: 20, color: AppColors.inkMuted),
+          Icon(Icons.payments_outlined, size: 20, color: context.ride.inkMuted),
           const SizedBox(width: 13),
           Expanded(
             child: Text(
               cerrado ? 'Total del viaje' : 'Precio estimado',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: AppColors.ink,
+                color: context.ride.ink,
               ),
             ),
           ),
           Text(
             '\$${viaje.montoVigente.toStringAsFixed(2)}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
-              color: AppColors.ink,
+              color: context.ride.ink,
             ),
           ),
         ],
@@ -468,15 +469,64 @@ class _TarjetaPrecio extends StatelessWidget {
   }
 }
 
-/// Mapa del viaje: origen, destino y el chofer si ya va en camino.
-class _MapaViaje extends StatelessWidget {
+/// Mapa del viaje: origen, destino, el recorrido por calles y el chofer si ya
+/// va en camino.
+class _MapaViaje extends StatefulWidget {
   const _MapaViaje({required this.viaje, required this.chofer});
 
   final Trip viaje;
   final ({double lat, double lng})? chofer;
 
   @override
+  State<_MapaViaje> createState() => _MapaViajeState();
+}
+
+class _MapaViajeState extends State<_MapaViaje> {
+  Ruta? _ruta;
+
+  /// Origen y destino con los que se pidió la ruta actual.
+  ///
+  /// Realtime reconstruye esta pantalla cada vez que el chofer reporta
+  /// posición —cada minuto—, y el recorrido entre origen y destino no cambia
+  /// por eso. Sin esta clave se le pediría a OSRM lo mismo una y otra vez.
+  String? _clave;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarRuta();
+  }
+
+  @override
+  void didUpdateWidget(_MapaViaje anterior) {
+    super.didUpdateWidget(anterior);
+    _cargarRuta();
+  }
+
+  Future<void> _cargarRuta() async {
+    final v = widget.viaje;
+    if (v.origenLat == null ||
+        v.origenLng == null ||
+        v.destinoLat == null ||
+        v.destinoLng == null) {
+      return;
+    }
+
+    final clave = '${v.origenLat},${v.origenLng};${v.destinoLat},${v.destinoLng}';
+    if (clave == _clave) return;
+    _clave = clave;
+
+    final ruta = await RoutingService.instance.entre(
+      LatLng(v.origenLat!, v.origenLng!),
+      LatLng(v.destinoLat!, v.destinoLng!),
+    );
+    if (mounted && ruta != null) setState(() => _ruta = ruta);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final viaje = widget.viaje;
+    final chofer = widget.chofer;
     final origen = viaje.origenLat == null || viaje.origenLng == null
         ? null
         : LatLng(viaje.origenLat!, viaje.origenLng!);
@@ -491,13 +541,13 @@ class _MapaViaje extends StatelessWidget {
     final marcadores = <MapMarker>[
       if (origen != null) MapMarker.origen(origen),
       if (destino != null) MapMarker.destino(destino),
-      if (chofer != null) MapMarker.chofer(LatLng(chofer!.lat, chofer!.lng)),
+      if (chofer != null) MapMarker.chofer(LatLng(chofer.lat, chofer.lng)),
     ];
 
     // El mapa se centra en el chofer mientras se mueve; si todavía no reportó,
     // en el punto de recogida.
     final centro = chofer != null
-        ? LatLng(chofer!.lat, chofer!.lng)
+        ? LatLng(chofer.lat, chofer.lng)
         : (origen ?? destino!);
 
     return ClipRRect(
@@ -508,7 +558,12 @@ class _MapaViaje extends StatelessWidget {
           centro: centro,
           zoom: chofer != null ? 15 : 13,
           marcadores: marcadores,
-          ruta: origen != null && destino != null ? [origen, destino] : const [],
+          // El recorrido real por calles; si OSRM no respondió, la recta
+          // entre los dos puntos, que al menos orienta.
+          ruta: _ruta?.puntos ??
+              (origen != null && destino != null
+                  ? [origen, destino]
+                  : const []),
         ),
       ),
     );

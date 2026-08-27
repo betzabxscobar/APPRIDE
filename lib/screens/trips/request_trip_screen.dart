@@ -1,13 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart' show CameraFit, MapController;
 import 'package:latlong2/latlong.dart' show LatLng;
 
-import '../../core/app_colors.dart';
 import '../../core/app_theme.dart';
+import '../../core/ride_colors.dart';
+import '../../core/map_defaults.dart';
 import '../../models/trip.dart';
 import '../../services/geocoding_service.dart';
 import '../../services/location_service.dart';
 import '../../services/places_service.dart';
 import '../../services/ride_service.dart';
+import '../../services/routing_service.dart';
 import '../../widgets/auth_feedback.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/ride_map.dart';
@@ -30,6 +35,12 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
   GeoPlace? _destino;
   Quote? _cotizacion;
 
+  /// Recorrido real por calles. `null` mientras se calcula o si OSRM falla.
+  Ruta? _ruta;
+
+  final MapController _mapa = MapController();
+  bool _mapaListo = false;
+
   bool _ubicando = true;
   bool _cotizando = false;
   bool _enviando = false;
@@ -41,8 +52,14 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
     _ubicar();
   }
 
+  /// Punto con el que sesgar la búsqueda de direcciones.
+  ///
+  /// Si ya hay origen, ese; si no, donde esté la persona. Antes aquí iba `null`
+  /// mientras no hubiera origen, así que la primera búsqueda —justo la del
+  /// origen— salía sin sesgo y devolvía calles del mismo nombre en otra ciudad
+  /// o en otro país.
   ({double lat, double lng})? get _referencia => _origen == null
-      ? null
+      ? MapDefaults.referenciaBusqueda
       : (lat: _origen!.lat, lng: _origen!.lng);
 
   Future<void> _ubicar() async {
@@ -98,6 +115,35 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
     await _cotizar();
   }
 
+  /// Pide a OSRM el recorrido por calles y encuadra el mapa sobre él.
+  ///
+  /// Si falla no se avisa: el mapa cae a la recta entre los dos puntos, que
+  /// orienta igual aunque no sea el camino real.
+  Future<void> _trazarRuta(GeoPlace o, GeoPlace d) async {
+    final ruta = await RoutingService.instance.entre(
+      LatLng(o.lat, o.lng),
+      LatLng(d.lat, d.lng),
+    );
+    if (!mounted || ruta == null) return;
+
+    setState(() => _ruta = ruta);
+    _encuadrar();
+  }
+
+  /// Deja a la vista el recorrido entero, como hacen las apps de viajes: lo que
+  /// interesa ver es de dónde a dónde, no un zoom fijo.
+  void _encuadrar() {
+    final puntos = _ruta?.puntos;
+    if (puntos == null || puntos.length < 2 || !_mapaListo) return;
+
+    _mapa.fitCamera(
+      CameraFit.coordinates(
+        coordinates: puntos,
+        padding: const EdgeInsets.all(36),
+      ),
+    );
+  }
+
   Future<void> _cotizar() async {
     final o = _origen;
     final d = _destino;
@@ -106,7 +152,12 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
     setState(() {
       _cotizando = true;
       _cotizacion = null;
+      _ruta = null;
     });
+
+    // La ruta se pide en paralelo con la tarifa: son cosas independientes y no
+    // tiene sentido encadenarlas.
+    unawaited(_trazarRuta(o, d));
     try {
       final q = await RideService.instance.cotizar(
         origenLat: o.lat,
@@ -169,7 +220,7 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
         ? LatLng(_destino!.lat, _destino!.lng)
         : _origen != null
             ? LatLng(_origen!.lat, _origen!.lng)
-            : const LatLng(-2.1709, -79.9224);
+            : MapDefaults.centro;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Pedir un viaje')),
@@ -177,19 +228,39 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
         children: [
           SizedBox(
             height: 210,
-            child: _ubicando && _origen == null
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: _ubicando && _origen == null
                 ? const Center(child: CircularProgressIndicator())
                 : RideMap(
                     centro: centro,
                     zoom: marcadores.length == 2 ? 12 : 15,
+                    controlador: _mapa,
                     marcadores: marcadores,
-                    ruta: marcadores.length == 2
-                        ? [
-                            LatLng(_origen!.lat, _origen!.lng),
-                            LatLng(_destino!.lat, _destino!.lng),
-                          ]
-                        : const [],
+                    // El recorrido real si ya llegó; si no, la recta entre los
+                    // dos puntos para no dejar el mapa sin nada.
+                    ruta: _ruta?.puntos ??
+                        (marcadores.length == 2
+                            ? [
+                                LatLng(_origen!.lat, _origen!.lng),
+                                LatLng(_destino!.lat, _destino!.lng),
+                              ]
+                            : const []),
+                    onListo: () {
+                      _mapaListo = true;
+                      _encuadrar();
+                    },
                   ),
+                ),
+                if (_ruta != null)
+                  Positioned(
+                    left: 12,
+                    top: 12,
+                    child: _PildoraRuta(ruta: _ruta!),
+                  ),
+              ],
+            ),
           ),
           Expanded(
             child: ListView(
@@ -200,7 +271,7 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
                     children: [
                       _Punto(
                         icono: Icons.my_location,
-                        color: AppColors.primary,
+                        color: context.ride.accent,
                         titulo: 'Origen',
                         valor: _origen?.nombre ??
                             (_ubicando ? 'Buscando tu ubicación…' : 'Sin definir'),
@@ -210,7 +281,7 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
                       const Divider(height: 24),
                       _Punto(
                         icono: Icons.place_outlined,
-                        color: AppColors.green,
+                        color: context.ride.success,
                         titulo: 'Destino',
                         valor: _destino?.nombre ?? 'Busca a dónde vas',
                         detalle: _destino?.direccion,
@@ -257,11 +328,11 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'El precio se calcula en el servidor con la tarifa vigente '
                   'y la distancia del recorrido.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                  style: TextStyle(fontSize: 11, color: context.ride.inkMuted),
                 ),
               ],
             ),
@@ -306,11 +377,11 @@ class _Punto extends StatelessWidget {
                 children: [
                   Text(
                     titulo.toUpperCase(),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 9,
                       letterSpacing: 1.1,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.inkMuted,
+                      color: context.ride.inkMuted,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -318,10 +389,10 @@ class _Punto extends StatelessWidget {
                     valor,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.ink,
+                      color: context.ride.ink,
                     ),
                   ),
                   if (detalle != null && detalle!.isNotEmpty) ...[
@@ -330,16 +401,16 @@ class _Punto extends StatelessWidget {
                       detalle!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.inkMuted,
+                        color: context.ride.inkMuted,
                       ),
                     ),
                   ],
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, size: 20, color: AppColors.inkMuted),
+            Icon(Icons.chevron_right, size: 20, color: context.ride.inkMuted),
           ],
         ),
       ),
@@ -357,26 +428,26 @@ class _ResumenCotizacion extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.primarySoft,
+        color: context.ride.accentSoft,
         borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
       ),
       child: Column(
         children: [
           Text(
             '\$${cotizacion.total.toStringAsFixed(2)}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 34,
               fontWeight: FontWeight.w900,
-              color: AppColors.ink,
+              color: context.ride.ink,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             cotizacion.tarifaNombre,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: AppColors.primary,
+              color: context.ride.accent,
             ),
           ),
           const SizedBox(height: 14),
@@ -416,21 +487,70 @@ class _Dato extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(icono, size: 18, color: AppColors.inkMuted),
+        Icon(icono, size: 18, color: context.ride.inkMuted),
         const SizedBox(height: 5),
         Text(
           valor,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+            color: context.ride.ink,
           ),
         ),
         Text(
           etiqueta,
-          style: const TextStyle(fontSize: 10, color: AppColors.inkMuted),
+          style: TextStyle(fontSize: 10, color: context.ride.inkMuted),
         ),
       ],
+    );
+  }
+}
+
+
+/// Distancia y tiempo del recorrido real, sobre el mapa.
+///
+/// No es lo mismo que los kilómetros de la tarifa: el precio lo calcula
+/// Postgres a partir de la distancia en línea recta por un factor, mientras que
+/// esto es el camino que se va a recorrer de verdad. Se muestran los dos a
+/// propósito, cada uno donde le toca.
+class _PildoraRuta extends StatelessWidget {
+  const _PildoraRuta({required this.ruta});
+
+  final Ruta ruta;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: ride.surface,
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: ride.border),
+        boxShadow: [
+          BoxShadow(
+            color: ride.shadow,
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.route_outlined, size: 17, color: ride.accent),
+          const SizedBox(width: 7),
+          Text(
+            '${ruta.distanciaTexto} · ${ruta.duracionTexto}',
+            style: TextStyle(
+              fontSize: AppText.label,
+              fontWeight: FontWeight.w700,
+              color: ride.ink,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
