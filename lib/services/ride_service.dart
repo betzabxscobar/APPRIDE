@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../models/trip.dart';
 import 'auth_service.dart';
+import 'h3_service.dart';
 
 /// Motor de viajes.
 ///
@@ -95,6 +96,10 @@ class RideService {
     required String destinoTexto,
     String? tarifaId,
   }) async {
+    // El disco de celdas se calcula aquí porque una política RLS no puede
+    // generarlo: H3 no existe dentro de Postgres. Si va en null, la difusión
+    // cae a PostGIS.
+    final h3 = H3Service.instance;
     return _rpc<String>('solicitar_viaje', {
       'p_origen_lat': origenLat,
       'p_origen_lng': origenLng,
@@ -103,6 +108,8 @@ class RideService {
       'p_destino_lng': destinoLng,
       'p_destino_texto': destinoTexto,
       'p_tarifa_id': tarifaId,
+      'p_origen_celda_h3_7': h3.celda(origenLat, origenLng),
+      'p_celdas_difusion': h3.disco(origenLat, origenLng),
     });
   }
 
@@ -192,12 +199,18 @@ class RideService {
   /// también necesita ser localizable, porque la difusión de solicitudes solo
   /// le llega si tiene una posición reciente. Cuando sí hay viaje, además queda
   /// el rastro en `public.ubicaciones`.
-  Future<void> reportarPosicion(double lat, double lng, [String? viajeId]) =>
-      _rpc<void>('reportar_posicion', {
-        'p_lat': lat,
-        'p_lng': lng,
-        'p_viaje_id': viajeId,
-      });
+  Future<void> reportarPosicion(double lat, double lng, [String? viajeId]) {
+    // Las celdas van solo si H3 está disponible. Donde no lo esté quedan en
+    // null y la difusión sigue funcionando por radio con PostGIS.
+    final h3 = H3Service.instance;
+    return _rpc<void>('reportar_posicion', {
+      'p_lat': lat,
+      'p_lng': lng,
+      'p_viaje_id': viajeId,
+      'p_celda_h3_7': h3.celda(lat, lng),
+      'p_celda_h3_9': h3.celdaZona(lat, lng),
+    });
+  }
 
   /// Última posición reportada por el chofer durante un viaje.
   ///
