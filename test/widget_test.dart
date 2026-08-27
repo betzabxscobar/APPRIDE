@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ride/main.dart';
+import 'package:ride/core/app_theme.dart';
 import 'package:ride/models/app_user.dart';
 import 'package:ride/models/fleet.dart';
 import 'package:ride/services/geocoding_service.dart';
+import 'package:ride/services/h3_service.dart';
 import 'package:ride/models/trip.dart';
 import 'package:ride/models/user_role.dart';
 import 'package:ride/models/vehicle.dart';
@@ -32,9 +33,19 @@ import 'package:ride/widgets/panel_switcher.dart';
 /// modelos.
 void main() {
   group('Pantalla de autenticación', () {
+    /// Monta solo la pantalla de autenticación.
+    ///
+    /// No se usa [RideApp] porque su primera pantalla conecta con Supabase, y
+    /// estas pruebas corren sin red. Lo que se verifica aquí es el árbol de
+    /// widgets, que no depende de la sesión.
+    Widget appDePrueba() => MaterialApp(
+          theme: AppTheme.light,
+          home: const AuthScreen(),
+        );
+
     /// Lleva la pantalla desde la bienvenida hasta [step].
     Future<void> abrir(WidgetTester tester, AuthStep step) async {
-      await tester.pumpWidget(const RideApp());
+      await tester.pumpWidget(appDePrueba());
       await tester.pumpAndSettle();
 
       await tester.tap(
@@ -47,7 +58,7 @@ void main() {
 
     testWidgets('La bienvenida ofrece registro e inicio de sesión',
         (tester) async {
-      await tester.pumpWidget(const RideApp());
+      await tester.pumpWidget(appDePrueba());
       await tester.pumpAndSettle();
 
       expect(find.text('BIENVENIDO A RIDE'), findsOneWidget);
@@ -59,7 +70,7 @@ void main() {
         (tester) async {
       // En móvil (800 px de ancho por defecto) la columna oscura se oculta,
       // igual que el `@media(max-width:850px)` de WEB-RIDE.
-      await tester.pumpWidget(const RideApp());
+      await tester.pumpWidget(appDePrueba());
       await tester.pumpAndSettle();
       expect(find.byType(BrandPanel), findsNothing);
 
@@ -67,7 +78,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(const RideApp());
+      await tester.pumpWidget(appDePrueba());
       await tester.pumpAndSettle();
       expect(find.byType(BrandPanel), findsOneWidget);
 
@@ -232,6 +243,35 @@ void main() {
       expect(TripStatus.aceptado.progreso,
           lessThan(TripStatus.enCurso.progreso));
       expect(TripStatus.finalizado.progreso, 1);
+    });
+  });
+
+  group('H3', () {
+    // Estas pruebas corren en la VM de Dart, no en el navegador, así que H3
+    // NO está disponible aquí. Es justo lo que interesa comprobar: que la app
+    // siga funcionando donde H3 no existe.
+    test('Fuera de la web, H3 se reporta como no disponible', () {
+      expect(H3Service.instance.disponible, isFalse);
+    });
+
+    test('Sin H3 las celdas son null, no una excepción', () {
+      // Si esto lanzara, pedir un viaje fallaría en móvil.
+      expect(H3Service.instance.celda(-2.1574, -79.8836), isNull);
+      expect(H3Service.instance.celdaZona(-2.1574, -79.8836), isNull);
+      expect(H3Service.instance.disco(-2.1574, -79.8836), isNull);
+    });
+
+    test('El radio coincide con el de PostGIS', () {
+      // Si se separan, las dos vías darían resultados distintos y la
+      // comparación dejaría de tener sentido.
+      expect(H3Service.radioKm, 5);
+    });
+
+    test('La resolución de difusión es la medida como mejor equilibrio', () {
+      // res 7: 61 celdas por consulta. res 8 sube a 331 y res 9 a 1951 sin
+      // ganar precisión.
+      expect(H3Service.resDifusion, 7);
+      expect(H3Service.resZona, greaterThan(H3Service.resDifusion));
     });
   });
 
