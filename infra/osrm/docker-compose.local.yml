@@ -1,0 +1,28 @@
+# OSRM en tu propia maquina, para desarrollo.
+#
+#   ./preparar.sh
+#   docker compose -f docker-compose.local.yml up -d
+#   flutter run --dart-define=OSRM_URL=http://localhost:5000
+#
+# Sin Caddy y sin dominio: aqui el puerto se expone directo porque no sale de
+# la maquina. El docker-compose.yml normal es el de un servidor de verdad, con
+# HTTPS y el motor escondido detras del proxy.
+#
+# Ojo: esto NO vale para produccion. Sin HTTPS, una app servida por https no
+# puede llamarlo, y OSRM no tiene autenticacion ninguna.
+
+services:
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:v26.4.0
+    command: >
+      osrm-routed
+      --algorithm mld
+      /data/ecuador-latest.osrm
+    volumes:
+      - ./datos:/data:ro
+    ports:
+      # Solo a la interfaz local: no queda abierto a la red del wifi.
+      # Para probar desde un telefono fisico, cambiar a "5000:5000" y usar la
+      # IP del PC. Ver README.
+      - "127.0.0.1:5000:5000"
+    restart: unless-stopped

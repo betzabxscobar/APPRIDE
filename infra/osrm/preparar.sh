@@ -17,6 +17,17 @@ PBF="${PAIS}-latest.osm.pbf"
 
 paso() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 
+# En Git Bash (Windows), MSYS reescribe las rutas que le parecen unix antes de
+# pasarselas a docker, y convierte `/data` en algo como
+# `C:/Program Files/Git/data`. Con esto se queda quieto. En Linux y macOS estas
+# variables no molestan.
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL='*'
+
+docker_osrm() {
+  docker run --rm -t -v "${DATOS}:/data" "$IMAGEN" "$@"
+}
+
 command -v docker >/dev/null || {
   echo "Falta docker. Instalalo antes: https://docs.docker.com/engine/install/" >&2
   exit 1
@@ -42,18 +53,18 @@ find . -maxdepth 1 -name "${PAIS}-latest.osrm*" -delete
 # `car.lua` es el perfil de coche que trae la imagen. Para moto o bici se
 # cambia por motorcycle.lua o bicycle.lua.
 paso "1/3 osrm-extract (el paso largo)"
-docker run --rm -t -v "${DATOS}:/data" "$IMAGEN" \
-  osrm-extract -p /opt/car.lua "/data/${PBF}"
+docker_osrm osrm-extract -p /opt/car.lua "/data/${PBF}"
 
 paso "2/3 osrm-partition"
-docker run --rm -t -v "${DATOS}:/data" "$IMAGEN" \
-  osrm-partition "/data/${PAIS}-latest.osrm"
+docker_osrm osrm-partition "/data/${PAIS}-latest.osrm"
 
 paso "3/3 osrm-customize"
-docker run --rm -t -v "${DATOS}:/data" "$IMAGEN" \
-  osrm-customize "/data/${PAIS}-latest.osrm"
+docker_osrm osrm-customize "/data/${PAIS}-latest.osrm"
 
 paso "Listo"
 du -sh "$DATOS" | awk '{print "El grafo ocupa " $1}'
 echo
-echo "Ahora:  docker compose up -d"
+echo "En tu maquina:   docker compose -f docker-compose.local.yml up -d"
+echo "                 flutter run --dart-define=OSRM_URL=http://localhost:5000"
+echo
+echo "En un servidor:  docker compose up -d"

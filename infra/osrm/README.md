@@ -1,14 +1,61 @@
 # Servidor de rutas propio (OSRM)
 
 La app calcula las rutas con [OSRM](https://github.com/Project-OSRM/osrm-backend).
-Mientras no se despliegue esto, apunta al **servidor público de demostración**,
-que sirve para desarrollar pero **no para usuarios reales**: su política de uso
-lo limita a pruebas, puede ir lento y puede cortar sin aviso. Lo mismo vale para
-el de FOSSGIS (`routing.openstreetmap.de`).
 
-Esta carpeta levanta el tuyo.
+**Mientras se desarrolla en local no hace falta nada de esto.** Por defecto la
+app usa el servidor público de demostración (`router.project-osrm.org`), que es
+justo para lo que existe: desarrollo y pruebas. No pide clave y funciona.
 
-## Qué hace falta
+Esta carpeta hace falta en dos casos:
+
+1. **Cuando haya usuarios reales.** La política del servidor de demostración lo
+   limita a pruebas: puede ir lento y puede cortar sin aviso. Lo mismo vale para
+   el de FOSSGIS (`routing.openstreetmap.de`). Ver *En un servidor*.
+2. **Si quieres trabajar sin internet**, o el de demostración te empieza a
+   cortar. Ver *En tu propia máquina*, que no necesita ni dominio ni servidor.
+
+## En tu propia máquina
+
+Solo hace falta **Docker Desktop**. Desde Git Bash:
+
+```bash
+cd infra/osrm
+./preparar.sh                                        # tarda, ver más abajo
+docker compose -f docker-compose.local.yml up -d
+```
+
+Y arrancas la app apuntando ahí:
+
+```bash
+flutter run -d chrome --dart-define=OSRM_URL=http://localhost:5000
+```
+
+Comprueba que responde:
+
+```bash
+curl "http://localhost:5000/route/v1/driving/-78.4880,-0.1760;-78.4750,-0.2050?overview=false"
+```
+
+Tiene que dar `{"code":"Ok"...}` con unos **5,9 km**, que es ese trayecto de
+Quito.
+
+### Desde un teléfono de verdad
+
+`localhost` no vale: para el teléfono, `localhost` es él mismo.
+
+- **Emulador de Android**: usa `http://10.0.2.2:5000`, que es como el emulador
+  ve el PC.
+- **Teléfono físico en el mismo wifi**: cambia el puerto en
+  `docker-compose.local.yml` de `"127.0.0.1:5000:5000"` a `"5000:5000"` y usa la
+  IP del PC (`ipconfig`). Android bloquea el tráfico http sin cifrar por
+  defecto, así que además hay que permitirlo para esa IP en
+  `network_security_config.xml`.
+
+Para el emulador y el navegador no hace falta nada de eso.
+
+## En un servidor
+
+### Qué hace falta
 
 - Una máquina Linux con **Docker** y **~4 GB de RAM**. La parte que más consume
   es `osrm-extract`; una vez construido el grafo, servirlo pide bastante menos.
@@ -19,7 +66,7 @@ Esta carpeta levanta el tuyo.
 > que una página https llame a un http: lo bloquea por contenido mixto. Por eso
 > el compose trae Caddy, que saca y renueva el certificado solo.
 
-## Puesta en marcha
+### Puesta en marcha
 
 ```bash
 cd infra/osrm
@@ -43,7 +90,7 @@ Para otro país se cambian las variables:
 PAIS=colombia REGION=south-america ./preparar.sh
 ```
 
-## Comprobar que funciona
+### Comprobar que funciona
 
 ```bash
 curl "https://rutas.tudominio.com/route/v1/driving/-78.4880,-0.1760;-78.4750,-0.2050?overview=false"
@@ -52,7 +99,7 @@ curl "https://rutas.tudominio.com/route/v1/driving/-78.4880,-0.1760;-78.4750,-0.
 Tiene que responder `{"code":"Ok"...}` con una distancia cercana a **5,9 km**,
 que es lo que da ese trayecto de Quito.
 
-## Apuntar la app
+### Apuntar la app
 
 ```bash
 flutter build web --dart-define=OSRM_URL=https://rutas.tudominio.com
