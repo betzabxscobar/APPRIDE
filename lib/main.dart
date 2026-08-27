@@ -9,6 +9,8 @@ import 'screens/auth/first_access_screen.dart';
 import 'screens/auth/auth_screen.dart';
 import 'screens/home/driver_home_screen.dart';
 import 'screens/home/passenger_home_screen.dart';
+import 'screens/home/welcome_home_screen.dart';
+import 'screens/splash/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,7 +35,35 @@ class RideApp extends StatelessWidget {
       title: 'Ride',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: const AuthGate(),
+      home: const _AppRoot(),
+    );
+  }
+}
+
+/// Muestra el splash la primera vez y luego el AuthGate.
+class _AppRoot extends StatefulWidget {
+  const _AppRoot();
+
+  @override
+  State<_AppRoot> createState() => _AppRootState();
+}
+
+class _AppRootState extends State<_AppRoot> {
+  bool _showSplash = true;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showSplash) {
+      return SplashScreen(
+        onDone: () => setState(() => _showSplash = false),
+      );
+    }
+    return WelcomeHomeScreen(
+      onContinue: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AuthGate()),
+        );
+      },
     );
   }
 }
