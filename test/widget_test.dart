@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ride/main.dart';
 import 'package:ride/models/app_user.dart';
 import 'package:ride/models/fleet.dart';
+import 'package:ride/services/geocoding_service.dart';
 import 'package:ride/models/trip.dart';
 import 'package:ride/models/user_role.dart';
 import 'package:ride/models/vehicle.dart';
@@ -231,6 +232,31 @@ void main() {
       expect(TripStatus.aceptado.progreso,
           lessThan(TripStatus.enCurso.progreso));
       expect(TripStatus.finalizado.progreso, 1);
+    });
+  });
+
+  group('Geocodificación', () {
+    test('El texto completo une nombre y contexto', () {
+      const p = GeoPlace(
+        nombre: 'Calle de Serrano 21',
+        direccion: 'Madrid, España',
+        lat: 40.42, lng: -3.68,
+      );
+      expect(p.completo, 'Calle de Serrano 21, Madrid, España');
+    });
+
+    test('Sin contexto no queda una coma suelta', () {
+      const p = GeoPlace(
+        nombre: 'Tu ubicación actual', direccion: '', lat: 0, lng: 0,
+      );
+      expect(p.completo, 'Tu ubicación actual');
+    });
+
+    test('Textos muy cortos no salen a la red', () async {
+      // Photon ignora consultas de una o dos letras y solo gastarían batería.
+      expect(await GeocodingService.instance.buscar('a'), isEmpty);
+      expect(await GeocodingService.instance.buscar('ab'), isEmpty);
+      expect(await GeocodingService.instance.buscar('   '), isEmpty);
     });
   });
 
