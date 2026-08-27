@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart' show MapController;
+import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
-import '../../core/app_colors.dart';
 import '../../core/app_theme.dart';
+import '../../core/map_defaults.dart';
+import '../../core/ride_colors.dart';
 import '../../models/app_user.dart';
 import '../../models/trip.dart';
 import '../../screens/driver/driver_profile_screen.dart';
@@ -12,12 +15,20 @@ import '../../screens/notifications/notifications_screen.dart';
 import '../../screens/trips/driver_trips_screen.dart';
 import '../../services/location_service.dart';
 import '../../services/ride_service.dart';
+import '../../widgets/map_controls.dart';
 import '../../widgets/panel_switcher.dart';
 import '../../widgets/ride_card.dart';
+import '../../widgets/ride_map.dart';
 import 'account_sheet.dart';
 
-/// Home del rol conductor. Maqueta estática del diseño; el flujo de aceptar
-/// rutas reales llega en la siguiente etapa.
+/// Home del rol conductor.
+///
+/// Mismo patrón que la pantalla del pasajero: el mapa de fondo y una hoja
+/// arrastrable con el estado, los accesos y las oportunidades. Para quien
+/// conduce el mapa no es decoración: es dónde está y qué tiene alrededor.
+///
+/// Las oportunidades siguen siendo maqueta; el flujo de aceptar rutas reales
+/// llega en la siguiente etapa.
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key, required this.user});
 
@@ -28,10 +39,23 @@ class DriverHomeScreen extends StatefulWidget {
 }
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
+  static const double _hojaMinima = 0.36;
+  static const double _hojaInicial = 0.52;
+
+  final MapController _mapa = MapController();
+
   sb.RealtimeChannel? _canal;
   DriverState _estado = const DriverState.sinCuenta();
   Trip? _activo;
   bool _cambiando = false;
+
+  /// Dónde está el chofer y con cuánto margen de error.
+  ({LatLng punto, double precision})? _yo;
+
+  bool _buscandoUbicacion = true;
+  String? _errorUbicacion;
+  bool _mapaListo = false;
+  double _hoja = _hojaInicial;
 
   /// Refleja el estado real guardado en `public.conductores`, no una bandera
   /// local: antes el interruptor cambiaba de color sin que el servidor se
@@ -42,7 +66,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   void initState() {
     super.initState();
     _cargar();
-    _canal = RideService.instance.escucharViajes(_cargar);
+    _ubicar();
+    try {
+      _canal = RideService.instance.escucharViajes(_cargar);
+    } catch (_) {
+      // Si Realtime no arranca, la pantalla sigue en pie con los datos que
+      // trae `_cargar`. Sin este try la excepción sale de initState y deja la
+      // pantalla en rojo.
+    }
   }
 
   @override
@@ -58,12 +89,61 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       final estado = await RideService.instance.estadoConductor();
       final activo = await RideService.instance.viajeActivo();
       if (mounted) {
-        setState(() { _estado = estado; _activo = activo; });
+        setState(() {
+          _estado = estado;
+          _activo = activo;
+        });
         _ajustarLatido();
       }
     } catch (_) {
       // Sin conexión la pantalla sigue usable.
     }
+  }
+
+  Future<void> _ubicar() async {
+    setState(() {
+      _buscandoUbicacion = true;
+      _errorUbicacion = null;
+    });
+
+    try {
+      final pos = await LocationService.instance.posicionActual();
+      if (!mounted) return;
+      setState(() {
+        _yo = (punto: LatLng(pos.lat, pos.lng), precision: pos.precision);
+        _buscandoUbicacion = false;
+      });
+      _centrar();
+    } on LocationUnavailable catch (e) {
+      // Aquí importa más que en el pasajero: sin posición fresca la política
+      // `viajes_difusion_conductores` no le muestra ninguna solicitud.
+      if (mounted) {
+        setState(() {
+          _errorUbicacion = e.message;
+          _buscandoUbicacion = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _errorUbicacion = 'No pudimos leer tu ubicación.';
+          _buscandoUbicacion = false;
+        });
+      }
+    }
+  }
+
+  void _centrar() {
+    final yo = _yo;
+    if (yo == null || !_mapaListo) return;
+    // El zoom sale del margen de error: no tiene sentido acercarse a nivel de
+    // calle si la posición viene de la IP y falla por kilómetros.
+    final zoom = yo.precision > 2000
+        ? 11.0
+        : yo.precision > 500
+            ? 13.5
+            : 15.5;
+    _mapa.move(yo.punto, zoom);
   }
 
   Future<void> _cambiarDisponibilidad(bool valor) async {
@@ -112,6 +192,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         pos.lng,
         _activo?.id,
       );
+      // El latido ya tiene la posición fresca: aprovecharla para el punto azul
+      // evita pedirle al GPS lo mismo dos veces.
+      if (mounted) {
+        setState(() {
+          _yo = (punto: LatLng(pos.lat, pos.lng), precision: pos.precision);
+          _buscandoUbicacion = false;
+          _errorUbicacion = null;
+        });
+      }
     } catch (_) {
       // Si el GPS falla puntualmente no se interrumpe la jornada: el siguiente
       // latido lo reintenta. Lo que sí se nota es que dejan de llegar viajes,
@@ -139,264 +228,445 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
     return Scaffold(
       appBar: const ViewingAsBar(),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          children: [
-            RideCard(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppColors.greenSoft,
-                    child: Text(
-                      user.initials,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.green,
-                      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final alto = constraints.maxHeight;
+
+          return NotificationListener<DraggableScrollableNotification>(
+            onNotification: (aviso) {
+              if (aviso.extent != _hoja) {
+                setState(() => _hoja = aviso.extent);
+              }
+              return false;
+            },
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: RideMap(
+                    centro: _yo?.punto ?? MapDefaults.centro,
+                    zoom: _yo == null
+                        ? MapDefaults.zoom
+                        : MapDefaults.zoomCalle,
+                    controlador: _mapa,
+                    miUbicacion: _yo,
+                    margenCredito: EdgeInsets.only(bottom: alto * _hoja),
+                    onListo: () {
+                      _mapaListo = true;
+                      _centrar();
+                    },
+                  ),
+                ),
+                _BarraFlotante(user: user, disponible: _available),
+                if (_yo == null)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    top: MediaQuery.paddingOf(context).top + 72,
+                    child: MapNotice(
+                      cargando: _buscandoUbicacion,
+                      mensaje: _buscandoUbicacion
+                          ? 'Buscando tu ubicación…'
+                          : _errorUbicacion ??
+                              'Sin ubicación no te llegan solicitudes.',
+                      onReintentar: _buscandoUbicacion ? null : _ubicar,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Modo conductor',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ink,
-                      ),
-                    ),
+                Positioned(
+                  right: 16,
+                  bottom: alto * _hoja + 16,
+                  child: MapRoundButton(
+                    icon: Icons.my_location,
+                    tooltip: 'Centrar en mi ubicación',
+                    onPressed: _yo == null ? _ubicar : _centrar,
                   ),
-                  Switch(
-                    value: _available,
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: AppColors.primary,
-                    onChanged: (_cambiando || !_estado.puedeTrabajar)
-                        ? null
-                        : _cambiarDisponibilidad,
+                ),
+                DraggableScrollableSheet(
+                  initialChildSize: _hojaInicial,
+                  minChildSize: _hojaMinima,
+                  maxChildSize: 0.92,
+                  snap: true,
+                  snapSizes: const [_hojaMinima, _hojaInicial, 0.92],
+                  builder: (context, scrollController) => _HojaConductor(
+                    controller: scrollController,
+                    user: user,
+                    estado: _estado,
+                    activo: _activo,
+                    cambiando: _cambiando,
+                    onDisponibilidad: _cambiarDisponibilidad,
+                    onAbrirViajes: _abrirViajes,
+                    onAbrirPerfil: _abrirPerfil,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            if (!_estado.puedeTrabajar && _estado.motivoBloqueo.isNotEmpty) ...[
-              Container(
-                padding: const EdgeInsets.all(13),
-                decoration: BoxDecoration(
-                  color: AppColors.purpleSoft,
-                  borderRadius: BorderRadius.circular(AppTheme.radius),
-                ),
-                child: Text(
-                  _estado.motivoBloqueo,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ink,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-            ],
-            if (_activo != null) ...[
-              InkWell(
-                onTap: _abrirViajes,
-                borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: _activo!.status.color.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-                    border: Border.all(
-                      color: _activo!.status.color.withValues(alpha: 0.35),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.local_taxi, size: 19, color: _activo!.status.color),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _activo!.status.label,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: _activo!.status.color,
-                              ),
-                            ),
-                            Text(
-                              'Hacia ${_activo!.destinoTexto}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.inkMuted,
-                              ),
-                            ),
-                          ],
+          );
+        },
+      ),
+      bottomNavigationBar: const _DriverNavBar(),
+    );
+  }
+}
+
+/// Cuenta y campana flotando sobre el mapa.
+class _BarraFlotante extends StatelessWidget {
+  const _BarraFlotante({required this.user, required this.disponible});
+
+  final AppUser user;
+  final bool disponible;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: Row(
+          children: [
+            MapCapsule(
+              child: InkWell(
+                onTap: () => showAccountSheet(context, user),
+                customBorder: const CircleBorder(),
+                child: Tooltip(
+                  message: 'Cuenta',
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Center(
+                      child: Text(
+                        user.initials,
+                        style: TextStyle(
+                          fontSize: AppText.small,
+                          fontWeight: FontWeight.w800,
+                          color: disponible ? ride.success : ride.inkMuted,
                         ),
                       ),
-                      const Icon(Icons.chevron_right,
-                          size: 21, color: AppColors.inkMuted),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-            ],
-            FilledButton.icon(
-              onPressed: _abrirViajes,
-              icon: const Icon(Icons.list_alt, size: 20),
-              label: Text(
-                _activo != null ? 'Ver mi viaje' : 'Ver solicitudes de viaje',
-              ),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
-              ),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: _abrirPerfil,
-              icon: const Icon(Icons.badge_outlined, size: 19),
-              label: Text(
-                _estado.puedeTrabajar
-                    ? 'Mi vehículo y documentos'
-                    : 'Completar mi cuenta de chofer',
-              ),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(46),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: _available ? AppColors.green : AppColors.inkMuted,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _available ? 'Estás disponible' : 'No estás disponible',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ink,
-                  ),
-                ),
-                const Spacer(),
-                const NotificationsBell(),
-                IconButton(
-                  onPressed: () => showAccountSheet(context, user),
-                  icon: const Icon(Icons.person_outline),
-                  tooltip: 'Cuenta',
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(
-                  Icons.place_outlined,
-                  size: 16,
-                  color: AppColors.inkMuted,
-                ),
-                const SizedBox(width: 6),
-                const Text(
-                  'Zona: Quito Norte',
-                  style: TextStyle(fontSize: 13, color: AppColors.inkMuted),
-                ),
-                const Spacer(),
-                TextButton(onPressed: () {}, child: const Text('Cambiar')),
-              ],
-            ),
-            if (user.vehicle != null) ...[
-              const SizedBox(height: 10),
-              RideCard(
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.directions_car_outlined,
-                      size: 22,
-                      color: AppColors.primary,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user.vehicle!.summary,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.ink,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            user.vehicle!.plate,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppColors.inkMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ],
-            const SizedBox(height: 22),
-            const Text(
-              'Oportunidades para ti',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+            ),
+            const Spacer(),
+            const MapCapsule(
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: NotificationsBell(),
               ),
-            ),
-            const SizedBox(height: 2),
-            const Text(
-              'Ordenadas por compatibilidad y retorno',
-              style: TextStyle(fontSize: 13, color: AppColors.inkMuted),
-            ),
-            const SizedBox(height: 14),
-            const _OpportunityCard(
-              index: 1,
-              tag: 'Alta compatibilidad',
-              match: '92%',
-              from: 'Av. 6 de Diciembre',
-              to: 'Cumbayá',
-              earnings: '\$8.40',
-              duration: '14 min',
-              distance: '6.2 km',
-            ),
-            const SizedBox(height: 14),
-            const _OpportunityCard(
-              index: 2,
-              tag: 'Buen retorno',
-              match: '78%',
-              from: 'La Carolina',
-              to: 'Calderón',
-              earnings: '\$9.10',
-              duration: '18 min',
-              distance: '8.1 km',
             ),
           ],
         ),
       ),
-      bottomNavigationBar: const _DriverNavBar(),
+    );
+  }
+}
+
+/// Contenido de la hoja del conductor.
+class _HojaConductor extends StatelessWidget {
+  const _HojaConductor({
+    required this.controller,
+    required this.user,
+    required this.estado,
+    required this.activo,
+    required this.cambiando,
+    required this.onDisponibilidad,
+    required this.onAbrirViajes,
+    required this.onAbrirPerfil,
+  });
+
+  final ScrollController controller;
+  final AppUser user;
+  final DriverState estado;
+  final Trip? activo;
+  final bool cambiando;
+  final ValueChanged<bool> onDisponibilidad;
+  final VoidCallback onAbrirViajes;
+  final VoidCallback onAbrirPerfil;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+    final viaje = activo;
+    final vehiculo = user.vehicle;
+
+    return SheetSurface(
+      child: ListView(
+        controller: controller,
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+        children: [
+          const SheetHandle(),
+          _InterruptorJornada(
+            disponible: estado.disponible,
+            bloqueado: cambiando || !estado.puedeTrabajar,
+            onChanged: onDisponibilidad,
+          ),
+          if (!estado.puedeTrabajar && estado.motivoBloqueo.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: ride.infoSoft,
+                borderRadius: BorderRadius.circular(AppTheme.radiusField),
+                border: Border.all(color: ride.info.withValues(alpha: 0.35)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, size: 21, color: ride.info),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      estado.motivoBloqueo,
+                      style: TextStyle(
+                        fontSize: AppText.small,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                        color: ride.ink,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (viaje != null) ...[
+            const SizedBox(height: 16),
+            _ViajeActivo(viaje: viaje, onAbrir: onAbrirViajes),
+          ],
+          const SizedBox(height: 18),
+          FilledButton.icon(
+            onPressed: onAbrirViajes,
+            icon: const Icon(Icons.list_alt, size: 22),
+            label: Text(
+              viaje != null ? 'Ver mi viaje' : 'Ver solicitudes de viaje',
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: onAbrirPerfil,
+            icon: const Icon(Icons.badge_outlined, size: 21),
+            label: Text(
+              estado.puedeTrabajar
+                  ? 'Mi vehículo y documentos'
+                  : 'Completar mi cuenta de chofer',
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Icon(Icons.place_outlined, size: 20, color: ride.inkMuted),
+              const SizedBox(width: 8),
+              Text(
+                'Zona: Quito Norte',
+                style: TextStyle(
+                  fontSize: AppText.small,
+                  color: ride.inkMuted,
+                ),
+              ),
+              const Spacer(),
+              TextButton(onPressed: () {}, child: const Text('Cambiar')),
+            ],
+          ),
+          if (vehiculo != null) ...[
+            const SizedBox(height: 12),
+            RideCard(
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.directions_car_outlined,
+                    size: 26,
+                    color: ride.accent,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          vehiculo.summary,
+                          style: TextStyle(
+                            fontSize: AppText.h3,
+                            fontWeight: FontWeight.w700,
+                            color: ride.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          vehiculo.plate,
+                          style: TextStyle(
+                            fontSize: AppText.small,
+                            color: ride.inkMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 26),
+          Text(
+            'Oportunidades para ti',
+            style: AppTheme.display(
+              AppText.h2,
+              color: ride.ink,
+              letterSpacing: -0.6,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Ordenadas por compatibilidad y retorno',
+            style: TextStyle(fontSize: AppText.small, color: ride.inkMuted),
+          ),
+          const SizedBox(height: 16),
+          const _OpportunityCard(
+            index: 1,
+            tag: 'Alta compatibilidad',
+            match: '92%',
+            from: 'Av. 6 de Diciembre',
+            to: 'Cumbayá',
+            earnings: '\$8.40',
+            duration: '14 min',
+            distance: '6.2 km',
+          ),
+          const SizedBox(height: 14),
+          const _OpportunityCard(
+            index: 2,
+            tag: 'Buen retorno',
+            match: '78%',
+            from: 'La Carolina',
+            to: 'Calderón',
+            earnings: '\$9.10',
+            duration: '18 min',
+            distance: '8.1 km',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// El control principal del conductor: entrar y salir de la jornada.
+///
+/// Ocupa el primer lugar de la hoja y cambia de color con el estado, para que
+/// se sepa de un vistazo si están llegando viajes o no.
+class _InterruptorJornada extends StatelessWidget {
+  const _InterruptorJornada({
+    required this.disponible,
+    required this.bloqueado,
+    required this.onChanged,
+  });
+
+  final bool disponible;
+  final bool bloqueado;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+    final color = disponible ? ride.success : ride.inkMuted;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      padding: const EdgeInsets.fromLTRB(18, 14, 12, 14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: ride.isDark ? 0.16 : 0.10),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  disponible ? 'Estás disponible' : 'No estás disponible',
+                  style: TextStyle(
+                    fontSize: AppText.h3,
+                    fontWeight: FontWeight.w800,
+                    color: ride.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  disponible
+                      ? 'Te llegan solicitudes de tu zona.'
+                      : 'Actívate para recibir solicitudes.',
+                  style: TextStyle(
+                    fontSize: AppText.label,
+                    color: ride.inkMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: disponible,
+            onChanged: bloqueado ? null : onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tarjeta del viaje en marcha del conductor.
+class _ViajeActivo extends StatelessWidget {
+  const _ViajeActivo({required this.viaje, required this.onAbrir});
+
+  final Trip viaje;
+  final VoidCallback onAbrir;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+    final color = viaje.status.color;
+
+    return RideCard(
+      onTap: onAbrir,
+      color: color.withValues(alpha: ride.isDark ? 0.16 : 0.10),
+      borderColor: color.withValues(alpha: 0.4),
+      child: Row(
+        children: [
+          Icon(Icons.local_taxi, size: 23, color: color),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  viaje.status.label,
+                  style: TextStyle(
+                    fontSize: AppText.h3,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Hacia ${viaje.destinoTexto}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: AppText.small,
+                    color: ride.inkMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right, size: 24, color: ride.inkMuted),
+        ],
+      ),
     );
   }
 }
@@ -424,6 +694,18 @@ class _OpportunityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    final placeStyle = TextStyle(
+      fontSize: AppText.h3,
+      fontWeight: FontWeight.w700,
+      color: ride.ink,
+    );
+    final metaStyle = TextStyle(
+      fontSize: AppText.small,
+      color: ride.inkMuted,
+    );
+
     return RideCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -431,49 +713,49 @@ class _OpportunityCard extends StatelessWidget {
           Row(
             children: [
               CircleAvatar(
-                radius: 11,
-                backgroundColor: AppColors.primary,
+                radius: 13,
+                backgroundColor: ride.accent,
                 child: Text(
                   '$index',
-                  style: const TextStyle(
-                    fontSize: 11,
+                  style: TextStyle(
+                    fontSize: AppText.label,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    color: ride.isDark ? const Color(0xFF04121C) : Colors.white,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   tag,
-                  style: const TextStyle(
-                    fontSize: 13,
+                  style: TextStyle(
+                    fontSize: AppText.small,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                    color: ride.accent,
                   ),
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
+                  horizontal: 11,
+                  vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.greenSoft,
+                  color: ride.successSoft,
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
                   match,
-                  style: const TextStyle(
-                    fontSize: 11,
+                  style: TextStyle(
+                    fontSize: AppText.label,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.green,
+                    color: ride.success,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -481,73 +763,67 @@ class _OpportunityCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _Label('Desde'),
-                    Text(from, style: _placeStyle),
-                    const SizedBox(height: 8),
-                    const _Label('Hasta'),
-                    Text(to, style: _placeStyle),
+                    _Label('Desde'),
+                    Text(from, style: placeStyle),
+                    const SizedBox(height: 10),
+                    _Label('Hasta'),
+                    Text(to, style: placeStyle),
                   ],
                 ),
               ),
+              const SizedBox(width: 12),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
+                  horizontal: 16,
+                  vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.greenSoft,
-                  borderRadius: BorderRadius.circular(14),
+                  color: ride.successSoft,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusField),
                 ),
                 child: Column(
                   children: [
-                    const Text(
+                    Text(
                       'Tú ganas',
                       style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.inkMuted,
+                        fontSize: AppText.label,
+                        color: ride.inkMuted,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       earnings,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                      style: AppTheme.display(
+                        AppText.h2,
+                        color: ride.ink,
+                        letterSpacing: -0.6,
+                        height: 1.1,
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Icon(
-                Icons.schedule,
-                size: 14,
-                color: AppColors.inkMuted,
-              ),
-              const SizedBox(width: 4),
-              Text(duration, style: _metaStyle),
-              const SizedBox(width: 14),
-              const Icon(
-                Icons.route_outlined,
-                size: 14,
-                color: AppColors.inkMuted,
-              ),
-              const SizedBox(width: 4),
-              Text(distance, style: _metaStyle),
             ],
           ),
           const SizedBox(height: 14),
           Row(
             children: [
+              Icon(Icons.schedule, size: 18, color: ride.inkMuted),
+              const SizedBox(width: 6),
+              Text(duration, style: metaStyle),
+              const SizedBox(width: 18),
+              Icon(Icons.route_outlined, size: 18, color: ride.inkMuted),
+              const SizedBox(width: 6),
+              Text(distance, style: metaStyle),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
               Expanded(
                 child: FilledButton(
                   style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(44),
+                    minimumSize: const Size.fromHeight(50),
                   ),
                   onPressed: () {},
                   child: const Text('Aceptar ruta'),
@@ -557,12 +833,7 @@ class _OpportunityCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(44),
-                    foregroundColor: AppColors.ink,
-                    side: const BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                    minimumSize: const Size.fromHeight(50),
                   ),
                   onPressed: () {},
                   child: const Text('Omitir'),
@@ -574,17 +845,6 @@ class _OpportunityCard extends StatelessWidget {
       ),
     );
   }
-
-  static const TextStyle _placeStyle = TextStyle(
-    fontSize: 15,
-    fontWeight: FontWeight.w700,
-    color: AppColors.ink,
-  );
-
-  static const TextStyle _metaStyle = TextStyle(
-    fontSize: 12,
-    color: AppColors.inkMuted,
-  );
 }
 
 class _Label extends StatelessWidget {
@@ -596,7 +856,11 @@ class _Label extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(fontSize: 11, color: AppColors.inkMuted),
+      style: TextStyle(
+        fontSize: AppText.label,
+        fontWeight: FontWeight.w600,
+        color: context.ride.inkMuted,
+      ),
     );
   }
 }
@@ -608,20 +872,25 @@ class _DriverNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return NavigationBar(
       selectedIndex: 0,
-      backgroundColor: AppColors.surface,
-      indicatorColor: AppColors.primarySoft,
       destinations: const [
-        NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Inicio'),
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home),
+          label: 'Inicio',
+        ),
         NavigationDestination(
           icon: Icon(Icons.account_balance_wallet_outlined),
+          selectedIcon: Icon(Icons.account_balance_wallet),
           label: 'Ganancias',
         ),
         NavigationDestination(
           icon: Icon(Icons.route_outlined),
+          selectedIcon: Icon(Icons.route),
           label: 'Viajes',
         ),
         NavigationDestination(
           icon: Icon(Icons.person_outline),
+          selectedIcon: Icon(Icons.person),
           label: 'Cuenta',
         ),
       ],

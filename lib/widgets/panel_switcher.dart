@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../core/app_colors.dart';
+import '../core/app_theme.dart';
+import '../core/ride_colors.dart';
 import '../models/user_role.dart';
 import '../services/auth_service.dart';
 
@@ -38,21 +39,21 @@ class PanelSwitcher extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(bottom: 10),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
           child: Text(
             'CAMBIAR DE PANEL',
             style: TextStyle(
-              fontSize: 10,
+              fontSize: AppText.micro,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.4,
-              color: AppColors.inkMuted,
+              color: context.ride.inkMuted,
             ),
           ),
         ),
         for (final view in views)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 10),
             child: _PanelOption(
               view: view,
               selected: view == active,
@@ -90,37 +91,46 @@ class _PanelOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
+    final radius = BorderRadius.circular(AppTheme.radiusAction);
+    // Los `accentSoft` del rol son tintes muy claros pensados para fondo
+    // blanco. Sobre el tema oscuro deslumbran, así que allí el resaltado se
+    // hace con el propio acento a baja opacidad.
+    final fondoSeleccion =
+        ride.isDark ? view.accent.withValues(alpha: 0.18) : view.accentSoft;
+
     return Material(
-      color: selected ? view.accentSoft : AppColors.surface,
-      borderRadius: BorderRadius.circular(12),
+      color: selected ? fondoSeleccion : ride.surfaceAlt,
+      borderRadius: radius,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: radius,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          constraints: const BoxConstraints(minHeight: AppTheme.tapTarget),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: radius,
             border: Border.all(
-              color: selected ? view.accent : AppColors.border,
-              width: selected ? 1.4 : 1,
+              color: selected ? view.accent : ride.border,
+              width: selected ? 1.8 : 1.4,
             ),
           ),
           child: Row(
             children: [
-              Icon(view.icon, size: 19, color: view.accent),
-              const SizedBox(width: 12),
+              Icon(view.icon, size: 22, color: view.accent),
+              const SizedBox(width: 14),
               Expanded(
                 child: Text(
                   panelLabel(view),
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: AppText.small,
                     fontWeight: FontWeight.w700,
-                    color: selected ? view.accent : AppColors.ink,
+                    color: selected ? view.accent : ride.ink,
                   ),
                 ),
               ),
               if (selected)
-                Icon(Icons.check_circle, size: 18, color: view.accent),
+                Icon(Icons.check_circle, size: 20, color: view.accent),
             ],
           ),
         ),
@@ -139,7 +149,7 @@ class _PanelOption extends StatelessWidget {
 class ViewingAsBar extends StatelessWidget implements PreferredSizeWidget {
   const ViewingAsBar({super.key});
 
-  static const double _alto = 46;
+  static const double _alto = 52;
 
   @override
   Size get preferredSize => AuthService.instance.isViewingOtherPanel
@@ -154,40 +164,38 @@ class ViewingAsBar extends StatelessWidget implements PreferredSizeWidget {
       return const SizedBox.shrink();
     }
 
+    final ride = context.ride;
+
     return Material(
-      color: AppColors.purpleSoft,
+      color: ride.infoSoft,
       child: SizedBox(
         height: _alto,
         child: Padding(
           padding: const EdgeInsets.only(left: 16, right: 6),
           child: Row(
             children: [
-              const Icon(Icons.visibility_outlined,
-                  size: 16, color: AppColors.purple),
-              const SizedBox(width: 9),
+              Icon(Icons.visibility_outlined, size: 18, color: ride.info),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Viendo como ${realRole.displayName.toLowerCase()}',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11.5,
+                  style: TextStyle(
+                    fontSize: AppText.label,
                     height: 1.25,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
+                    color: ride.ink,
                   ),
                 ),
               ),
               TextButton(
                 onPressed: () => AuthService.instance.resetView(),
                 style: TextButton.styleFrom(
-                  foregroundColor: AppColors.purple,
+                  foregroundColor: ride.info,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                 ),
-                child: const Text(
-                  'Volver a mi panel',
-                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
-                ),
+                child: const Text('Volver a mi panel'),
               ),
             ],
           ),
