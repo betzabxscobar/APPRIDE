@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
+import '../../core/app_theme.dart';
+import '../../core/google_config.dart';
 import '../../core/map_defaults.dart';
 import '../../core/ride_colors.dart';
 import '../../services/geocoding_service.dart';
@@ -123,7 +125,32 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
     });
   }
 
-  void _confirmar(GeoPlace lugar) => Navigator.of(context).pop(lugar);
+  /// Devuelve el lugar elegido, con coordenadas.
+  ///
+  /// Las sugerencias de Google llegan sin ellas —su autocompletado solo da un
+  /// identificador—, así que hay que pedirlas al confirmar. Se hace aquí y no
+  /// al listar: preguntarlas para los ocho resultados costaría ocho llamadas en
+  /// vez de una, y solo interesa la del sitio que se elige.
+  Future<void> _confirmar(GeoPlace lugar) async {
+    if (!lugar.necesitaResolver) {
+      Navigator.of(context).pop(lugar);
+      return;
+    }
+
+    setState(() => _buscando = true);
+    try {
+      final resuelto = await GeocodingService.instance.resolver(lugar);
+      if (!mounted) return;
+      Navigator.of(context).pop(resuelto);
+    } on GeocodingException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _buscando = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -276,8 +303,11 @@ class _VistaLista extends StatelessWidget {
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
-      itemCount: resultados.length,
+      // Una fila extra al final para el credito del buscador.
+      itemCount: resultados.length + 1,
       itemBuilder: (context, i) {
+        if (i == resultados.length) return const _CreditoBuscador();
+
         final r = resultados[i];
         return _Fila(
           icono: Icons.place_outlined,
@@ -510,6 +540,32 @@ class _Mensaje extends StatelessWidget {
               style: TextStyle(fontSize: 12.5, color: context.ride.inkMuted),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+
+/// Crédito del buscador de direcciones.
+///
+/// Con Google no es decorativo: sus condiciones obligan a mostrar «Powered by
+/// Google» cuando se usan sus sugerencias **sin** un mapa suyo, que es
+/// exactamente lo que hace esta pantalla. Con Photon se acredita a
+/// OpenStreetMap, de donde salen sus datos.
+class _CreditoBuscador extends StatelessWidget {
+  const _CreditoBuscador();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 4),
+      child: Text(
+        GoogleConfig.usaGoogle ? 'Powered by Google' : 'Datos de OpenStreetMap',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: AppText.micro,
+          color: context.ride.inkFaint,
         ),
       ),
     );
