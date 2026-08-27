@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../../core/app_colors.dart';
@@ -9,6 +10,7 @@ import '../../models/trip.dart';
 import '../../services/ride_service.dart';
 import '../../widgets/auth_feedback.dart';
 import '../../widgets/ride_card.dart';
+import '../../widgets/ride_map.dart';
 import 'rate_trip_sheet.dart';
 
 /// Seguimiento del viaje, del lado del pasajero.
@@ -33,6 +35,9 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   String? _error;
   bool _calificacionOfrecida = false;
 
+  /// Dónde va el chofer ahora mismo. Se refresca con cada aviso de Realtime.
+  ({double lat, double lng})? _posicionChofer;
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +60,12 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
         _viaje = viaje;
         _cargando = false;
       });
+      // Solo tiene sentido seguir al chofer mientras el viaje está vivo.
+      if (viaje != null && viaje.status.tieneConductor) {
+        final pos = await RideService.instance.posicionDelChofer(viaje.id);
+        if (mounted) setState(() => _posicionChofer = pos);
+      }
+
       if (viaje != null && viaje.status == TripStatus.finalizado) {
         _ofrecerCalificacion(viaje);
       }
@@ -136,6 +147,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                   children: [
+                    _MapaViaje(viaje: viaje, chofer: _posicionChofer),
+                    const SizedBox(height: 16),
                     _EstadoActual(viaje: viaje),
                     const SizedBox(height: 16),
                     _Ruta(viaje: viaje),
@@ -450,6 +463,53 @@ class _TarjetaPrecio extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Mapa del viaje: origen, destino y el chofer si ya va en camino.
+class _MapaViaje extends StatelessWidget {
+  const _MapaViaje({required this.viaje, required this.chofer});
+
+  final Trip viaje;
+  final ({double lat, double lng})? chofer;
+
+  @override
+  Widget build(BuildContext context) {
+    final origen = viaje.origenLat == null || viaje.origenLng == null
+        ? null
+        : LatLng(viaje.origenLat!, viaje.origenLng!);
+    final destino = viaje.destinoLat == null || viaje.destinoLng == null
+        ? null
+        : LatLng(viaje.destinoLat!, viaje.destinoLng!);
+
+    // Sin coordenadas no hay nada que dibujar; el resto de la pantalla sirve
+    // igual.
+    if (origen == null && destino == null) return const SizedBox.shrink();
+
+    final marcadores = <MapMarker>[
+      if (origen != null) MapMarker.origen(origen),
+      if (destino != null) MapMarker.destino(destino),
+      if (chofer != null) MapMarker.chofer(LatLng(chofer!.lat, chofer!.lng)),
+    ];
+
+    // El mapa se centra en el chofer mientras se mueve; si todavía no reportó,
+    // en el punto de recogida.
+    final centro = chofer != null
+        ? LatLng(chofer!.lat, chofer!.lng)
+        : (origen ?? destino!);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+      child: SizedBox(
+        height: 190,
+        child: RideMap(
+          centro: centro,
+          zoom: chofer != null ? 15 : 13,
+          marcadores: marcadores,
+          ruta: origen != null && destino != null ? [origen, destino] : const [],
+        ),
       ),
     );
   }
