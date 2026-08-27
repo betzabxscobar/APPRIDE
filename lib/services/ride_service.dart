@@ -199,6 +199,32 @@ class RideService {
         'p_viaje_id': viajeId,
       });
 
+  /// Última posición reportada por el chofer durante un viaje.
+  ///
+  /// Sale de `public.ubicaciones`, no de `conductores`: RLS deja al pasajero
+  /// leer las ubicaciones de su propio viaje, pero no la posición suelta de una
+  /// persona. Así el seguimiento solo funciona mientras dura el viaje.
+  Future<({double lat, double lng})?> posicionDelChofer(String viajeId) async {
+    try {
+      final fila = await _client
+          .from('ubicaciones')
+          .select('latitud, longitud')
+          .eq('viaje_id', viajeId)
+          .eq('tipo', 'posicion_actual')
+          .order('registrado_en', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (fila == null) return null;
+      return (
+        lat: (fila['latitud'] as num).toDouble(),
+        lng: (fila['longitud'] as num).toDouble(),
+      );
+    } on sb.PostgrestException {
+      return null;
+    }
+  }
+
   /// Pone al chofer en línea o fuera de línea.
   Future<void> cambiarDisponibilidad(bool disponible) async {
     final uid = AuthService.instance.currentUser?.id;
