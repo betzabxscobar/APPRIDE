@@ -19,17 +19,54 @@ import 'package:latlong2/latlong.dart' show LatLng;
 ///
 /// ## El servidor
 ///
-/// Se usa el servidor de demostración público, que no pide clave. Su política
-/// de uso lo limita a desarrollo y pruebas: **no está pensado para producción**
-/// y puede ir lento o cortar si se abusa. Para producción hay que levantar el
-/// propio con `osrm-backend`; cuando llegue ese momento, solo hay que cambiar
-/// [_servidor].
+/// Por defecto usa el servidor de demostración público, que no pide clave pero
+/// **no vale para producción**: su política lo limita a desarrollo, puede ir
+/// lento y puede cortar. Lo mismo vale para el de FOSSGIS.
+///
+/// Para producción se levanta el propio con `osrm-backend` —ver `infra/osrm/`,
+/// que ya trae todo preparado— y se apunta la app ahí:
+///
+/// ```sh
+/// flutter build web --dart-define=OSRM_URL=https://rutas.tudominio.com
+/// ```
+///
+/// Tiene que ser **https**: una app servida por https no puede llamar a http,
+/// el navegador lo bloquea por contenido mixto.
 class RoutingService {
   RoutingService._();
 
   static final RoutingService instance = RoutingService._();
 
-  static const String _servidor = 'https://router.project-osrm.org';
+  static const String _demo = 'https://router.project-osrm.org';
+
+  static const String _configurado = String.fromEnvironment(
+    'OSRM_URL',
+    defaultValue: _demo,
+  );
+
+  static String get servidor => normalizar(_configurado);
+
+  /// Deja la URL como la espera [entre]: sin espacios ni barra final, y con el
+  /// servidor de demostración si viene vacía.
+  ///
+  /// Separada para poder probarla: [_configurado] es una constante de
+  /// compilación y no se puede variar desde una prueba.
+  static String normalizar(String url) {
+    var u = url.trim();
+    while (u.endsWith('/')) {
+      u = u.substring(0, u.length - 1);
+    }
+    return u.isEmpty ? _demo : u;
+  }
+
+  /// `true` mientras se siga usando un servidor público de cortesía.
+  ///
+  /// Ninguno de los dos vale para usuarios reales: son de desarrollo y pueden
+  /// cortar. Ver `infra/osrm/` para levantar el propio.
+  static bool get usaServidorPublico => esServidorPublico(servidor);
+
+  static bool esServidorPublico(String url) =>
+      url.contains('project-osrm.org') || url.contains('openstreetmap.de');
 
   /// Recorrido entre dos puntos, o `null` si no se pudo calcular.
   ///
@@ -40,18 +77,19 @@ class RoutingService {
     final coords = '${origen.longitude},${origen.latitude}'
         ';${destino.longitude},${destino.latitude}';
     final url = Uri.parse(
-      '$_servidor/route/v1/driving/$coords'
+      '$servidor/route/v1/driving/$coords'
       // `alternatives` porque OSRM ordena por tiempo, y a veces la segunda
       // opción tarda lo mismo y es un kilómetro más corta. Ver [elegirMejor].
       '?overview=full&geometries=geojson&alternatives=3',
     );
 
     try {
-      final respuesta = await http
-          .get(url)
-          .timeout(const Duration(seconds: 12));
+      // Un reintento: el servidor publico corta de vez en cuando, y volver a
+      // preguntar sale mas barato que dejar al pasajero con la linea recta.
+      var respuesta = await _pedir(url);
+      respuesta ??= await _pedir(url);
 
-      if (respuesta.statusCode != 200) return null;
+      if (respuesta == null || respuesta.statusCode != 200) return null;
 
       final cuerpo = jsonDecode(respuesta.body) as Map<String, dynamic>;
       if (cuerpo['code'] != 'Ok') return null;
@@ -78,6 +116,14 @@ class RoutingService {
     } catch (_) {
       // Sin red, con el servidor caído o con una respuesta rara: se devuelve
       // null y la pantalla sigue funcionando.
+      return null;
+    }
+  }
+
+  Future<http.Response?> _pedir(Uri url) async {
+    try {
+      return await http.get(url).timeout(const Duration(seconds: 12));
+    } catch (_) {
       return null;
     }
   }

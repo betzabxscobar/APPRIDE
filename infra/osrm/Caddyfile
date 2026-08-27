@@ -1,0 +1,20 @@
+# HTTPS automatico para el servidor de rutas.
+{$DOMINIO} {
+	reverse_proxy osrm:5000
+
+	# OSRM no tiene autenticacion: cualquiera que descubra el dominio puede
+	# gastar CPU. Esto no lo impide, solo lo encarece un poco.
+	@abuso {
+		not path /route/* /nearest/* /table/* /match/*
+	}
+	respond @abuso 404
+
+	encode gzip
+
+	log {
+		output file /data/acceso.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+	}
+}

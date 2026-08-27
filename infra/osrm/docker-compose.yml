@@ -1,0 +1,59 @@
+# Servidor de rutas propio para Ride.
+#
+# Levanta OSRM con el mapa de Ecuador y lo publica por HTTPS. Antes de esto hay
+# que construir el grafo una vez con ./preparar.sh — ver README.md.
+#
+# Version fijada a proposito: `latest` cambiaria el motor por debajo sin avisar,
+# y el grafo que genera osrm-extract tiene que coincidir con la version que lo
+# sirve.
+
+services:
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:v26.4.0
+    # `mld` es el algoritmo que corresponde a osrm-partition + osrm-customize,
+    # que es lo que hace preparar.sh. Con otro algoritmo no arranca.
+    command: >
+      osrm-routed
+      --algorithm mld
+      --max-matching-size 100
+      /data/ecuador-latest.osrm
+    volumes:
+      - ./datos:/data:ro
+    # Sin `ports`: OSRM no tiene autenticacion ninguna, asi que no se asoma a
+    # internet por su cuenta. Solo lo alcanza el proxy.
+    expose:
+      - "5000"
+    restart: unless-stopped
+    healthcheck:
+      # Una ruta cortita en Quito: si responde, el grafo esta cargado.
+      test:
+        - CMD-SHELL
+        - >
+          wget -qO- 'http://localhost:5000/route/v1/driving/-78.4880,-0.1760;-78.4750,-0.2050?overview=false'
+          | grep -q '"code":"Ok"'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  proxy:
+    image: caddy:2-alpine
+    # Caddy saca y renueva el certificado de Let's Encrypt solo. Para eso el
+    # dominio tiene que apuntar ya a esta maquina y los puertos 80 y 443 estar
+    # abiertos.
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO:?falta DOMINIO en el archivo .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - osrm
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

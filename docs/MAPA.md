@@ -73,15 +73,33 @@ cobrar por distancia real es una decisión de negocio, no técnica.
 
 ### El servidor de OSRM
 
-Ahora mismo se usa el **servidor público de demostración**
-(`router.project-osrm.org`), que no pide clave. Su política de uso lo limita a
-desarrollo y pruebas: **no está pensado para producción** y puede ir lento o
-cortar si se abusa.
+Por defecto la app usa el **servidor público de demostración**
+(`router.project-osrm.org`), que no pide clave. Su política lo limita a
+desarrollo: puede ir lento y puede cortar. Lo mismo vale para el de FOSSGIS
+(`routing.openstreetmap.de`), que se probó y responde idéntico.
 
-Para producción hay que levantar el propio con
-[osrm-backend](https://github.com/Project-OSRM/osrm-backend) — es justo para eso.
-Cuando llegue el momento solo hay que cambiar `_servidor` en
-`routing_service.dart`; el resto del código no se entera.
+**Para producción hay que levantar el propio.** Está todo preparado en
+`infra/osrm/`: Docker Compose con OSRM y Caddy —que saca el certificado HTTPS
+solo— más un script que descarga el mapa de Ecuador y construye el grafo.
+
+```bash
+cd infra/osrm
+cp .env.ejemplo .env && nano .env    # el dominio
+./preparar.sh
+docker compose up -d
+```
+
+Y se apunta la app ahí:
+
+```bash
+flutter build web --dart-define=OSRM_URL=https://rutas.tudominio.com
+```
+
+Tiene que ser **https**: una página servida por https no puede llamar a http, el
+navegador lo bloquea por contenido mixto.
+
+Detalles, requisitos de memoria y cómo refrescar el mapa, en
+[`infra/osrm/README.md`](../infra/osrm/README.md).
 
 ## Por qué no un mapa «más bonito»
 

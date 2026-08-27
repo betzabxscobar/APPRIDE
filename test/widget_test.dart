@@ -332,6 +332,39 @@ void main() {
     });
   });
 
+  group('Servidor de rutas', () {
+    test('Quita la barra final, que duplicaria la de la ruta', () {
+      expect(
+        RoutingService.normalizar('https://rutas.midominio.com/'),
+        'https://rutas.midominio.com',
+      );
+      expect(
+        RoutingService.normalizar('  https://rutas.midominio.com//  '),
+        'https://rutas.midominio.com',
+      );
+    });
+
+    test('Sin configurar cae al servidor de demostracion', () {
+      expect(RoutingService.normalizar(''), contains('project-osrm.org'));
+      expect(RoutingService.normalizar('   '), contains('project-osrm.org'));
+    });
+
+    test('Reconoce los servidores publicos, que no valen para produccion', () {
+      expect(
+        RoutingService.esServidorPublico('https://router.project-osrm.org'),
+        isTrue,
+      );
+      expect(
+        RoutingService.esServidorPublico('https://routing.openstreetmap.de/routed-car'),
+        isTrue,
+      );
+      expect(
+        RoutingService.esServidorPublico('https://rutas.midominio.com'),
+        isFalse,
+      );
+    });
+  });
+
   group('Roles', () {
     test('Solo pasajero y conductor se pueden elegir', () {
       expect(UserRole.selectable, [UserRole.passenger, UserRole.driver]);
