@@ -30,15 +30,48 @@ de noche (0,56 / 0,43 = 1,30).
 
 ## El reparto
 
-Cada tarifa lleva `porcentaje_conductor`, hoy **0,60**: el chofer se lleva el
-60 % de lo que paga el pasajero y el 40 % restante es comisión de la app.
+Cada tarifa lleva `porcentaje_conductor`, hoy **0,85**: el chofer se lleva el
+85 % de lo que paga el pasajero y el 15 % restante es comisión de la app.
 
 `cotizar_viaje` devuelve ya repartido `gana_conductor` y `comision_app`, para
 que ni la app ni el cliente tengan que multiplicar por su cuenta.
 
-> Un 40 % de comisión está por encima del mercado —Uber ronda el 25 %, inDrive
-> entre el 10 y el 15 %—. Es una decisión de negocio, pero conviene tenerlo
-> presente para retener choferes. Se cambia en la columna, sin tocar código.
+**Bajar la comisión no abarata el viaje.** El pasajero paga lo mismo; lo que
+cambia es quién se lo lleva.
+
+### Por qué 15 %
+
+Se empezó en 40 % y se bajó el 2026-08-27. Razones:
+
+- **El cuello de botella son los choferes**, no los pasajeros. Sin choferes no
+  hay servicio, y lo escaso hay que pagarlo bien.
+- **El coste real por carrera hoy es casi nulo**: Supabase en plan gratuito,
+  OpenStreetMap y el OSRM de demostración. La comisión no cubre operación,
+  financia crecimiento que aún no existe.
+- **inDrive ya está asentado en Quito con 10–15 %.** Al chofer le da igual la
+  marca: compara lo que se lleva.
+
+Sobre un trayecto real de Quito de 5,92 km ($4,31):
+
+| Comisión | Chofer | App |
+|---|---|---|
+| 40 % | 2,59 | 1,72 |
+| 20 % | 3,45 | 0,86 |
+| **15 %** | **3,66** | **0,65** |
+
+**Cuándo subirla.** El 20 % es un techo razonable una vez haya choferes fieles y
+costes de verdad (hospedaje propio de OSRM, teselas de pago, soporte, y el 3–4 %
+que se lleva la pasarela si se cobra con tarjeta). Subir antes de eso es
+regalarle choferes a la competencia.
+
+Se cambia con una línea, sin desplegar la app:
+
+```sql
+update public.tarifas set porcentaje_conductor = 0.80;  -- comision del 20 %
+```
+
+Es una columna **por tarifa**, así que también se puede dejar más baja de noche
+para que salgan choferes en la franja donde escasean.
 
 ## Qué tarifa se aplica
 

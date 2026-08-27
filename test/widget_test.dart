@@ -291,8 +291,8 @@ void main() {
           'distancia_km': 5.92,
           'minutos_estimados': 15,
           'total': 4.31,
-          'gana_conductor': 2.59,
-          'comision_app': 1.72,
+          'gana_conductor': 3.66,
+          'comision_app': 0.65,
           'aplico_minima': false,
           ...extra,
         });
@@ -300,15 +300,22 @@ void main() {
     test('Lee el reparto entre chofer y app', () {
       final q = cotizar(const {});
       expect(q.total, 4.31);
-      expect(q.ganaConductor, 2.59);
-      expect(q.comisionApp, 1.72);
+      expect(q.ganaConductor, 3.66);
+      expect(q.comisionApp, 0.65);
       // Lo que se lleva el chofer mas la comision es lo que paga el pasajero.
       expect(q.ganaConductor + q.comisionApp, closeTo(q.total, 0.001));
     });
 
-    test('El chofer se lleva el 60 %', () {
-      final q = cotizar(const {});
-      expect(q.ganaConductor / q.total, closeTo(0.60, 0.01));
+    test('El redondeo a centimos no pierde ni inventa dinero', () {
+      // El porcentaje vive en la tabla `tarifas`, no en Dart, asi que aqui no
+      // se afirma cual es. Lo que si tiene que cumplirse siempre es que las dos
+      // partes sumen exactamente lo que paga el pasajero.
+      final q = cotizar(const {
+        'total': 4.31,
+        'gana_conductor': 3.66,
+        'comision_app': 0.65,
+      });
+      expect(q.ganaConductor + q.comisionApp, closeTo(q.total, 0.001));
     });
 
     test('Marca cuando se aplico la carrera minima', () {
@@ -316,8 +323,8 @@ void main() {
       expect(
         cotizar(const {
           'total': 1.44,
-          'gana_conductor': 0.86,
-          'comision_app': 0.58,
+          'gana_conductor': 1.22,
+          'comision_app': 0.22,
           'aplico_minima': true,
         }).aplicoMinima,
         isTrue,
