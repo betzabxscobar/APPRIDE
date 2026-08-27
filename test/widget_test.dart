@@ -284,6 +284,47 @@ void main() {
     });
   });
 
+  group('Cotizacion', () {
+    Quote cotizar(Map<String, dynamic> extra) => Quote.fromMap({
+          'tarifa_id': 't1',
+          'tarifa_nombre': 'Tarifa Estandar',
+          'distancia_km': 5.92,
+          'minutos_estimados': 15,
+          'total': 4.31,
+          'gana_conductor': 2.59,
+          'comision_app': 1.72,
+          'aplico_minima': false,
+          ...extra,
+        });
+
+    test('Lee el reparto entre chofer y app', () {
+      final q = cotizar(const {});
+      expect(q.total, 4.31);
+      expect(q.ganaConductor, 2.59);
+      expect(q.comisionApp, 1.72);
+      // Lo que se lleva el chofer mas la comision es lo que paga el pasajero.
+      expect(q.ganaConductor + q.comisionApp, closeTo(q.total, 0.001));
+    });
+
+    test('El chofer se lleva el 60 %', () {
+      final q = cotizar(const {});
+      expect(q.ganaConductor / q.total, closeTo(0.60, 0.01));
+    });
+
+    test('Marca cuando se aplico la carrera minima', () {
+      expect(cotizar(const {}).aplicoMinima, isFalse);
+      expect(
+        cotizar(const {
+          'total': 1.44,
+          'gana_conductor': 0.86,
+          'comision_app': 0.58,
+          'aplico_minima': true,
+        }).aplicoMinima,
+        isTrue,
+      );
+    });
+  });
+
   group('Roles', () {
     test('Solo pasajero y conductor se pueden elegir', () {
       expect(UserRole.selectable, [UserRole.passenger, UserRole.driver]);

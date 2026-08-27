@@ -102,13 +102,26 @@ class Quote {
     required this.km,
     required this.minutos,
     required this.total,
+    required this.ganaConductor,
+    required this.comisionApp,
+    required this.aplicoMinima,
   });
 
   final String tarifaId;
   final String tarifaNombre;
   final double km;
   final int minutos;
+
+  /// Lo que paga el pasajero.
   final double total;
+
+  /// Reparto de ese total. El chofer se lleva el porcentaje que diga la tarifa
+  /// y el resto es comision de la app.
+  final double ganaConductor;
+  final double comisionApp;
+
+  /// El viaje salia por debajo de la carrera minima y se cobro esa.
+  final bool aplicoMinima;
 
   factory Quote.fromMap(Map<String, dynamic> row) => Quote(
         tarifaId: row['tarifa_id'] as String,
@@ -116,6 +129,9 @@ class Quote {
         km: (row['distancia_km'] as num).toDouble(),
         minutos: (row['minutos_estimados'] as num).toInt(),
         total: (row['total'] as num).toDouble(),
+        ganaConductor: (row['gana_conductor'] as num).toDouble(),
+        comisionApp: (row['comision_app'] as num).toDouble(),
+        aplicoMinima: row['aplico_minima'] as bool? ?? false,
       );
 }
 

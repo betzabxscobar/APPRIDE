@@ -57,15 +57,20 @@ class RideService {
     required double origenLng,
     required double destinoLat,
     required double destinoLng,
+    double? distanciaKm,
     String? tarifaId,
   }) async {
-    final id = tarifaId ?? await _tarifaPorDefecto();
     final rows = await _client.rpc('cotizar_viaje', params: {
-      'p_tarifa_id': id,
       'p_origen_lat': origenLat,
       'p_origen_lng': origenLng,
       'p_destino_lat': destinoLat,
       'p_destino_lng': destinoLng,
+      // La distancia de la ruta real, si ya se calculo. El servidor la acota
+      // contra la linea recta antes de usarla, asi que mandarla no permite
+      // pagar de menos.
+      'p_distancia_km': distanciaKm,
+      // Normalmente null: la tarifa la elige el servidor por la hora.
+      'p_tarifa_id': tarifaId,
     }) as List<dynamic>;
 
     if (rows.isEmpty) {
@@ -74,17 +79,6 @@ class RideService {
     return Quote.fromMap(Map<String, dynamic>.from(rows.first as Map));
   }
 
-  Future<String> _tarifaPorDefecto() async {
-    final row = await _client
-        .from('tarifas')
-        .select('id')
-        .eq('activo', true)
-        .order('tarifa_base')
-        .limit(1)
-        .maybeSingle();
-    if (row == null) throw const RideException('No hay tarifas disponibles');
-    return row['id'] as String;
-  }
 
   /// Crea la solicitud. Devuelve el id del viaje.
   Future<String> solicitar({

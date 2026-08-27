@@ -124,11 +124,20 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
       LatLng(o.lat, o.lng),
       LatLng(d.lat, d.lng),
     );
-    if (!mounted || ruta == null) return;
+    // Mientras se calculaba la ruta puede haberse cambiado el origen o el
+    // destino; si pasó, esta respuesta ya no vale.
+    if (!mounted || ruta == null || !_sigueVigente(o, d)) return;
 
     setState(() => _ruta = ruta);
     _encuadrar();
+
+    // Con la distancia real el precio cambia: la línea recta por un factor se
+    // queda corta. Se vuelve a cotizar, ahora con el recorrido de verdad.
+    await _pedirPrecio(o, d, km: ruta.metros / 1000);
   }
+
+  bool _sigueVigente(GeoPlace o, GeoPlace d) =>
+      identical(_origen, o) && identical(_destino, d);
 
   /// Deja a la vista el recorrido entero, como hacen las apps de viajes: lo que
   /// interesa ver es de dónde a dónde, no un zoom fijo.
@@ -155,17 +164,27 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
       _ruta = null;
     });
 
-    // La ruta se pide en paralelo con la tarifa: son cosas independientes y no
-    // tiene sentido encadenarlas.
+    // La ruta se pide en paralelo: así el precio aparece enseguida con la
+    // estimación del servidor, y se ajusta solo cuando llega el recorrido.
     unawaited(_trazarRuta(o, d));
+    await _pedirPrecio(o, d);
+  }
+
+  /// Pide el precio al servidor. Con [km] usa la distancia del recorrido real;
+  /// sin ella, el servidor la estima desde la línea recta.
+  ///
+  /// Mandar los kilómetros no abarata el viaje: el servidor los acota contra la
+  /// línea recta, que es el mínimo físico, antes de usarlos.
+  Future<void> _pedirPrecio(GeoPlace o, GeoPlace d, {double? km}) async {
     try {
       final q = await RideService.instance.cotizar(
         origenLat: o.lat,
         origenLng: o.lng,
         destinoLat: d.lat,
         destinoLng: d.lng,
+        distanciaKm: km,
       );
-      if (mounted) setState(() => _cotizacion = q);
+      if (mounted && _sigueVigente(o, d)) setState(() => _cotizacion = q);
     } on RideException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -445,11 +464,21 @@ class _ResumenCotizacion extends StatelessWidget {
           Text(
             cotizacion.tarifaNombre,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: AppText.label,
               fontWeight: FontWeight.w700,
               color: context.ride.accent,
             ),
           ),
+          if (cotizacion.aplicoMinima) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Carrera mínima',
+              style: TextStyle(
+                fontSize: AppText.micro,
+                color: context.ride.inkMuted,
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
