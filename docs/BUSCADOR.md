@@ -1,14 +1,14 @@
 # Buscador de direcciones
 
-`lib/services/geocoding_service.dart` busca direcciones con **Google Places** si
-hay clave, y con **Photon** —geocodificador libre sobre OpenStreetMap— si no.
+`lib/services/geocoding_service.dart` busca con **Photon**
+(<https://photon.komoot.io>), un geocodificador libre sobre datos de
+OpenStreetMap. Sin clave, sin cuenta y con cobertura mundial.
 
-Sin clave la app funciona igual. Lo que cambia es la calidad de los datos.
+## El hueco de Quito, medido
 
-## Por qué se añadió Google
-
-En Quito el hueco de OSM es real y medible. Muestra de vías de cada ciudad,
-mirando cuándo se editó cada una por última vez:
+Los datos de OSM en Quito están claramente menos mantenidos que en otras
+ciudades. Muestra de vías por ciudad, mirando cuándo se editó cada una por
+última vez:
 
 | Ciudad | Editado en 2026 | Últimos 2 años |
 |---|---|---|
@@ -21,88 +21,64 @@ mirando cuándo se editó cada una por última vez:
 | Lagos | 11 % | 25 % |
 | **Quito** | **6 %** | **9 %** |
 
-Quito quedó última de las ocho, y por bastante. Que una calle se editara en 2022
-no significa que esté mal —si no ha cambiado, sigue bien— pero un 9 % en dos
-años, frente al 88 % de Nueva York, dice que hay mucho menos mantenimiento.
+Quito quedó última de las ocho, y por bastante.
 
-Cambiar a Mapbox, LocationIQ o Geoapify **no arregla esto**: todos derivan de
-OSM y arrastran el mismo hueco. Solo Google, HERE y TomTom tienen datos propios.
+Un matiz importante: que una calle se editara en 2022 **no significa que esté
+mal**. Si no ha cambiado, sigue siendo correcta. Pero un 9 % en dos años, frente
+al 88 % de Nueva York, indica mucho menos mantenimiento, y eso se nota en
+direcciones nuevas o poco comunes.
 
-## Lo que cuesta
+## Lo que NO arregla esto
 
-Google no es gratis, por mucho que se optimice:
+**Cambiar a Mapbox, LocationIQ o Geoapify no sirve de nada.** Los tres derivan
+de OpenStreetMap y arrastran exactamente el mismo hueco. Solo **Google, HERE y
+TomTom** tienen datos propios.
 
-- Exige **cuenta de facturación con tarjeta**, aunque no se gaste.
-- El tope gratuito son **10 000 llamadas al mes por servicio**.
-- **No hay límite duro de gasto**, solo alertas de presupuesto. Con la clave
-  dentro de un APK, un pico o una filtración es una factura real.
+## Por qué no se usa Google
 
-Por eso se usa **solo en el buscador**, no en el mapa. Un mapa dinámico gasta una
-llamada cada vez que se abre una pantalla con mapa; el buscador gasta una por
-búsqueda, que es muchísimo menos.
+Se llegó a implementar y **se retiró**: Google Cloud no deja activar las APIs de
+Maps sin **cuenta de facturación con tarjeta**, aunque no se llegue a gastar.
 
-## Las dos optimizaciones que lo hacen barato
+Aparte de la tarjeta, lo que habría implicado:
 
-**1. Session tokens.** Google factura *por pulsación de teclado* si cada
-petición va suelta. Agrupándolas con un mismo token, todas las sugerencias de
-una búsqueda **más** la consulta de coordenadas del sitio elegido cuentan como
-**una sola sesión**. La sesión se abre al empezar a escribir y se cierra en
-`resolver()`.
+- Tope gratuito de 10 000 llamadas al mes por servicio.
+- **Sin límite duro de gasto**, solo alertas de presupuesto. Con la clave dentro
+  de un APK, un pico o una filtración es una factura real.
+- Sus condiciones obligan a mostrar los resultados sobre un mapa de Google, así
+  que solo se podía usar en el buscador —no en el mapa— y con la atribución
+  «Powered by Google» a la vista.
 
-**2. Coordenadas solo del elegido.** El autocompletado de Google no devuelve
-coordenadas, solo un identificador. Se podrían pedir para los ocho resultados,
-pero eso serían ocho llamadas por búsqueda. Se piden únicamente para el que la
-persona toca, ya dentro de la sesión abierta.
+Si algún día hay tarjeta y se retoma, lo que hacía barata la integración era:
+**session tokens** (sin ellos Google cobra por cada pulsación de teclado; con
+ellos toda la búsqueda más la consulta de coordenadas cuentan como una sola
+sesión) y pedir las coordenadas **solo del lugar elegido**, no de los ocho
+resultados. Está en el historial de git, en el commit «Busca direcciones con
+Google Places cuando hay clave».
 
-A eso se suma lo que ya había: no buscar hasta los 3 caracteres, y esperar
-350 ms a que dejen de escribir.
+## Qué se puede hacer sin tarjeta
 
-También se usa `X-Goog-FieldMask` para pedir solo los campos que se usan
-(`placeId`, `structuredFormat` y `location`): el campo pedido decide en qué
-tramo de precio cae la llamada.
+Lo que ya amortigua el hueco, y funciona hoy:
 
-## Poner la clave
+- **Elegir el punto en el mapa.** El botón *Mapa* del buscador permite tocar
+  dónde es exactamente, y la app hace geocodificación inversa para ponerle
+  nombre. Es la salida cuando la búsqueda no encuentra la dirección.
+- **Historial y lugares guardados** (`PlacesService`). Una dirección que OSM no
+  conoce se busca a mano una vez y después ya sale en la lista.
+- **Sesgo por posición.** Los resultados se ordenan alrededor de donde estás.
+  Ver `docs/MAPA.md`.
 
-1. En <https://console.cloud.google.com>, crea un proyecto y activa
-   **Places API (New)** — no la antigua.
-2. Crea una clave (empieza por `AIza`) y **restríngela**: por aplicación Android
-   (nombre de paquete + huella SHA-1) o por dominio en web, y por API, dejando
-   solo Places.
-3. Compruébala antes de compilar:
+Y hay una opción que no cuesta dinero: **editar OpenStreetMap**. Es abierto, y
+lo que se corrige aparece en las teselas en minutos y en las rutas al
+reconstruir el grafo. No es realista mantener una ciudad entera a mano, pero sí
+las zonas donde más molesta.
 
-   ```bash
-   dart run tool/verificar_google.dart TU_CLAVE
-   ```
+## Límite de uso de Photon
 
-   Hace las dos llamadas reales sobre una dirección de Quito y comprueba que
-   comparten sesión. Si falta activar la API o la restricción bloquea, lo dice
-   con el error de Google tal cual.
-
-4. Compila con ella:
-
-   ```bash
-   flutter run --dart-define=GOOGLE_PLACES_KEY=TU_CLAVE
-   ```
-
-Sin la variable, o con un valor que no tenga forma de clave, la app usa Photon.
-Eso es a propósito: mejor un buscador con datos flojos que uno que no encuentra
-nada.
+El servidor lo dona Komoot y pide no abusar. Para desarrollo y demos va bien.
+Con usuarios reales conviene auto-hospedarlo. El cambio afecta solo a
+`GeocodingService`.
 
 ## Atribución
 
-Google obliga a mostrar **«Powered by Google»** cuando se usan sus sugerencias
-sin un mapa suyo, que es justo lo que hace esta pantalla. Sale al pie de la
-lista de resultados. Con Photon, en el mismo sitio se acredita a OpenStreetMap.
-
-## Lo que sigue en OSM
-
-El **mapa** sigue siendo OpenStreetMap, y las **rutas** también (OSRM). Google
-no se usa ahí:
-
-- Sus condiciones dicen que los resultados deben mostrarse sobre un mapa de
-  Google, lo que obligaría a migrar a `google_maps_flutter` y rehacer toda la
-  capa de mapa.
-- Un mapa dinámico consume cuota cada vez que se abre una pantalla.
-
-Que una manzana esté algo desfasada en las teselas es cosmético. Que no
-encuentre tu calle rompe el producto. Por eso el gasto se pone donde duele.
+La licencia de OpenStreetMap obliga a acreditar los datos allí donde se
+muestren. El crédito sale al pie de la lista de resultados.

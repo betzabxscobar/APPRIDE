@@ -3,7 +3,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
 import '../../core/app_theme.dart';
-import '../../core/google_config.dart';
 import '../../core/map_defaults.dart';
 import '../../core/ride_colors.dart';
 import '../../services/geocoding_service.dart';
@@ -17,11 +16,7 @@ import '../../widgets/ride_map.dart';
 /// contra un geocodificador, y el catálogo queda como sugerencia rápida junto a
 /// las direcciones que la persona ya usó.
 class PlacePickerScreen extends StatefulWidget {
-  const PlacePickerScreen({
-    super.key,
-    required this.titulo,
-    this.cercaDe,
-  });
+  const PlacePickerScreen({super.key, required this.titulo, this.cercaDe});
 
   final String titulo;
 
@@ -106,14 +101,17 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
   /// Al tocar el mapa se pregunta qué dirección es ese punto.
   Future<void> _tocarMapa(LatLng punto) async {
     setState(() => _buscando = true);
-    final lugar = await GeocodingService.instance
-        .direccionDe(punto.latitude, punto.longitude);
+    final lugar = await GeocodingService.instance.direccionDe(
+      punto.latitude,
+      punto.longitude,
+    );
     if (!mounted) return;
 
     setState(() {
       // Si el geocodificador no reconoce el punto, se usa igual con sus
       // coordenadas: el viaje puede salir de un descampado sin nombre.
-      _elegido = lugar ??
+      _elegido =
+          lugar ??
           GeoPlace(
             nombre: 'Punto en el mapa',
             direccion:
@@ -125,32 +123,7 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
     });
   }
 
-  /// Devuelve el lugar elegido, con coordenadas.
-  ///
-  /// Las sugerencias de Google llegan sin ellas —su autocompletado solo da un
-  /// identificador—, así que hay que pedirlas al confirmar. Se hace aquí y no
-  /// al listar: preguntarlas para los ocho resultados costaría ocho llamadas en
-  /// vez de una, y solo interesa la del sitio que se elige.
-  Future<void> _confirmar(GeoPlace lugar) async {
-    if (!lugar.necesitaResolver) {
-      Navigator.of(context).pop(lugar);
-      return;
-    }
-
-    setState(() => _buscando = true);
-    try {
-      final resuelto = await GeocodingService.instance.resolver(lugar);
-      if (!mounted) return;
-      Navigator.of(context).pop(resuelto);
-    } on GeocodingException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message;
-          _buscando = false;
-        });
-      }
-    }
-  }
+  void _confirmar(GeoPlace lugar) => Navigator.of(context).pop(lugar);
 
   @override
   Widget build(BuildContext context) {
@@ -266,15 +239,19 @@ class _VistaLista extends StatelessWidget {
             for (final g in guardadas)
               _Fila(
                 icono: g.favorita ? Icons.star : Icons.history,
-                color: g.favorita ? const Color(0xFFF5A623) : context.ride.inkMuted,
+                color: g.favorita
+                    ? const Color(0xFFF5A623)
+                    : context.ride.inkMuted,
                 titulo: g.etiqueta ?? g.direccion,
                 detalle: g.etiqueta == null ? null : g.direccion,
-                onTap: () => onElegir(GeoPlace(
-                  nombre: g.etiqueta ?? g.direccion,
-                  direccion: g.etiqueta == null ? '' : g.direccion,
-                  lat: g.lat,
-                  lng: g.lng,
-                )),
+                onTap: () => onElegir(
+                  GeoPlace(
+                    nombre: g.etiqueta ?? g.direccion,
+                    direccion: g.etiqueta == null ? '' : g.direccion,
+                    lat: g.lat,
+                    lng: g.lng,
+                  ),
+                ),
               ),
             const SizedBox(height: 14),
           ],
@@ -297,7 +274,8 @@ class _VistaLista extends StatelessWidget {
       return const _Mensaje(
         icono: Icons.search_off,
         titulo: 'Sin resultados',
-        detalle: 'Prueba con otra forma de escribirlo, o elige el punto en el mapa.',
+        detalle:
+            'Prueba con otra forma de escribirlo, o elige el punto en el mapa.',
       );
     }
 
@@ -343,9 +321,7 @@ class _VistaMapa extends StatelessWidget {
     return Stack(
       children: [
         RideMap(
-          centro: elegido == null
-              ? centro
-              : LatLng(elegido!.lat, elegido!.lng),
+          centro: elegido == null ? centro : LatLng(elegido!.lat, elegido!.lng),
           controlador: controlador,
           onTap: onTap,
           marcadores: elegido == null
@@ -546,13 +522,10 @@ class _Mensaje extends StatelessWidget {
   }
 }
 
-
 /// Crédito del buscador de direcciones.
 ///
-/// Con Google no es decorativo: sus condiciones obligan a mostrar «Powered by
-/// Google» cuando se usan sus sugerencias **sin** un mapa suyo, que es
-/// exactamente lo que hace esta pantalla. Con Photon se acredita a
-/// OpenStreetMap, de donde salen sus datos.
+/// Photon busca sobre datos de OpenStreetMap, y su licencia obliga a
+/// acreditarlos allí donde se muestren.
 class _CreditoBuscador extends StatelessWidget {
   const _CreditoBuscador();
 
@@ -561,12 +534,9 @@ class _CreditoBuscador extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 14, bottom: 4),
       child: Text(
-        GoogleConfig.usaGoogle ? 'Powered by Google' : 'Datos de OpenStreetMap',
+        'Datos de OpenStreetMap',
         textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: AppText.micro,
-          color: context.ride.inkFaint,
-        ),
+        style: TextStyle(fontSize: AppText.micro, color: context.ride.inkFaint),
       ),
     );
   }

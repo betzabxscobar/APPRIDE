@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
 import 'package:ride/core/app_theme.dart';
-import 'package:ride/core/google_config.dart';
 import 'package:ride/models/app_user.dart';
 import 'package:ride/models/fleet.dart';
 import 'package:ride/services/geocoding_service.dart';
@@ -363,52 +362,6 @@ void main() {
         RoutingService.esServidorPublico('https://rutas.midominio.com'),
         isFalse,
       );
-    });
-  });
-
-  group('Buscador de direcciones', () {
-    test('Sin clave de Google se usa Photon', () {
-      expect(GoogleConfig.claveValida(''), isFalse);
-      expect(GoogleConfig.claveValida('   '), isFalse);
-    });
-
-    test('Reconoce una clave de Google por su forma', () {
-      expect(
-        GoogleConfig.claveValida('AIzaSyD-ejemplo-de-clave-larga-1234567'),
-        isTrue,
-      );
-    });
-
-    test('Un texto que no es clave cae a Photon en vez de romper el buscador',
-        () {
-      expect(GoogleConfig.claveValida('no-es-una-clave'), isFalse);
-      // Demasiado corta para ser real.
-      expect(GoogleConfig.claveValida('AIzaCorta'), isFalse);
-    });
-
-    test('Las sugerencias de Google llegan sin coordenadas', () {
-      // Su autocompletado solo da un identificador; las coordenadas se piden
-      // aparte al elegir, que es lo que evita pagar ocho consultas por
-      // busqueda en vez de una.
-      const sugerencia = GeoPlace(
-        nombre: 'Avenida Amazonas',
-        direccion: 'Quito, Ecuador',
-        lat: 0,
-        lng: 0,
-        placeId: 'ChIJejemplo',
-      );
-      expect(sugerencia.necesitaResolver, isTrue);
-      expect(sugerencia.conCoordenadas(-0.18, -78.48).necesitaResolver, isFalse);
-    });
-
-    test('Los lugares de Photon ya vienen resueltos', () {
-      const p = GeoPlace(
-        nombre: 'Avenida Amazonas',
-        direccion: 'Quito',
-        lat: -0.18,
-        lng: -78.48,
-      );
-      expect(p.necesitaResolver, isFalse);
     });
   });
 
