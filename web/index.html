@@ -31,6 +31,21 @@
 
   <title>ride</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    H3 de Uber, para la busqueda de choferes por celda hexagonal.
+
+    Solo aplica a la version web: en movil h3_dart usa FFI y necesita la
+    libreria C compilada, que todavia no esta integrada. La app detecta la
+    plataforma y cae a la busqueda por radio de PostGIS donde H3 no esta.
+
+    Tiene que cargarse ANTES de flutter_bootstrap.js: el paquete h3_web busca
+    el objeto global `h3` al arrancar.
+
+    Para produccion conviene servir el archivo desde el propio dominio en vez
+    de depender de un CDN externo.
+  -->
+  <script defer src="https://unpkg.com/h3-js@4.2.1"></script>
 </head>
 <body>
   <!--
