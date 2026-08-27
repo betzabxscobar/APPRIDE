@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'core/app_colors.dart';
 import 'core/app_theme.dart';
+import 'core/ride_colors.dart';
 import 'core/supabase_config.dart';
 import 'services/auth_service.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
@@ -79,49 +79,62 @@ class _ArranqueState extends State<_Arranque> {
   Widget build(BuildContext context) {
     if (_listo) return const AuthGate();
 
+    final ride = context.ride;
+
     return Scaffold(
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const RideMark(size: 64),
-              const SizedBox(height: 26),
-              if (_error == null) ...[
-                const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.4),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Preparando Ride…',
-                  style: TextStyle(fontSize: 13, color: AppColors.inkMuted),
-                ),
-              ] else ...[
-                Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const RideMark(size: 76),
+                const SizedBox(height: 30),
+                if (_error == null) ...[
+                  const SizedBox(
+                    width: 26,
+                    height: 26,
+                    child: CircularProgressIndicator(strokeWidth: 2.6),
                   ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Revisa tu conexión a internet.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12.5, color: AppColors.inkMuted),
-                ),
-                const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: _conectar,
-                  child: const Text('Reintentar'),
-                ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Preparando Ride…',
+                    style: TextStyle(
+                      fontSize: AppText.small,
+                      color: ride.inkMuted,
+                    ),
+                  ),
+                ] else ...[
+                  Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: AppTheme.display(
+                      AppText.h2,
+                      color: ride.ink,
+                      letterSpacing: -0.6,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Revisa tu conexión a internet.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: AppText.small,
+                      height: 1.5,
+                      color: ride.inkMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  FilledButton(
+                    onPressed: _conectar,
+                    child: const Text('Reintentar'),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -138,6 +151,10 @@ class RideApp extends StatelessWidget {
       title: 'Ride',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      // La app sigue el ajuste del teléfono. No hay interruptor propio: en
+      // móvil la gente espera que respete lo que ya eligió en el sistema.
+      themeMode: ThemeMode.system,
       home: const _Arranque(),
     );
   }
