@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/app_colors.dart';
 import '../../core/app_theme.dart';
+import '../../core/ride_colors.dart';
 import '../../models/fleet.dart';
 import '../../services/fleet_service.dart';
 import '../../services/ride_service.dart';
@@ -115,14 +115,14 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 Container(
                   padding: const EdgeInsets.all(15),
                   decoration: BoxDecoration(
-                    color: AppColors.background,
+                    color: context.ride.background,
                     borderRadius: BorderRadius.circular(AppTheme.radius),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: context.ride.border),
                   ),
-                  child: const Row(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.lock_outline, size: 18, color: AppColors.inkMuted),
+                      Icon(Icons.lock_outline, size: 18, color: context.ride.inkMuted),
                       SizedBox(width: 11),
                       Expanded(
                         child: Text(
@@ -133,7 +133,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                           style: TextStyle(
                             fontSize: 11.5,
                             height: 1.45,
-                            color: AppColors.inkMuted,
+                            color: context.ride.inkMuted,
                           ),
                         ),
                       ),
@@ -158,7 +158,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            style: FilledButton.styleFrom(backgroundColor: context.ride.danger),
             child: const Text('Eliminar'),
           ),
         ],
@@ -192,16 +192,16 @@ class _Tarjeta extends StatelessWidget {
             height: 42,
             decoration: BoxDecoration(
               color: metodo.predeterminado
-                  ? AppColors.primarySoft
-                  : AppColors.background,
+                  ? context.ride.accentSoft
+                  : context.ride.background,
               borderRadius: BorderRadius.circular(11),
             ),
             child: Icon(
               metodo.esEfectivo ? Icons.payments_outlined : Icons.credit_card,
               size: 20,
               color: metodo.predeterminado
-                  ? AppColors.primary
-                  : AppColors.inkMuted,
+                  ? context.ride.accent
+                  : context.ride.inkMuted,
             ),
           ),
           const SizedBox(width: 13),
@@ -213,10 +213,10 @@ class _Tarjeta extends StatelessWidget {
                   children: [
                     Text(
                       metodo.label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        color: context.ride.ink,
                       ),
                     ),
                     if (metodo.predeterminado) ...[
@@ -225,15 +225,15 @@ class _Tarjeta extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
-                          color: AppColors.primarySoft,
+                          color: context.ride.accentSoft,
                           borderRadius: BorderRadius.circular(99),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Principal',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
+                            color: context.ride.accent,
                           ),
                         ),
                       ),
@@ -243,7 +243,7 @@ class _Tarjeta extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   metodo.descripcion,
-                  style: const TextStyle(fontSize: 12, color: AppColors.inkMuted),
+                  style: TextStyle(fontSize: 12, color: context.ride.inkMuted),
                 ),
               ],
             ),
@@ -277,22 +277,22 @@ class _Vacio extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 34),
       child: Column(
         children: [
-          const Icon(Icons.account_balance_wallet_outlined,
-              size: 42, color: AppColors.border),
+          Icon(Icons.account_balance_wallet_outlined,
+              size: 42, color: context.ride.border),
           const SizedBox(height: 14),
-          const Text(
+          Text(
             'Sin métodos de pago',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+              color: context.ride.ink,
             ),
           ),
           const SizedBox(height: 5),
-          const Text(
+          Text(
             'Agrega uno para que tus viajes queden cobrados al finalizar.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, color: AppColors.inkMuted),
+            style: TextStyle(fontSize: 12.5, color: context.ride.inkMuted),
           ),
         ],
       ),

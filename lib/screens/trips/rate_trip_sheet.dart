@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/app_colors.dart';
+import '../../core/ride_colors.dart';
 import '../../services/ride_service.dart';
 import '../../widgets/auth_feedback.dart';
 
@@ -21,7 +21,7 @@ Future<bool?> mostrarHojaCalificacion(
     context: context,
     isScrollControlled: true,
     isDismissible: false,
-    backgroundColor: AppColors.surface,
+    backgroundColor: context.ride.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
@@ -101,17 +101,17 @@ class _HojaCalificacionState extends State<_HojaCalificacion> {
           Text(
             widget.titulo,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 19,
               fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+              color: context.ride.ink,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             widget.subtitulo,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: AppColors.inkMuted),
+            style: TextStyle(fontSize: 13, color: context.ride.inkMuted),
           ),
           const SizedBox(height: 22),
           Row(
@@ -129,7 +129,7 @@ class _HojaCalificacionState extends State<_HojaCalificacion> {
                     i <= _puntuacion ? Icons.star : Icons.star_border,
                     color: i <= _puntuacion
                         ? const Color(0xFFF5A623)
-                        : AppColors.border,
+                        : context.ride.border,
                   ),
                   tooltip: '$i de 5',
                 ),

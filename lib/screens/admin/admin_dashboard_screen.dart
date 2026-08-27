@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/app_colors.dart';
 import '../../core/app_theme.dart';
+import '../../core/ride_colors.dart';
 import '../../models/app_user.dart';
 import '../../models/user_role.dart';
 import '../../services/auth_service.dart';
@@ -103,11 +103,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           children: [
             Text(
               _accessName,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
                 letterSpacing: 1.1,
                 fontWeight: FontWeight.w800,
-                color: AppColors.purple,
+                color: context.ride.info,
               ),
             ),
             Text(_section.label),
@@ -118,13 +118,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             padding: const EdgeInsets.only(right: 12),
             child: CircleAvatar(
               radius: 17,
-              backgroundColor: AppColors.purpleSoft,
+              backgroundColor: context.ride.infoSoft,
               child: Text(
                 widget.user.initials,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.purple,
+                  color: context.ride.info,
                 ),
               ),
             ),
@@ -187,7 +187,7 @@ class _AdminDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.ride.surface,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -200,7 +200,7 @@ class _AdminDrawer extends StatelessWidget {
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      color: AppColors.purple,
+                      color: context.ride.info,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     alignment: Alignment.center,
@@ -218,21 +218,21 @@ class _AdminDrawer extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Ride',
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            color: context.ride.ink,
                           ),
                         ),
                         Text(
                           accessName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
                             letterSpacing: 1,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.inkMuted,
+                            color: context.ride.inkMuted,
                           ),
                         ),
                       ],
@@ -252,8 +252,8 @@ class _AdminDrawer extends StatelessWidget {
                         section.icon,
                         size: 21,
                         color: section == active
-                            ? AppColors.purple
-                            : AppColors.inkMuted,
+                            ? context.ride.info
+                            : context.ride.inkMuted,
                       ),
                       title: Text(
                         section.label,
@@ -261,12 +261,12 @@ class _AdminDrawer extends StatelessWidget {
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: section == active
-                              ? AppColors.ink
-                              : AppColors.inkMuted,
+                              ? context.ride.ink
+                              : context.ride.inkMuted,
                         ),
                       ),
                       selected: section == active,
-                      selectedTileColor: AppColors.purpleSoft,
+                      selectedTileColor: context.ride.infoSoft,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -290,15 +290,15 @@ class _AdminDrawer extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.greenSoft,
+                  color: context.ride.successSoft,
                   borderRadius: BorderRadius.circular(AppTheme.radius),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(
                       Icons.check_circle_outline,
                       size: 18,
-                      color: AppColors.green,
+                      color: context.ride.success,
                     ),
                     SizedBox(width: 10),
                     Expanded(
@@ -310,14 +310,14 @@ class _AdminDrawer extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.ink,
+                              color: context.ride.ink,
                             ),
                           ),
                           Text(
                             'Acceso protegido',
                             style: TextStyle(
                               fontSize: 11,
-                              color: AppColors.inkMuted,
+                              color: context.ride.inkMuted,
                             ),
                           ),
                         ],
@@ -334,7 +334,7 @@ class _AdminDrawer extends StatelessWidget {
                 icon: const Icon(Icons.logout, size: 18),
                 label: const Text('Cerrar sesión'),
                 style: TextButton.styleFrom(
-                  foregroundColor: AppColors.danger,
+                  foregroundColor: context.ride.danger,
                   alignment: Alignment.centerLeft,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                 ),
@@ -376,54 +376,54 @@ class _Overview extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: AppColors.purpleSoft,
+            color: context.ride.infoSoft,
             borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'PANEL DE CONTROL',
                 style: TextStyle(
                   fontSize: 10,
                   letterSpacing: 1.1,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.purple,
+                  color: context.ride.info,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Hola, ${user.firstName}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  color: context.ride.ink,
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Revisa el estado real de las cuentas registradas en Ride.',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.4,
-                  color: AppColors.inkMuted,
+                  color: context.ride.inkMuted,
                 ),
               ),
               const SizedBox(height: 14),
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.verified_user_outlined,
                     size: 16,
-                    color: AppColors.purple,
+                    color: context.ride.info,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Sesión ${user.role.displayName.toLowerCase()} segura',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.purple,
+                      color: context.ride.info,
                     ),
                   ),
                 ],
@@ -438,8 +438,8 @@ class _Overview extends StatelessWidget {
               child: _Metric(
                 label: 'Pasajeros',
                 value: passengers,
-                color: AppColors.primary,
-                background: AppColors.primarySoft,
+                color: context.ride.accent,
+                background: context.ride.accentSoft,
                 icon: Icons.person_outline,
               ),
             ),
@@ -448,8 +448,8 @@ class _Overview extends StatelessWidget {
               child: _Metric(
                 label: 'Conductores',
                 value: drivers,
-                color: AppColors.green,
-                background: AppColors.greenSoft,
+                color: context.ride.success,
+                background: context.ride.successSoft,
                 icon: Icons.drive_eta_outlined,
               ),
             ),
@@ -462,8 +462,8 @@ class _Overview extends StatelessWidget {
               child: _Metric(
                 label: 'Equipo administrativo',
                 value: administrators,
-                color: AppColors.purple,
-                background: AppColors.purpleSoft,
+                color: context.ride.info,
+                background: context.ride.infoSoft,
                 icon: Icons.shield_outlined,
               ),
             ),
@@ -472,7 +472,7 @@ class _Overview extends StatelessWidget {
               child: _Metric(
                 label: 'Viajes registrados',
                 value: 0,
-                color: AppColors.danger,
+                color: context.ride.danger,
                 background: Color(0x14E5484D),
                 icon: Icons.route_outlined,
               ),
@@ -535,7 +535,7 @@ class _UserList extends StatelessWidget {
       children: [
         Text(
           '${users.length} cuentas visibles para tu rol',
-          style: const TextStyle(fontSize: 13, color: AppColors.inkMuted),
+          style: TextStyle(fontSize: 13, color: context.ride.inkMuted),
         ),
         const SizedBox(height: 14),
         _Card(
@@ -575,9 +575,9 @@ class _Metric extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.ride.surface,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.ride.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,16 +591,16 @@ class _Metric extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             '$value',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+              color: context.ride.ink,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(fontSize: 12, color: AppColors.inkMuted),
+            style: TextStyle(fontSize: 12, color: context.ride.inkMuted),
           ),
         ],
       ),
@@ -626,9 +626,9 @@ class _Card extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.ride.surface,
         borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.ride.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -642,18 +642,18 @@ class _Card extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        color: context.ride.ink,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.inkMuted,
+                        color: context.ride.inkMuted,
                       ),
                     ),
                   ],
@@ -713,19 +713,19 @@ class _UserRow extends StatelessWidget {
                   user.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
+                    color: context.ride.ink,
                   ),
                 ),
                 Text(
                   user.email,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.inkMuted,
+                    color: context.ride.inkMuted,
                   ),
                 ),
               ],
@@ -753,7 +753,7 @@ class _UserRow extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 _date,
-                style: const TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                style: TextStyle(fontSize: 11, color: context.ride.inkMuted),
               ),
             ],
           ),
@@ -789,21 +789,21 @@ class _ImplementationStatus extends StatelessWidget {
                     width: 26,
                     height: 26,
                     decoration: BoxDecoration(
-                      color: step.$1 ? AppColors.greenSoft : AppColors.background,
+                      color: step.$1 ? context.ride.successSoft : context.ride.background,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: step.$1 ? AppColors.green : AppColors.border,
+                        color: step.$1 ? context.ride.success : context.ride.border,
                       ),
                     ),
                     alignment: Alignment.center,
                     child: step.$1
-                        ? const Icon(Icons.check, size: 14, color: AppColors.green)
+                        ? Icon(Icons.check, size: 14, color: context.ride.success)
                         : Text(
                             '${index + 1}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.inkMuted,
+                              color: context.ride.inkMuted,
                             ),
                           ),
                   ),
@@ -814,17 +814,17 @@ class _ImplementationStatus extends StatelessWidget {
                       children: [
                         Text(
                           step.$2,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.ink,
+                            color: context.ride.ink,
                           ),
                         ),
                         Text(
                           step.$3,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.inkMuted,
+                            color: context.ride.inkMuted,
                           ),
                         ),
                       ],
@@ -856,29 +856,29 @@ class _Placeholder extends StatelessWidget {
             Container(
               width: 64,
               height: 64,
-              decoration: const BoxDecoration(
-                color: AppColors.purpleSoft,
+              decoration: BoxDecoration(
+                color: context.ride.infoSoft,
                 shape: BoxShape.circle,
               ),
-              child: Icon(section.icon, size: 28, color: AppColors.purple),
+              child: Icon(section.icon, size: 28, color: context.ride.info),
             ),
             const SizedBox(height: 18),
             Text(
               section.label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                color: context.ride.ink,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Este módulo se construirá en una siguiente etapa.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
                 height: 1.4,
-                color: AppColors.inkMuted,
+                color: context.ride.inkMuted,
               ),
             ),
             const SizedBox(height: 20),
@@ -901,10 +901,10 @@ class _Note extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           height: 1.4,
-          color: AppColors.inkMuted,
+          color: context.ride.inkMuted,
         ),
       ),
     );

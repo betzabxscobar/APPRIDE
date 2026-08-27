@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
-import '../../core/app_colors.dart';
+import '../../core/map_defaults.dart';
+import '../../core/ride_colors.dart';
 import '../../services/geocoding_service.dart';
 import '../../services/places_service.dart';
 import '../../widgets/auth_feedback.dart';
@@ -126,8 +127,10 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Sin referencia se usa la última posición conocida; si tampoco la hay,
+    // una vista de país. Nunca una ciudad concreta escrita a mano.
     final centro = widget.cercaDe == null
-        ? const LatLng(-2.1709, -79.9224)
+        ? MapDefaults.centro
         : LatLng(widget.cercaDe!.lat, widget.cercaDe!.lng);
 
     return Scaffold(
@@ -236,7 +239,7 @@ class _VistaLista extends StatelessWidget {
             for (final g in guardadas)
               _Fila(
                 icono: g.favorita ? Icons.star : Icons.history,
-                color: g.favorita ? const Color(0xFFF5A623) : AppColors.inkMuted,
+                color: g.favorita ? const Color(0xFFF5A623) : context.ride.inkMuted,
                 titulo: g.etiqueta ?? g.direccion,
                 detalle: g.etiqueta == null ? null : g.direccion,
                 onTap: () => onElegir(GeoPlace(
@@ -253,7 +256,7 @@ class _VistaLista extends StatelessWidget {
             for (final s in sugeridos)
               _Fila(
                 icono: Icons.place_outlined,
-                color: AppColors.inkMuted,
+                color: context.ride.inkMuted,
                 titulo: s.nombre,
                 detalle: s.direccion,
                 onTap: () => onElegir(s),
@@ -278,7 +281,7 @@ class _VistaLista extends StatelessWidget {
         final r = resultados[i];
         return _Fila(
           icono: Icons.place_outlined,
-          color: AppColors.primary,
+          color: context.ride.accent,
           titulo: r.nombre,
           detalle: r.direccion.isEmpty ? null : r.direccion,
           onTap: () => onElegir(r),
@@ -349,19 +352,19 @@ class _VistaMapa extends StatelessWidget {
                   children: [
                     Text(
                       elegido!.nombre,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        color: context.ride.ink,
                       ),
                     ),
                     if (elegido!.direccion.isNotEmpty) ...[
                       const SizedBox(height: 3),
                       Text(
                         elegido!.direccion,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.inkMuted,
+                          color: context.ride.inkMuted,
                         ),
                       ),
                     ],
@@ -390,7 +393,7 @@ class _Pista extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.ink.withValues(alpha: 0.82),
+        color: context.ride.ink.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
@@ -417,11 +420,11 @@ class _Encabezado extends StatelessWidget {
       padding: const EdgeInsets.only(top: 8, bottom: 6),
       child: Text(
         texto.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
           letterSpacing: 1.2,
           fontWeight: FontWeight.w800,
-          color: AppColors.inkMuted,
+          color: context.ride.inkMuted,
         ),
       ),
     );
@@ -452,10 +455,10 @@ class _Fila extends StatelessWidget {
         titulo,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w700,
-          color: AppColors.ink,
+          color: context.ride.ink,
         ),
       ),
       subtitle: detalle == null
@@ -490,21 +493,21 @@ class _Mensaje extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icono, size: 42, color: AppColors.border),
+            Icon(icono, size: 42, color: context.ride.border),
             const SizedBox(height: 14),
             Text(
               titulo,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                color: context.ride.ink,
               ),
             ),
             const SizedBox(height: 5),
             Text(
               detalle,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted),
+              style: TextStyle(fontSize: 12.5, color: context.ride.inkMuted),
             ),
           ],
         ),

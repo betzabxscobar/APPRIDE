@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
-import '../../core/app_colors.dart';
 import '../../core/app_theme.dart';
+import '../../core/ride_colors.dart';
 import '../../models/fleet.dart';
 import '../../services/fleet_service.dart';
 
@@ -76,10 +76,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               onRefresh: _cargar,
               child: _avisos.isEmpty
                   ? ListView(
-                      children: const [
+                      children: [
                         SizedBox(height: 120),
                         Icon(Icons.notifications_none,
-                            size: 46, color: AppColors.border),
+                            size: 46, color: context.ride.border),
                         SizedBox(height: 14),
                         Center(
                           child: Text(
@@ -87,7 +87,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.ink,
+                              color: context.ride.ink,
                             ),
                           ),
                         ),
@@ -96,7 +96,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           child: Text(
                             'Te avisaremos cuando pase algo con tus viajes.',
                             style: TextStyle(
-                                fontSize: 12, color: AppColors.inkMuted),
+                                fontSize: 12, color: context.ride.inkMuted),
                           ),
                         ),
                       ],
@@ -124,10 +124,10 @@ class _Aviso extends StatelessWidget {
       decoration: BoxDecoration(
         // Las no leídas resaltan; las leídas quedan en blanco para que la
         // diferencia se vea de un vistazo.
-        color: aviso.leida ? AppColors.surface : AppColors.primarySoft,
+        color: aviso.leida ? context.ride.surface : context.ride.accentSoft,
         borderRadius: BorderRadius.circular(AppTheme.radius),
         border: Border.all(
-          color: aviso.leida ? AppColors.border : AppColors.primary,
+          color: aviso.leida ? context.ride.border : context.ride.accent,
           width: aviso.leida ? 1 : 1.3,
         ),
       ),
@@ -140,8 +140,8 @@ class _Aviso extends StatelessWidget {
                 Container(
                   width: 7,
                   height: 7,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
+                  decoration: BoxDecoration(
+                    color: context.ride.accent,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -150,26 +150,26 @@ class _Aviso extends StatelessWidget {
               Expanded(
                 child: Text(
                   aviso.titulo,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    color: context.ride.ink,
                   ),
                 ),
               ),
               Text(
                 aviso.cuando,
-                style: const TextStyle(fontSize: 10.5, color: AppColors.inkMuted),
+                style: TextStyle(fontSize: 10.5, color: context.ride.inkMuted),
               ),
             ],
           ),
           const SizedBox(height: 5),
           Text(
             aviso.mensaje,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12.5,
               height: 1.4,
-              color: AppColors.ink,
+              color: context.ride.ink,
             ),
           ),
         ],
@@ -194,7 +194,13 @@ class _NotificationsBellState extends State<NotificationsBell> {
   void initState() {
     super.initState();
     _contar();
-    _canal = FleetService.instance.escucharNotificaciones(_contar);
+    try {
+      _canal = FleetService.instance.escucharNotificaciones(_contar);
+    } catch (_) {
+      // Abrir el canal falla si no hay sesión todavía o si Realtime no
+      // responde. Sin este try la excepción sale de initState y tumba la
+      // barra entera; así la campana simplemente no se actualiza sola.
+    }
   }
 
   @override
@@ -236,7 +242,7 @@ class _NotificationsBellState extends State<NotificationsBell> {
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               constraints: const BoxConstraints(minWidth: 16),
               decoration: BoxDecoration(
-                color: AppColors.danger,
+                color: context.ride.danger,
                 borderRadius: BorderRadius.circular(99),
               ),
               child: Text(

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/app_colors.dart';
+import '../../core/ride_colors.dart';
 import '../../models/fleet.dart';
 import '../../services/fleet_service.dart';
 import '../../services/ride_service.dart';
@@ -15,7 +15,7 @@ Future<bool?> mostrarFormularioVehiculo(
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: AppColors.surface,
+    backgroundColor: context.ride.surface,
     showDragHandle: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -124,16 +124,16 @@ class _FormularioVehiculoState extends State<_FormularioVehiculo> {
             children: [
               Text(
                 _esEdicion ? 'Editar vehículo' : 'Registrar vehículo',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  color: context.ride.ink,
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Estos datos se muestran al pasajero cuando aceptas su viaje.',
-                style: TextStyle(fontSize: 12, color: AppColors.inkMuted),
+                style: TextStyle(fontSize: 12, color: context.ride.inkMuted),
               ),
               const SizedBox(height: 18),
               RideTextField(

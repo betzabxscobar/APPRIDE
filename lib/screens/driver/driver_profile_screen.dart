@@ -3,8 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../core/app_colors.dart';
 import '../../core/app_theme.dart';
+import '../../core/ride_colors.dart';
 import '../../models/fleet.dart';
 import '../../services/fleet_service.dart';
 import '../../services/ride_service.dart';
@@ -86,7 +86,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
   Future<void> _subir(DocumentType tipo) async {
     final origen = await showModalBottomSheet<ImageSource>(
       context: context,
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.ride.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -97,16 +97,16 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             const SizedBox(height: 12),
             Text(
               tipo.label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                color: context.ride.ink,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               tipo.hint,
-              style: const TextStyle(fontSize: 12, color: AppColors.inkMuted),
+              style: TextStyle(fontSize: 12, color: context.ride.inkMuted),
             ),
             const SizedBox(height: 8),
             ListTile(
@@ -195,9 +195,9 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                   const SizedBox(height: 16),
                   const _Titulo('Mis documentos'),
                   const SizedBox(height: 6),
-                  const Text(
+                  Text(
                     'La administración los revisa antes de aprobar tu cuenta.',
-                    style: TextStyle(fontSize: 12, color: AppColors.inkMuted),
+                    style: TextStyle(fontSize: 12, color: context.ride.inkMuted),
                   ),
                   const SizedBox(height: 12),
                   for (final tipo in DocumentType.values) ...[
@@ -229,19 +229,19 @@ class _EstadoCuenta extends StatelessWidget {
 
     final (color, icono, titulo, detalle) = switch (estado.estadoAprobacion) {
       'aprobado' => (
-          AppColors.green,
+          context.ride.success,
           Icons.verified,
           'Cuenta aprobada',
           'Ya puedes ponerte en línea y recibir viajes.'
         ),
       'rechazado' => (
-          AppColors.danger,
+          context.ride.danger,
           Icons.cancel_outlined,
           'Cuenta rechazada',
           'Revisa tus documentos y vuelve a enviarlos.'
         ),
       _ => (
-          AppColors.purple,
+          context.ride.info,
           Icons.hourglass_top,
           'En revisión',
           'Faltan $aprobados de 3 documentos aprobados'
@@ -276,10 +276,10 @@ class _EstadoCuenta extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   detalle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     height: 1.35,
-                    color: AppColors.ink,
+                    color: context.ride.ink,
                   ),
                 ),
               ],
@@ -311,13 +311,13 @@ class _TarjetaVehiculo extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: vehiculo.activo ? AppColors.greenSoft : AppColors.background,
+              color: vehiculo.activo ? context.ride.successSoft : context.ride.background,
               borderRadius: BorderRadius.circular(11),
             ),
             child: Icon(
               Icons.directions_car,
               size: 21,
-              color: vehiculo.activo ? AppColors.green : AppColors.inkMuted,
+              color: vehiculo.activo ? context.ride.success : context.ride.inkMuted,
             ),
           ),
           const SizedBox(width: 13),
@@ -331,10 +331,10 @@ class _TarjetaVehiculo extends StatelessWidget {
                       child: Text(
                         vehiculo.resumen,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          color: context.ride.ink,
                         ),
                       ),
                     ),
@@ -344,15 +344,15 @@ class _TarjetaVehiculo extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
-                          color: AppColors.greenSoft,
+                          color: context.ride.successSoft,
                           borderRadius: BorderRadius.circular(99),
                         ),
-                        child: const Text(
+                        child: Text(
                           'En servicio',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.green,
+                            color: context.ride.success,
                           ),
                         ),
                       ),
@@ -362,7 +362,7 @@ class _TarjetaVehiculo extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   '${vehiculo.placa}${vehiculo.color == null ? '' : ' · ${vehiculo.color}'}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.inkMuted),
+                  style: TextStyle(fontSize: 12, color: context.ride.inkMuted),
                 ),
               ],
             ),
@@ -403,12 +403,12 @@ class _TarjetaDocumento extends StatelessWidget {
     final doc = documento;
 
     final (color, icono, etiqueta) = switch (doc?.estado) {
-      DocumentStatus.aprobado => (AppColors.green, Icons.check_circle, 'Aprobado'),
+      DocumentStatus.aprobado => (context.ride.success, Icons.check_circle, 'Aprobado'),
       DocumentStatus.rechazado =>
-        (AppColors.danger, Icons.error_outline, 'Rechazado'),
+        (context.ride.danger, Icons.error_outline, 'Rechazado'),
       DocumentStatus.pendiente =>
-        (AppColors.purple, Icons.hourglass_empty, 'En revisión'),
-      null => (AppColors.inkMuted, Icons.upload_file, 'Sin subir'),
+        (context.ride.info, Icons.hourglass_empty, 'En revisión'),
+      null => (context.ride.inkMuted, Icons.upload_file, 'Sin subir'),
     };
 
     return RideCard(
@@ -422,10 +422,10 @@ class _TarjetaDocumento extends StatelessWidget {
               children: [
                 Text(
                   tipo.label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    color: context.ride.ink,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -471,10 +471,10 @@ class _Titulo extends StatelessWidget {
         Expanded(
           child: Text(
             texto,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15.5,
               fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+              color: context.ride.ink,
             ),
           ),
         ),
@@ -495,14 +495,14 @@ class _Vacio extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: context.ride.background,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.ride.border),
       ),
       child: Text(
         texto,
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted),
+        style: TextStyle(fontSize: 12.5, color: context.ride.inkMuted),
       ),
     );
   }

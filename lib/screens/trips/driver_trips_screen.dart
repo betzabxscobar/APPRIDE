@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
-import '../../core/app_colors.dart';
 import '../../core/app_theme.dart';
+import '../../core/ride_colors.dart';
 import '../../models/trip.dart';
 import '../../services/ride_service.dart';
 import '../../widgets/auth_feedback.dart';
@@ -192,17 +192,17 @@ class _Disponibilidad extends StatelessWidget {
                 height: 10,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: estado.disponible ? AppColors.green : AppColors.border,
+                  color: estado.disponible ? context.ride.success : context.ride.border,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   estado.disponible ? 'En línea' : 'Fuera de línea',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    color: context.ride.ink,
                   ),
                 ),
               ),
@@ -217,24 +217,24 @@ class _Disponibilidad extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.purpleSoft,
+                color: context.ride.infoSoft,
                 borderRadius: BorderRadius.circular(AppTheme.radius),
               ),
               child: Text(
                 estado.motivoBloqueo,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11.5,
                   height: 1.35,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.ink,
+                  color: context.ride.ink,
                 ),
               ),
             ),
           ] else if (!estado.disponible) ...[
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Ponte en línea para recibir solicitudes de viaje.',
-              style: TextStyle(fontSize: 11.5, color: AppColors.inkMuted),
+              style: TextStyle(fontSize: 11.5, color: context.ride.inkMuted),
             ),
           ],
         ],
@@ -279,10 +279,10 @@ class _ListaSolicitudes extends StatelessWidget {
       children: [
         Text(
           '${solicitudes.length} ${solicitudes.length == 1 ? 'solicitud' : 'solicitudes'} disponibles',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: AppColors.inkMuted,
+            color: context.ride.inkMuted,
           ),
         ),
         const SizedBox(height: 12),
@@ -296,19 +296,19 @@ class _ListaSolicitudes extends StatelessWidget {
                     Expanded(
                       child: Text(
                         viaje.pasajeroNombre,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          color: context.ride.ink,
                         ),
                       ),
                     ),
                     Text(
                       '\$${viaje.tarifaEstimada.toStringAsFixed(2)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.green,
+                        color: context.ride.success,
                       ),
                     ),
                   ],
@@ -380,10 +380,10 @@ class _ViajeActivo extends StatelessWidget {
               ),
               Text(
                 '\$${viaje.montoVigente.toStringAsFixed(2)}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w900,
-                  color: AppColors.ink,
+                  color: context.ride.ink,
                 ),
               ),
             ],
@@ -396,25 +396,25 @@ class _ViajeActivo extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.person_outline, size: 18, color: AppColors.inkMuted),
+                  Icon(Icons.person_outline, size: 18, color: context.ride.inkMuted),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       viaje.pasajeroNombre,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        color: context.ride.ink,
                       ),
                     ),
                   ),
                   if (viaje.pasajeroTelefono != null)
                     Text(
                       viaje.pasajeroTelefono!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
+                        color: context.ride.accent,
                       ),
                     ),
                 ],
@@ -436,7 +436,7 @@ class _ViajeActivo extends StatelessWidget {
             onPressed: ocupado ? null : onFinalizar,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
-              backgroundColor: AppColors.green,
+              backgroundColor: context.ride.success,
             ),
             child: const Text('Finalizar viaje'),
           ),
@@ -444,7 +444,7 @@ class _ViajeActivo extends StatelessWidget {
           const SizedBox(height: 10),
           TextButton(
             onPressed: ocupado ? null : onCancelar,
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            style: TextButton.styleFrom(foregroundColor: context.ride.danger),
             child: const Text('Cancelar viaje'),
           ),
         ],
@@ -465,13 +465,13 @@ class _MiniRuta extends StatelessWidget {
       children: [
         _Linea(
           icono: Icons.my_location,
-          color: AppColors.primary,
+          color: context.ride.accent,
           texto: viaje.origenTexto,
         ),
         const SizedBox(height: 7),
         _Linea(
           icono: Icons.place_outlined,
-          color: AppColors.green,
+          color: context.ride.success,
           texto: viaje.destinoTexto,
         ),
       ],
@@ -497,7 +497,7 @@ class _Linea extends StatelessWidget {
             texto,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12.5, color: AppColors.ink),
+            style: TextStyle(fontSize: 12.5, color: context.ride.ink),
           ),
         ),
       ],
@@ -522,21 +522,21 @@ class _Vacio extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 46),
       child: Column(
         children: [
-          Icon(icono, size: 42, color: AppColors.border),
+          Icon(icono, size: 42, color: context.ride.border),
           const SizedBox(height: 14),
           Text(
             titulo,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+              color: context.ride.ink,
             ),
           ),
           const SizedBox(height: 5),
           Text(
             detalle,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted),
+            style: TextStyle(fontSize: 12.5, color: context.ride.inkMuted),
           ),
         ],
       ),
