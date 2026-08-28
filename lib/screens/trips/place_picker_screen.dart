@@ -30,6 +30,7 @@ class PlacePickerScreen extends StatefulWidget {
 
 class _PlacePickerScreenState extends State<PlacePickerScreen> {
   final _busqueda = TextEditingController();
+  final _foco = FocusNode();
   final _mapa = MapController();
 
   List<GeoPlace> _resultados = const [];
@@ -37,6 +38,14 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
   List<GeoPlace> _sugeridos = const [];
 
   GeoPlace? _elegido;
+
+  /// Etiqueta que se le va a poner al próximo lugar que se elija.
+  ///
+  /// Cuando no es nula, la pantalla deja de servir para elegir destino y pasa a
+  /// servir para guardar un favorito: se busca la dirección de «Casa» y, al
+  /// tocarla, se guarda con ese nombre en vez de devolverla.
+  String? _etiquetaPendiente;
+
   bool _buscando = false;
   bool _enMapa = false;
   String? _error;
@@ -50,6 +59,7 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
   @override
   void dispose() {
     _busqueda.dispose();
+    _foco.dispose();
     GeocodingService.instance.cancelarEspera();
     super.dispose();
   }
@@ -123,7 +133,85 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
     });
   }
 
-  void _confirmar(GeoPlace lugar) => Navigator.of(context).pop(lugar);
+  Future<void> _confirmar(GeoPlace lugar) async {
+    final etiqueta = _etiquetaPendiente;
+    if (etiqueta == null) {
+      Navigator.of(context).pop(lugar);
+      return;
+    }
+
+    // Estamos guardando un favorito, no eligiendo destino.
+    setState(() => _buscando = true);
+    await PlacesService.instance.recordar(lugar, etiqueta: etiqueta);
+    if (!mounted) return;
+
+    _busqueda.clear();
+    setState(() {
+      _etiquetaPendiente = null;
+      _resultados = const [];
+      _buscando = false;
+    });
+    await _cargarAtajos();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Guardado como $etiqueta')),
+      );
+    }
+  }
+
+  /// Empieza a guardar un favorito: pide la dirección de [etiqueta].
+  void _guardarFavorito(String etiqueta) {
+    _busqueda.clear();
+    setState(() {
+      _etiquetaPendiente = etiqueta;
+      _resultados = const [];
+      _enMapa = false;
+    });
+    _foco.requestFocus();
+  }
+
+  /// Pregunta cómo se llama el favorito, para los que no son Casa ni Oficina.
+  Future<void> _guardarOtro() async {
+    final control = TextEditingController();
+    final nombre = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Cómo se llama?'),
+        content: TextField(
+          controller: control,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(hintText: 'Gimnasio, casa de mamá…'),
+          onSubmitted: (v) => Navigator.of(context).pop(v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(control.text),
+            child: const Text('Continuar'),
+          ),
+        ],
+      ),
+    );
+    control.dispose();
+
+    final limpio = nombre?.trim() ?? '';
+    if (limpio.isNotEmpty) _guardarFavorito(limpio);
+  }
+
+  Future<void> _olvidar(SavedPlace lugar) async {
+    await PlacesService.instance.olvidar(lugar.id);
+    await _cargarAtajos();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Se quitó ${lugar.etiqueta ?? lugar.direccion}')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -151,10 +239,13 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
               child: TextField(
                 controller: _busqueda,
+                focusNode: _foco,
                 autofocus: true,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
-                  hintText: 'Calle, número, lugar…',
+                  hintText: _etiquetaPendiente == null
+                      ? 'Calle, número, lugar…'
+                      : 'Dirección de ${_etiquetaPendiente!}…',
                   prefixIcon: const Icon(Icons.search, size: 20),
                   suffixIcon: _busqueda.text.isEmpty
                       ? null
@@ -167,6 +258,14 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
                         ),
                 ),
                 onChanged: _buscar,
+              ),
+            ),
+          if (_etiquetaPendiente != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+              child: _AvisoGuardando(
+                etiqueta: _etiquetaPendiente!,
+                onCancelar: () => setState(() => _etiquetaPendiente = null),
               ),
             ),
           if (_error != null)
@@ -190,7 +289,11 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
                     guardadas: _guardadas,
                     sugeridos: _sugeridos,
                     hayTexto: _busqueda.text.trim().length >= 3,
+                    guardandoFavorito: _etiquetaPendiente != null,
                     onElegir: _confirmar,
+                    onGuardarFavorito: _guardarFavorito,
+                    onGuardarOtro: _guardarOtro,
+                    onOlvidar: _olvidar,
                   ),
           ),
         ],
@@ -206,7 +309,11 @@ class _VistaLista extends StatelessWidget {
     required this.guardadas,
     required this.sugeridos,
     required this.hayTexto,
+    required this.guardandoFavorito,
     required this.onElegir,
+    required this.onGuardarFavorito,
+    required this.onGuardarOtro,
+    required this.onOlvidar,
   });
 
   final bool buscando;
@@ -214,7 +321,34 @@ class _VistaLista extends StatelessWidget {
   final List<SavedPlace> guardadas;
   final List<GeoPlace> sugeridos;
   final bool hayTexto;
+
+  /// Mientras se guarda un favorito no se ofrecen los atajos: se está buscando
+  /// una dirección concreta, y volver a ofrecer «Casa» no lleva a ningún sitio.
+  final bool guardandoFavorito;
+
   final void Function(GeoPlace) onElegir;
+  final void Function(String etiqueta) onGuardarFavorito;
+  final VoidCallback onGuardarOtro;
+  final void Function(SavedPlace) onOlvidar;
+
+  /// Etiquetas que se ofrecen de entrada. El resto se crean con «Otro».
+  static const List<String> _sugeridasFavoritas = ['Casa', 'Oficina'];
+
+  static IconData iconoDe(String? etiqueta) {
+    final e = (etiqueta ?? '').toLowerCase();
+    if (e.contains('casa') || e.contains('hogar')) return Icons.home_outlined;
+    if (e.contains('oficina') || e.contains('trabajo')) {
+      return Icons.work_outline;
+    }
+    return Icons.star_outline;
+  }
+
+  GeoPlace _comoGeoPlace(SavedPlace g) => GeoPlace(
+        nombre: g.etiqueta ?? g.direccion,
+        direccion: g.etiqueta == null ? '' : g.direccion,
+        lat: g.lat,
+        lng: g.lng,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -222,79 +356,164 @@ class _VistaLista extends StatelessWidget {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Mientras no se escribe nada se ofrecen atajos: lo propio primero.
-    if (!hayTexto) {
-      if (guardadas.isEmpty && sugeridos.isEmpty) {
+    if (hayTexto) {
+      if (resultados.isEmpty) {
         return const _Mensaje(
-          icono: Icons.search,
-          titulo: 'Busca tu destino',
-          detalle: 'Escribe una calle, un número o el nombre de un lugar.',
+          icono: Icons.search_off,
+          titulo: 'Sin resultados',
+          detalle:
+              'Prueba con otra forma de escribirlo, o elige el punto en el mapa.',
         );
       }
-      return ListView(
+
+      return ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
-        children: [
-          if (guardadas.isNotEmpty) ...[
-            const _Encabezado('Tus direcciones'),
-            for (final g in guardadas)
-              _Fila(
-                icono: g.favorita ? Icons.star : Icons.history,
-                color: g.favorita
-                    ? const Color(0xFFF5A623)
-                    : context.ride.inkMuted,
-                titulo: g.etiqueta ?? g.direccion,
-                detalle: g.etiqueta == null ? null : g.direccion,
-                onTap: () => onElegir(
-                  GeoPlace(
-                    nombre: g.etiqueta ?? g.direccion,
-                    direccion: g.etiqueta == null ? '' : g.direccion,
-                    lat: g.lat,
-                    lng: g.lng,
-                  ),
-                ),
-              ),
-            const SizedBox(height: 14),
-          ],
-          if (sugeridos.isNotEmpty) ...[
-            const _Encabezado('Lugares conocidos'),
-            for (final s in sugeridos)
-              _Fila(
-                icono: Icons.place_outlined,
-                color: context.ride.inkMuted,
-                titulo: s.nombre,
-                detalle: s.direccion,
-                onTap: () => onElegir(s),
-              ),
-          ],
-        ],
+        // Una fila extra al final para el credito del buscador.
+        itemCount: resultados.length + 1,
+        itemBuilder: (context, i) {
+          if (i == resultados.length) return const _CreditoBuscador();
+
+          final r = resultados[i];
+          return _Fila(
+            icono: Icons.place_outlined,
+            color: context.ride.accent,
+            titulo: r.nombre,
+            detalle: r.direccion.isEmpty ? null : r.direccion,
+            onTap: () => onElegir(r),
+          );
+        },
       );
     }
 
-    if (resultados.isEmpty) {
+    // Sin texto: atajos. Lo propio primero.
+    final favoritas = guardadas.where((g) => g.favorita).toList();
+    final recientes = guardadas.where((g) => !g.favorita).toList();
+
+    if (guardandoFavorito) {
       return const _Mensaje(
-        icono: Icons.search_off,
-        titulo: 'Sin resultados',
-        detalle:
-            'Prueba con otra forma de escribirlo, o elige el punto en el mapa.',
+        icono: Icons.bookmark_add_outlined,
+        titulo: 'Busca la dirección',
+        detalle: 'Escríbela arriba y tócala para guardarla con ese nombre.',
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
-      // Una fila extra al final para el credito del buscador.
-      itemCount: resultados.length + 1,
-      itemBuilder: (context, i) {
-        if (i == resultados.length) return const _CreditoBuscador();
+    final faltantes = _sugeridasFavoritas
+        .where((e) => !favoritas.any(
+              (f) => (f.etiqueta ?? '').toLowerCase() == e.toLowerCase(),
+            ))
+        .toList();
 
-        final r = resultados[i];
-        return _Fila(
-          icono: Icons.place_outlined,
-          color: context.ride.accent,
-          titulo: r.nombre,
-          detalle: r.direccion.isEmpty ? null : r.direccion,
-          onTap: () => onElegir(r),
-        );
-      },
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
+      children: [
+        const _Encabezado('Favoritos'),
+        for (final f in favoritas)
+          _Fila(
+            icono: iconoDe(f.etiqueta),
+            color: context.ride.accent,
+            titulo: f.etiqueta ?? f.direccion,
+            detalle: f.etiqueta == null ? null : f.direccion,
+            onTap: () => onElegir(_comoGeoPlace(f)),
+            accion: IconButton(
+              icon: const Icon(Icons.close, size: 18),
+              tooltip: 'Quitar de favoritos',
+              color: context.ride.inkMuted,
+              onPressed: () => onOlvidar(f),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final e in faltantes)
+                ActionChip(
+                  avatar: Icon(iconoDe(e), size: 18),
+                  label: Text('Añadir $e'),
+                  onPressed: () => onGuardarFavorito(e),
+                ),
+              ActionChip(
+                avatar: const Icon(Icons.add, size: 18),
+                label: const Text('Otro'),
+                onPressed: onGuardarOtro,
+              ),
+            ],
+          ),
+        ),
+        if (recientes.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          const _Encabezado('Recientes'),
+          for (final g in recientes)
+            _Fila(
+              icono: Icons.history,
+              color: context.ride.inkMuted,
+              titulo: g.direccion,
+              onTap: () => onElegir(_comoGeoPlace(g)),
+            ),
+        ],
+        // El catálogo de la ciudad está vacío a propósito: sembrarlo con una
+        // ciudad fija mandaba a la gente al otro lado del país.
+        if (sugeridos.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          const _Encabezado('Lugares conocidos'),
+          for (final s in sugeridos)
+            _Fila(
+              icono: Icons.place_outlined,
+              color: context.ride.inkMuted,
+              titulo: s.nombre,
+              detalle: s.direccion,
+              onTap: () => onElegir(s),
+            ),
+        ],
+        if (favoritas.isEmpty && recientes.isEmpty) ...[
+          const SizedBox(height: 24),
+          const _Mensaje(
+            icono: Icons.search,
+            titulo: 'Busca tu destino',
+            detalle: 'Escribe una calle, un número o el nombre de un lugar.',
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Aviso de que la pantalla está guardando un favorito, no eligiendo destino.
+class _AvisoGuardando extends StatelessWidget {
+  const _AvisoGuardando({required this.etiqueta, required this.onCancelar});
+
+  final String etiqueta;
+  final VoidCallback onCancelar;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+      decoration: BoxDecoration(
+        color: ride.accentSoft,
+        borderRadius: BorderRadius.circular(AppTheme.radiusField),
+        border: Border.all(color: ride.accent.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(_VistaLista.iconoDe(etiqueta), size: 20, color: ride.accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Elige la dirección de $etiqueta',
+              style: TextStyle(
+                fontSize: AppText.label,
+                fontWeight: FontWeight.w700,
+                color: ride.ink,
+              ),
+            ),
+          ),
+          TextButton(onPressed: onCancelar, child: const Text('Cancelar')),
+        ],
+      ),
     );
   }
 }
@@ -442,8 +661,9 @@ class _Fila extends StatelessWidget {
     required this.icono,
     required this.color,
     required this.titulo,
-    required this.detalle,
+    this.detalle,
     required this.onTap,
+    this.accion,
   });
 
   final IconData icono;
@@ -451,6 +671,9 @@ class _Fila extends StatelessWidget {
   final String titulo;
   final String? detalle;
   final VoidCallback onTap;
+
+  /// Control opcional a la derecha, como el aspa de quitar un favorito.
+  final Widget? accion;
 
   @override
   Widget build(BuildContext context) {
@@ -462,7 +685,7 @@ class _Fila extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          fontSize: 14,
+          fontSize: AppText.small,
           fontWeight: FontWeight.w700,
           color: context.ride.ink,
         ),
@@ -473,8 +696,12 @@ class _Fila extends StatelessWidget {
               detalle!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11.5),
+              style: TextStyle(
+                fontSize: AppText.micro,
+                color: context.ride.inkMuted,
+              ),
             ),
+      trailing: accion,
       onTap: onTap,
     );
   }

@@ -8,6 +8,7 @@ import 'package:ride/models/app_user.dart';
 import 'package:ride/models/fleet.dart';
 import 'package:ride/services/geocoding_service.dart';
 import 'package:ride/services/h3_service.dart';
+import 'package:ride/services/places_service.dart';
 import 'package:ride/services/routing_service.dart';
 import 'package:ride/widgets/ride_map.dart';
 import 'package:ride/models/trip.dart';
@@ -362,6 +363,34 @@ void main() {
         RoutingService.esServidorPublico('https://rutas.midominio.com'),
         isFalse,
       );
+    });
+  });
+
+  group('Direcciones guardadas', () {
+    SavedPlace leer(Map<String, dynamic> extra) => SavedPlace.fromMap({
+          'id': 'd1',
+          'direccion': 'Avenida Amazonas 123, Quito',
+          'latitud': -0.18,
+          'longitud': -78.48,
+          'favorita': false,
+          'etiqueta': null,
+          ...extra,
+        });
+
+    test('Una direccion del historial no es favorita ni tiene etiqueta', () {
+      final d = leer(const {});
+      expect(d.favorita, isFalse);
+      expect(d.etiqueta, isNull);
+    });
+
+    test('Un favorito trae su etiqueta', () {
+      // `recordar_direccion` marca favorita cualquier direccion a la que se le
+      // ponga nombre, asi que las dos cosas viajan juntas.
+      final d = leer(const {'favorita': true, 'etiqueta': 'Casa'});
+      expect(d.favorita, isTrue);
+      expect(d.etiqueta, 'Casa');
+      expect(d.lat, -0.18);
+      expect(d.lng, -78.48);
     });
   });
 
