@@ -118,17 +118,21 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
     if (!mounted) return;
 
     setState(() {
-      // Si el geocodificador no reconoce el punto, se usa igual con sus
-      // coordenadas: el viaje puede salir de un descampado sin nombre.
-      _elegido =
-          lugar ??
-          GeoPlace(
-            nombre: 'Punto en el mapa',
-            direccion:
-                '${punto.latitude.toStringAsFixed(5)}, ${punto.longitude.toStringAsFixed(5)}',
-            lat: punto.latitude,
-            lng: punto.longitude,
-          );
+      // Las coordenadas son SIEMPRE las del toque. Del geocodificador se toma
+      // solo el nombre.
+      //
+      // Antes se usaba el lugar que devolvia Photon tal cual, y Photon responde
+      // con el nodo conocido mas cercano —el centro de una calle, un portal—,
+      // asi que el alfiler se iba a otra parte y el viaje salia desde donde la
+      // persona no habia tocado. El nombre puede ser aproximado; el punto no.
+      _elegido = GeoPlace(
+        nombre: lugar?.nombre ?? 'Punto en el mapa',
+        direccion: lugar == null || lugar.direccion.isEmpty
+            ? '${punto.latitude.toStringAsFixed(5)}, ${punto.longitude.toStringAsFixed(5)}'
+            : lugar.direccion,
+        lat: punto.latitude,
+        lng: punto.longitude,
+      );
       _buscando = false;
     });
   }

@@ -289,6 +289,10 @@ class _Pin extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      // La punta del alfiler tiene que quedar en el borde inferior de la caja,
+      // porque `alignment: topCenter` sitúa toda la caja encima del punto. Sin
+      // esto el alfiler senala unos pixeles mas arriba de donde toca.
+      mainAxisAlignment: MainAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
