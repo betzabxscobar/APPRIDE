@@ -34,7 +34,52 @@ direcciones nuevas o poco comunes.
 de OpenStreetMap y arrastran exactamente el mismo hueco. Solo **Google, HERE y
 TomTom** tienen datos propios.
 
+## Cómo se busca hoy
+
+Dos pasadas contra Photon, y una tercera opción si hay clave de TomTom.
+
+**1. Acotado a la ciudad** (±1,5°, unos 165 km). El `lat`/`lon` de Photon es un
+sesgo flojo, no un filtro, y cualquier coincidencia de nombre se lo come.
+Medido: buscando «Urbanización Alma Lojana Baja» desde Quito devolvía cuatro
+urbanizaciones **de España** y ninguna de Ecuador.
+
+**2. Acotado al país** (±10°) si lo anterior no da nada.
+
+**Y ya.** No se busca en todo el mundo: un viaje en taxi a 9 000 km no existe, y
+ofrecer una calle de Málaga solo consigue que alguien la toque por error. Es
+mejor devolver vacío y que se elija el punto en el mapa.
+
+| Búsqueda | Antes | Ahora |
+|---|---|---|
+| «Urbanización Alma Lojana Baja» | Vélez-Málaga, Albatera, Olula del Río | sin resultados |
+| «Alma Lojana» | 1 de 3 en Quito | 2 de 3 en Quito |
+
+## TomTom, si hay clave
+
+`BusquedaConfig` acepta una clave de TomTom, que **sí tiene cartografía propia**
+y encuentra sitios que OSM no conoce.
+
+A diferencia de Google, **no pide tarjeta**: la clave se saca con un correo en
+<https://developer.tomtom.com>. Su plan gratuito da 2 500 peticiones de búsqueda
+al día, con uso comercial permitido.
+
+Antes de compilar con ella, conviene ver si mejora de verdad:
+
+```sh
+dart run tool/comparar_buscador.dart TU_CLAVE "Alma Lojana"
+```
+
+Enseña lo que devuelven Photon y TomTom para la misma búsqueda, uno al lado del
+otro. Si TomTom no aporta, no vale la pena la dependencia.
+
+```sh
+flutter build apk --release --dart-define=TOMTOM_KEY=TU_CLAVE
+```
+
+Sin la variable —o con algo que no tenga forma de clave— se sigue usando Photon.
+
 ## Por qué no se usa Google
+
 
 Se llegó a implementar y **se retiró**: Google Cloud no deja activar las APIs de
 Maps sin **cuenta de facturación con tarjeta**, aunque no se llegue a gastar.

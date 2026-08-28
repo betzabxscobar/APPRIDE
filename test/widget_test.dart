@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
 import 'package:ride/core/app_theme.dart';
+import 'package:ride/core/busqueda_config.dart';
 import 'package:ride/models/app_user.dart';
 import 'package:ride/models/fleet.dart';
 import 'package:ride/services/geocoding_service.dart';
@@ -391,6 +392,26 @@ void main() {
       expect(d.etiqueta, 'Casa');
       expect(d.lat, -0.18);
       expect(d.lng, -78.48);
+    });
+  });
+
+  group('Clave del buscador', () {
+    test('Sin clave se usa Photon', () {
+      expect(BusquedaConfig.claveValida(''), isFalse);
+      expect(BusquedaConfig.claveValida('   '), isFalse);
+    });
+
+    test('Una clave de TomTom se acepta', () {
+      expect(BusquedaConfig.claveValida('rAnDoM4lFaNuM3r1cK3y0fT0mT0m'), isTrue);
+    });
+
+    test('Una URL pegada por error cae a Photon', () {
+      // Mejor un buscador con datos flojos que uno que no encuentra nada.
+      expect(
+        BusquedaConfig.claveValida('https://developer.tomtom.com/miclave'),
+        isFalse,
+      );
+      expect(BusquedaConfig.claveValida('corta'), isFalse);
     });
   });
 

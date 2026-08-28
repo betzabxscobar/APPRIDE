@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../core/busqueda_config.dart';
+
 /// Un lugar del mundo, venga del geocodificador o de las direcciones guardadas.
 class GeoPlace {
   const GeoPlace({
@@ -57,6 +59,124 @@ class GeocodingService {
   /// de escribir.
   Timer? _espera;
 
+  // ---------------------------------------------------------------- TomTom
+  //
+  // Con clave se usa TomTom, que tiene cartografía propia. En Quito encuentra
+  // sitios que OSM no conoce. Sin clave, nada de esto se ejecuta.
+
+  static const String _tomtomBase = 'api.tomtom.com';
+
+  Future<List<GeoPlace>> _buscarTomTom(
+    String q,
+    ({double lat, double lng})? cercaDe,
+    int limite,
+  ) async {
+    final r = await _cliente
+        .get(
+          Uri.https(
+            _tomtomBase,
+            '/search/2/search/${Uri.encodeComponent(q)}.json',
+            {
+              'key': BusquedaConfig.tomtomKey,
+              'limit': '$limite',
+              'language': 'es-ES',
+              // `typeahead` le dice que el texto puede estar a medio escribir.
+              'typeahead': 'true',
+              // Sesgo, no filtro: sin `radius`, lo de fuera sigue apareciendo
+              // más abajo. Es lo que hace que «terminal» devuelva la de tu
+              // ciudad y no la de otro país.
+              if (cercaDe != null) 'lat': '${cercaDe.lat}',
+              if (cercaDe != null) 'lon': '${cercaDe.lng}',
+            },
+          ),
+        )
+        .timeout(const Duration(seconds: 8));
+
+    if (r.statusCode != 200) {
+      throw const GeocodingException(
+        'El buscador de direcciones no respondió.',
+      );
+    }
+
+    final datos = jsonDecode(r.body) as Map<String, dynamic>;
+    final resultados = datos['results'] as List? ?? const [];
+
+    return [
+      for (final x in resultados.cast<Map<String, dynamic>>()) ?_desdeTomTom(x),
+    ];
+  }
+
+  GeoPlace? _desdeTomTom(Map<String, dynamic> r) {
+    final pos = r['position'] as Map<String, dynamic>?;
+    if (pos == null) return null;
+
+    final dir = (r['address'] as Map<String, dynamic>?) ?? const {};
+    final completo = (dir['freeformAddress'] as String?) ?? '';
+    final partes = completo.split(',').map((e) => e.trim()).toList();
+
+    // Un punto de interés se nombra por su nombre; una calle, por su nombre de
+    // calle. Si no hay ninguno, el primer trozo de la dirección completa.
+    final poi = (r['poi'] as Map<String, dynamic>?)?['name'] as String?;
+    final calle = dir['streetName'] as String?;
+    final nombre =
+        poi ?? calle ?? (partes.isEmpty ? 'Sin nombre' : partes.first);
+
+    // El contexto es la dirección completa sin repetir lo que ya va de nombre.
+    final resto = partes.isNotEmpty && partes.first == nombre
+        ? partes.skip(1)
+        : partes;
+
+    return GeoPlace(
+      nombre: nombre,
+      direccion: resto.join(', '),
+      lat: (pos['lat'] as num).toDouble(),
+      lng: (pos['lon'] as num).toDouble(),
+    );
+  }
+
+  Future<GeoPlace?> _direccionDeTomTom(double lat, double lng) async {
+    final r = await _cliente
+        .get(
+          Uri.https(_tomtomBase, '/search/2/reverseGeocode/$lat,$lng.json', {
+            'key': BusquedaConfig.tomtomKey,
+            'language': 'es-ES',
+          }),
+        )
+        .timeout(const Duration(seconds: 8));
+
+    if (r.statusCode != 200) return null;
+
+    final lista =
+        (jsonDecode(r.body) as Map<String, dynamic>)['addresses'] as List?;
+    if (lista == null || lista.isEmpty) return null;
+
+    final dir =
+        (lista.first as Map<String, dynamic>)['address']
+            as Map<String, dynamic>?;
+    if (dir == null) return null;
+
+    final completo = (dir['freeformAddress'] as String?) ?? '';
+    final partes = completo.split(',').map((e) => e.trim()).toList();
+    final nombre =
+        (dir['streetName'] as String?) ??
+        (partes.isEmpty ? 'Punto en el mapa' : partes.first);
+
+    return GeoPlace(
+      nombre: nombre,
+      direccion:
+          (partes.isNotEmpty && partes.first == nombre
+                  ? partes.skip(1)
+                  : partes)
+              .join(', '),
+      // Las coordenadas que se devuelven son las que se preguntaron: quien
+      // llama ya decide si se queda con las suyas.
+      lat: lat,
+      lng: lng,
+    );
+  }
+
+  // ---------------------------------------------------------------- Photon
+
   /// Busca direcciones que coincidan con [texto].
   ///
   /// Si se pasan [cercaDe], los resultados de esa zona salen primero. Es lo que
@@ -69,17 +189,67 @@ class GeocodingService {
     final q = texto.trim();
     if (q.length < 3) return const [];
 
+    if (BusquedaConfig.usaTomTom) {
+      try {
+        final r = await _buscarTomTom(q, cercaDe, limite);
+        if (r.isNotEmpty) return r;
+      } catch (_) {
+        // Sin red, cuota agotada o clave revocada: se sigue con Photon en vez
+        // de dejar a la persona sin buscador.
+      }
+    }
+
+    // Dos pasadas: primero acotando a la ciudad de quien busca, y solo si eso
+    // no devuelve nada, al país entero.
+    //
+    // El `lat`/`lon` de Photon es un sesgo flojo, no un filtro, y se lo come
+    // cualquier coincidencia de nombre: buscando «Urbanización Alma Lojana
+    // Baja» desde Quito devolvía cuatro urbanizaciones de España y ninguna de
+    // Ecuador. Con el recuadro, lo de fuera deja de competir.
+    if (cercaDe == null) {
+      // Sin saber dónde está la persona no hay recuadro posible.
+      return _photon(q, limite, null, acotar: false);
+    }
+
+    final cerca = await _photon(q, limite, cercaDe, acotar: true);
+    if (cerca.isNotEmpty) return cerca;
+
+    // Si por ahí no hay nada se amplía al país entero, pero **no al mundo**.
+    // Un viaje en taxi a 9 000 km no existe, y ofrecer una calle de España
+    // solo consigue que alguien la toque por error y el viaje salga absurdo.
+    // Prefiero devolver vacío y que se elija el punto en el mapa.
+    return _photon(q, limite, cercaDe, acotar: true, radio: _radioPais);
+  }
+
+  /// Media anchura del recuadro de búsqueda, en grados.
+  ///
+  /// Un grado son unos 111 km. El primero cubre ~165 km: la ciudad y sus
+  /// valles. El segundo, ~1 100 km, que es Ecuador entero y algo más.
+  static const double _radioCiudad = 1.5;
+  static const double _radioPais = 10;
+
+  Future<List<GeoPlace>> _photon(
+    String q,
+    int limite,
+    ({double lat, double lng})? cercaDe, {
+    required bool acotar,
+    double radio = _radioCiudad,
+  }) async {
     // Sin `lang`: Photon solo acepta en, de, fr e it, y con `lang=es`
     // responde 400. Los nombres llegan igual en el idioma local, que es lo
     // que se quiere («Avenida Amazonas», no «Amazonas Avenue»).
-    //
-    // `lat`/`lon` no es un adorno: sin el sesgo, buscar «Avenida Amazonas»
-    // desde Guayaquil devuelve la de Perú.
     final params = <String, String>{
       'q': q,
       'limit': '$limite',
       if (cercaDe != null) 'lat': '${cercaDe.lat}',
       if (cercaDe != null) 'lon': '${cercaDe.lng}',
+      if (acotar && cercaDe != null)
+        'bbox': [
+          cercaDe.lng - radio,
+          cercaDe.lat - radio,
+          cercaDe.lng + radio,
+          cercaDe.lat + radio,
+        ].join(','),
     };
 
     try {
@@ -132,6 +302,15 @@ class GeocodingService {
   /// Es lo que permite tocar el mapa y que aparezca el nombre de la calle en
   /// vez de unas coordenadas.
   Future<GeoPlace?> direccionDe(double lat, double lng) async {
+    if (BusquedaConfig.usaTomTom) {
+      try {
+        final r = await _direccionDeTomTom(lat, lng);
+        if (r != null) return r;
+      } catch (_) {
+        // Se prueba con Photon.
+      }
+    }
+
     try {
       final r = await _cliente
           .get(
