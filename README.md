@@ -47,3 +47,113 @@ flutter build apk --release
 El APK sale en `build/app/outputs/flutter-apk/app-release.apk`. Hoy se firma
 con la clave de depuración (ver `android/app/build.gradle.kts`): sirve para
 instalarlo a mano, no para publicarlo en Play Store.
+
+## Casos de uso implementados
+
+Los siguientes flujos corresponden a las funciones conectadas en la versión
+actual de `main`.
+
+### CU-A01. Registrar una cuenta
+
+**Actor:** pasajero o conductor.
+
+1. El usuario abre el registro, elige si desea viajar o conducir e ingresa sus datos.
+2. El sistema crea la cuenta en Supabase y solicita confirmar el correo.
+3. Tras la confirmación, el usuario puede iniciar sesión con el rol elegido.
+
+**Resultado:** se crea el perfil; el registro público no permite elegir roles administrativos.
+
+### CU-A02. Iniciar y cerrar sesión
+
+**Actor:** usuario registrado.
+
+1. El usuario ingresa correo y contraseña.
+2. El sistema valida las credenciales, carga el perfil y abre la vista de su rol.
+3. La sesión se restaura al volver a abrir la aplicación.
+4. El usuario puede cerrar sesión desde su cuenta o desde el panel administrativo.
+
+**Resultado:** el usuario accede a la aplicación con los permisos de su perfil.
+
+### CU-A03. Solicitar la recuperación de contraseña
+
+**Actor:** usuario registrado.
+
+1. El usuario selecciona **¿Olvidaste tu contraseña?** e ingresa su correo.
+2. El sistema solicita a Supabase el envío del enlace de recuperación.
+3. El usuario completa el cambio desde el navegador y vuelve a iniciar sesión.
+
+**Resultado:** se inicia una recuperación sin revelar si el correo está registrado.
+
+### CU-A04. Solicitar un viaje
+
+**Actor:** pasajero autenticado.
+
+1. El pasajero selecciona **Pedir un viaje**.
+2. Define el origen con el GPS o el catálogo y selecciona un destino disponible.
+3. El sistema calcula en el servidor la distancia y la tarifa estimada.
+4. El pasajero confirma la cotización.
+
+**Resultado:** el viaje queda en búsqueda de conductor y se abre su seguimiento.
+
+### CU-A05. Seguir, cancelar y calificar un viaje
+
+**Actor:** pasajero con un viaje registrado.
+
+1. El pasajero abre su viaje activo o uno de su historial.
+2. La pantalla actualiza el estado mediante Supabase Realtime.
+3. Antes de iniciar el recorrido, el pasajero puede cancelar el viaje.
+4. Al finalizar, puede calificar al conductor una sola vez.
+
+**Resultado:** el pasajero conoce el avance y deja registrada su valoración.
+
+### CU-A06. Ponerse disponible y aceptar una solicitud
+
+**Actor:** conductor aprobado con vehículo activo.
+
+1. El conductor abre **Viajes** y activa su disponibilidad.
+2. El sistema muestra las solicitudes que puede atender.
+3. El conductor selecciona **Aceptar ruta**.
+4. La base de datos asigna el viaje solo si ningún otro conductor lo tomó antes.
+
+**Resultado:** el conductor queda asignado al viaje y deja de recibir otras solicitudes.
+
+### CU-A07. Realizar y finalizar un viaje
+
+**Actor:** conductor asignado.
+
+1. El conductor informa sucesivamente que va en camino, llegó al origen e inició el viaje.
+2. Al terminar, selecciona **Finalizar viaje**.
+3. El sistema liquida la tarifa y cierra el recorrido.
+4. El conductor puede calificar al pasajero una sola vez.
+
+**Resultado:** el viaje y su cobro quedan finalizados con su historial de estados.
+
+### CU-A08. Consultar usuarios desde el panel móvil
+
+**Actor:** administrador o superadministrador.
+
+1. El usuario completa el cambio de contraseña inicial si corresponde.
+2. Entra en **Resumen** o **Usuarios**.
+3. El sistema muestra métricas y los perfiles visibles para su rol.
+
+**Resultado:** un administrador consulta pasajeros, conductores y cuentas permitidas;
+solo el superadministrador puede ver perfiles de superadministradores.
+
+### CU-A09. Cambiar entre vistas autorizadas
+
+**Actor:** usuario con acceso a más de una vista.
+
+1. El usuario abre el selector de panel.
+2. El sistema ofrece únicamente las vistas habilitadas por su rol y vehículo.
+3. El usuario cambia de vista o regresa a la correspondiente a su cuenta.
+
+**Resultado:** cambia la pantalla, pero no el rol real ni los permisos en Supabase.
+
+## Alcance actual
+
+- En el panel administrativo móvil solo están conectados **Resumen** y **Usuarios**;
+  Conductores, Viajes, Tarifas y Soporte son pantallas de espera.
+- La recuperación abre el navegador porque aún no están configurados los enlaces
+  profundos que devolverían al usuario directamente a la aplicación.
+- El ciclo principal de viajes funciona sin mapa visual: usa GPS, un catálogo de
+  lugares y el cálculo de distancia en la base de datos.
