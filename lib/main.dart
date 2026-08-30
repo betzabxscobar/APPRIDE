@@ -12,6 +12,8 @@ import 'screens/auth/first_access_screen.dart';
 import 'screens/auth/auth_screen.dart';
 import 'screens/home/driver_home_screen.dart';
 import 'screens/home/passenger_home_screen.dart';
+import 'screens/home/welcome_home_screen.dart';
+import 'screens/splash/splash_screen.dart';
 import 'widgets/ride_logo.dart';
 
 void main() {
@@ -77,7 +79,7 @@ class _ArranqueState extends State<_Arranque> {
 
   @override
   Widget build(BuildContext context) {
-    if (_listo) return const AuthGate();
+    if (_listo) return const _AppRoot();
 
     final ride = context.ride;
 
@@ -156,6 +158,34 @@ class RideApp extends StatelessWidget {
       // móvil la gente espera que respete lo que ya eligió en el sistema.
       themeMode: ThemeMode.system,
       home: const _Arranque(),
+    );
+  }
+}
+
+/// Muestra el splash la primera vez y luego el AuthGate.
+class _AppRoot extends StatefulWidget {
+  const _AppRoot();
+
+  @override
+  State<_AppRoot> createState() => _AppRootState();
+}
+
+class _AppRootState extends State<_AppRoot> {
+  bool _showSplash = true;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showSplash) {
+      return SplashScreen(
+        onDone: () => setState(() => _showSplash = false),
+      );
+    }
+    return WelcomeHomeScreen(
+      onContinue: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AuthGate()),
+        );
+      },
     );
   }
 }
