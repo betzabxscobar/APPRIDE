@@ -5,6 +5,9 @@ replican pantalla por pantalla los de WEB-RIDE (`src/App.tsx`), con la misma
 paleta, las mismas tipografías (Sora y Plus Jakarta Sans) y las mismas reglas
 de validación.
 
+Los dos clientes comparten autenticación, perfiles, viajes, flota, pagos,
+notificaciones y políticas de seguridad en el mismo proyecto de Supabase.
+
 ## Credenciales del equipo administrativo
 
 Las contraseñas temporales **no están en el código**. Se pasan al compilar
@@ -37,7 +40,11 @@ Cuando exista la base de datos, estas cuentas pasan a Supabase, se activa
 
 ## Comandos
 
+Requisitos: Flutter con Dart 3.11 o posterior, Android Studio o Xcode según la
+plataforma y un dispositivo o emulador configurado.
+
 ```sh
+flutter pub get          # instalar dependencias
 flutter run              # ejecutar en el dispositivo conectado
 flutter test             # pruebas
 flutter analyze          # análisis estático
@@ -149,11 +156,77 @@ solo el superadministrador puede ver perfiles de superadministradores.
 
 **Resultado:** cambia la pantalla, pero no el rol real ni los permisos en Supabase.
 
+### CU-A10. Gestionar vehículos y documentos
+
+**Actor:** conductor autenticado.
+
+1. El conductor abre su perfil, registra o edita un vehículo y elige cuál queda en servicio.
+2. Sube licencia, SOAT y matrícula desde la cámara o la galería.
+3. Consulta si cada documento está pendiente, aprobado o rechazado.
+4. Puede abrir el archivo privado mediante un enlace temporal y reemplazarlo si es necesario.
+
+**Resultado:** el conductor puede completar desde el móvil los requisitos que
+la administración revisa antes de habilitarlo.
+
+### CU-A11. Buscar y guardar lugares en el mapa
+
+**Actor:** pasajero autenticado.
+
+1. El pasajero busca una dirección o toca directamente un punto del mapa.
+2. La búsqueda se limita a su región y usa TomTom cuando hay una clave válida;
+   en caso contrario utiliza Photon/OpenStreetMap.
+3. Puede guardar lugares como favoritos y reutilizarlos en viajes posteriores.
+4. La app dibuja el recorrido por calles entre origen y destino con OSRM.
+
+**Resultado:** el pasajero elige puntos reales y conserva sus lugares frecuentes.
+
+### CU-A12. Consultar notificaciones
+
+**Actor:** usuario autenticado.
+
+1. El usuario abre la campana desde su pantalla principal.
+2. Consulta los avisos generados por cambios de sus viajes y su cuenta.
+3. La aplicación recibe nuevas notificaciones mediante Realtime y permite marcarlas como leídas.
+
+**Resultado:** el usuario conoce los cambios relevantes sin consultar viajes ajenos.
+
+### CU-A13. Administrar métodos de pago
+
+**Actor:** pasajero autenticado.
+
+1. El pasajero abre **Métodos de pago** desde su cuenta.
+2. Registra efectivo, elige su opción principal o elimina una opción que no tenga pagos asociados.
+3. La interfaz informa que las tarjetas requieren una futura pasarela de tokenización.
+
+**Resultado:** la app no solicita ni almacena números de tarjeta y solo presenta
+métodos respaldados por la base de datos.
+
 ## Alcance actual
 
 - En el panel administrativo móvil solo están conectados **Resumen** y **Usuarios**;
   Conductores, Viajes, Tarifas y Soporte son pantallas de espera.
 - La recuperación abre el navegador porque aún no están configurados los enlaces
   profundos que devolverían al usuario directamente a la aplicación.
-- El ciclo principal de viajes funciona sin mapa visual: usa GPS, un catálogo de
-  lugares y el cálculo de distancia en la base de datos.
+- Pasajero y conductor disponen de un mapa visual con ubicación, puntos del
+  viaje, posición del conductor y ruta por calles cuando OSRM responde.
+- El precio siempre se calcula en Supabase; la distancia de OSRM se usa para
+  presentar la ruta y no autoriza al cliente a fijar la tarifa.
+- El servidor público de OSRM sirve para desarrollo. Para producción debe
+  configurarse uno propio siguiendo [`infra/osrm/README.md`](infra/osrm/README.md).
+
+## Configuración opcional
+
+La app incluye valores públicos de Supabase para el entorno compartido. Pueden
+sobrescribirse al compilar, junto con el buscador y el servidor de rutas:
+
+```sh
+flutter run \
+  --dart-define=SUPABASE_URL=https://proyecto.supabase.co \
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_clave \
+  --dart-define=TOMTOM_KEY=clave_opcional \
+  --dart-define=OSRM_URL=https://rutas.ejemplo.com
+```
+
+Sin `TOMTOM_KEY`, la búsqueda cae automáticamente a Photon. Sin `OSRM_URL`, usa
+el servidor público de demostración. Nunca se debe compilar una clave
+`service_role` dentro de la aplicación.
