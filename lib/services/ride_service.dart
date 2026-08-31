@@ -251,6 +251,27 @@ class RideService {
     }
   }
 
+  /// Deja lista la cuenta de chofer de un superadministrador.
+  ///
+  /// Le crea —o le aprueba— su fila en `conductores`, para que pueda probar el
+  /// flujo entero sin esperar a que alguien apruebe su propia cuenta. El
+  /// servidor comprueba el rol por su cuenta: `preparar_chofer_superadmin`
+  /// rebota con 42501 si quien llama no es superadmin, así que llamarla desde
+  /// otra cuenta no sirve de nada.
+  ///
+  /// Sigue haciendo falta un vehículo activo: eso no es un permiso, es que un
+  /// viaje no puede arrancar sin auto asignado.
+  ///
+  /// Es idempotente y silenciosa: si falla, la pantalla sigue funcionando y
+  /// simplemente mostrará el bloqueo de siempre.
+  Future<void> prepararChoferSuperadmin() async {
+    try {
+      await _client.rpc('preparar_chofer_superadmin');
+    } catch (_) {
+      // Sin permiso o sin red: se sigue como un chofer normal.
+    }
+  }
+
   /// Estado del chofer actual: aprobación, disponibilidad y vehículo activo.
   Future<DriverState> estadoConductor() async {
     final uid = AuthService.instance.currentUser?.id;

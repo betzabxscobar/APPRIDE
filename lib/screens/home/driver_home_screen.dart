@@ -10,9 +10,11 @@ import '../../core/map_defaults.dart';
 import '../../core/ride_colors.dart';
 import '../../models/app_user.dart';
 import '../../models/trip.dart';
+import '../../models/user_role.dart';
 import '../../screens/driver/driver_profile_screen.dart';
 import '../../screens/notifications/notifications_screen.dart';
 import '../../screens/trips/driver_trips_screen.dart';
+import '../../services/auth_service.dart';
 import '../../services/location_service.dart';
 import '../../services/ride_service.dart';
 import '../../services/trip_session_store.dart';
@@ -96,6 +98,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _cargar() async {
     try {
+      // Un superadministrador entra a conducir sin esperar a que alguien
+      // apruebe su propia cuenta: esto se la deja lista antes de leer su
+      // estado. El servidor comprueba el rol, así que a nadie más le sirve.
+      if (AuthService.instance.currentUser?.role == UserRole.superadmin) {
+        await RideService.instance.prepararChoferSuperadmin();
+      }
+
       final estado = await RideService.instance.estadoConductor();
       final activo = await RideService.instance.viajeActivo();
       if (mounted) {
