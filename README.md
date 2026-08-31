@@ -149,11 +149,69 @@ solo el superadministrador puede ver perfiles de superadministradores.
 
 **Resultado:** cambia la pantalla, pero no el rol real ni los permisos en Supabase.
 
+### CU-A10. Configurar la cuenta
+
+**Actor:** cualquier usuario autenticado.
+
+1. El usuario abre **Configuración** desde su hoja de cuenta.
+2. Elige el tema —el del sistema, claro u oscuro— y la elección queda guardada
+   en el teléfono.
+3. Cambia su foto de perfil, su nombre y su teléfono.
+4. Para cambiar el correo o la contraseña, confirma antes su contraseña actual.
+
+**Resultado:** el perfil queda actualizado. El correo nuevo solo entra en vigor
+cuando el usuario abre el enlace de confirmación; hasta entonces sigue entrando
+con el anterior. El rol no se puede cambiar desde aquí: lo impide el trigger
+`prevent_role_self_edit()`.
+
+### CU-A11. Revisar y aprobar a un conductor
+
+**Actor:** administrador o superadministrador.
+
+1. El usuario entra en **Conductores** y filtra por estado.
+2. Abre la ficha de un chofer: sus datos de contacto, sus vehículos con placa y
+   sus cuatro documentos —cédula, licencia, SOAT y matrícula—.
+3. Abre cada documento a pantalla completa y lo aprueba o lo rechaza.
+4. Con los cuatro aprobados y al menos un vehículo, aprueba la cuenta.
+
+**Resultado:** el chofer puede ponerse en línea. El servidor comprueba las
+mismas condiciones en `revisar_conductor`, así que aprobar sin los papeles
+completos rebota aunque se manipule el cliente. Cada decisión le llega al chofer
+como notificación.
+
+### CU-A12. Ver la ruta del viaje
+
+**Actor:** pasajero y conductor, a la vez.
+
+1. Al aceptarse un viaje, ambos ven el mismo mapa con dos trazados: el camino
+   del chofer hasta el punto de recogida —a rayas— y el del viaje hasta el
+   destino.
+2. La posición del chofer se refresca mientras dura el viaje.
+3. Al iniciarse el recorrido, el tramo de recogida desaparece.
+
+**Resultado:** las dos partes ven por dónde va el auto y cuánto falta.
+
+### CU-A13. Recuperar el viaje tras cerrar la app
+
+**Actor:** pasajero o conductor con un viaje en marcha.
+
+1. El usuario cierra la aplicación durante un viaje.
+2. Al volver a abrirla, la sesión abierta se salta la pantalla de bienvenida.
+3. La aplicación reabre sola el viaje activo, con su ruta ya dibujada.
+
+**Resultado:** no se pierde el seguimiento. El viaje siempre estuvo en Postgres;
+lo que faltaba era el camino de vuelta y una copia local para pintarlo sin
+esperar a la red.
+
 ## Alcance actual
 
-- En el panel administrativo móvil solo están conectados **Resumen** y **Usuarios**;
-  Conductores, Viajes, Tarifas y Soporte son pantallas de espera.
+- En el panel administrativo móvil están conectados **Resumen**, **Usuarios** y
+  **Conductores**; Viajes, Tarifas y Soporte siguen siendo pantallas de espera.
 - La recuperación abre el navegador porque aún no están configurados los enlaces
-  profundos que devolverían al usuario directamente a la aplicación.
-- El ciclo principal de viajes funciona sin mapa visual: usa GPS, un catálogo de
-  lugares y el cálculo de distancia en la base de datos.
+  profundos que devolverían al usuario directamente a la aplicación. Lo mismo
+  vale para el enlace que confirma un cambio de correo.
+- Un documento subido en PDF se identifica pero no se previsualiza en la
+  revisión: haría falta un visor de PDF y hoy no hay ninguno en el proyecto.
+- El seguimiento del chofer se refresca cada 30 segundos mientras la aplicación
+  está abierta. No hay rastreo en segundo plano: con la app cerrada, el auto
+  deja de reportar posición hasta que se vuelve a abrir.

@@ -8,10 +8,10 @@ import '../../core/app_theme.dart';
 import '../../core/ride_colors.dart';
 import '../../models/trip.dart';
 import '../../services/ride_service.dart';
-import '../../services/routing_service.dart';
+import '../../services/trip_session_store.dart';
 import '../../widgets/auth_feedback.dart';
 import '../../widgets/ride_card.dart';
-import '../../widgets/ride_map.dart';
+import '../../widgets/trip_route_map.dart';
 import 'rate_trip_sheet.dart';
 
 /// Seguimiento del viaje, del lado del pasajero.
@@ -30,24 +30,45 @@ class TripTrackingScreen extends StatefulWidget {
 
 class _TripTrackingScreenState extends State<TripTrackingScreen> {
   sb.RealtimeChannel? _canal;
+  Timer? _seguimiento;
   Trip? _viaje;
   bool _cargando = true;
   bool _ocupado = false;
   String? _error;
   bool _calificacionOfrecida = false;
 
-  /// Dónde va el chofer ahora mismo. Se refresca con cada aviso de Realtime.
-  ({double lat, double lng})? _posicionChofer;
+  /// Dónde va el chofer ahora mismo.
+  LatLng? _posicionChofer;
+
+  /// Cada cuánto se vuelve a preguntar dónde está el chofer.
+  ///
+  /// Su posición se escribe en `public.ubicaciones`, y el canal de Realtime de
+  /// esta pantalla escucha `public.viajes`: moverse no cambia el viaje, así que
+  /// sin este reloj el alfiler del chofer se quedaba clavado donde estaba
+  /// cuando se abrió la pantalla. El chofer reporta una vez por minuto; medio
+  /// minuto aquí basta para no ir por detrás.
+  static const Duration _cadaCuanto = Duration(seconds: 30);
 
   @override
   void initState() {
     super.initState();
+    // Lo último que se vio de este viaje, para que la pantalla tenga algo que
+    // enseñar en el primer frame en vez de una rueda girando. Lo reemplaza la
+    // fila real en cuanto llega.
+    final guardado = TripSessionStore.instance.cacheado;
+    if (guardado != null && guardado.id == widget.viajeId) {
+      _viaje = guardado;
+      _cargando = false;
+    }
+
     _cargar();
     _canal = RideService.instance.escucharViajes(_cargar);
+    _seguimiento = Timer.periodic(_cadaCuanto, (_) => _ubicarChofer());
   }
 
   @override
   void dispose() {
+    _seguimiento?.cancel();
     final canal = _canal;
     if (canal != null) RideService.instance.cerrarCanal(canal);
     super.dispose();
@@ -61,11 +82,12 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
         _viaje = viaje;
         _cargando = false;
       });
-      // Solo tiene sentido seguir al chofer mientras el viaje está vivo.
-      if (viaje != null && viaje.status.tieneConductor) {
-        final pos = await RideService.instance.posicionDelChofer(viaje.id);
-        if (mounted) setState(() => _posicionChofer = pos);
-      }
+
+      // Que el viaje sobreviva a que se cierre la app: al volver a abrirla se
+      // entra directo aquí en vez de perderse el seguimiento.
+      await TripSessionStore.instance.guardar(viaje);
+
+      await _ubicarChofer();
 
       if (viaje != null && viaje.status == TripStatus.finalizado) {
         _ofrecerCalificacion(viaje);
@@ -77,6 +99,17 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
         _cargando = false;
       });
     }
+  }
+
+  /// Refresca el alfiler del chofer. Solo mientras hay uno asignado y el viaje
+  /// sigue vivo: después no hay a quién seguir.
+  Future<void> _ubicarChofer() async {
+    final viaje = _viaje;
+    if (viaje == null || !viaje.status.tieneConductor) return;
+
+    final pos = await RideService.instance.posicionDelChofer(viaje.id);
+    if (!mounted || pos == null) return;
+    setState(() => _posicionChofer = LatLng(pos.lat, pos.lng));
   }
 
   /// Al terminar el viaje se abre la calificación una sola vez.
@@ -148,7 +181,15 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                   children: [
-                    _MapaViaje(viaje: viaje, chofer: _posicionChofer),
+                    TripRouteMap(
+                      viaje: viaje,
+                      chofer: _posicionChofer,
+                      onTocar: () => TripRouteFullScreen.abrir(
+                        context,
+                        viaje: viaje,
+                        chofer: _posicionChofer,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     _EstadoActual(viaje: viaje),
                     const SizedBox(height: 16),
@@ -464,107 +505,6 @@ class _TarjetaPrecio extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Mapa del viaje: origen, destino, el recorrido por calles y el chofer si ya
-/// va en camino.
-class _MapaViaje extends StatefulWidget {
-  const _MapaViaje({required this.viaje, required this.chofer});
-
-  final Trip viaje;
-  final ({double lat, double lng})? chofer;
-
-  @override
-  State<_MapaViaje> createState() => _MapaViajeState();
-}
-
-class _MapaViajeState extends State<_MapaViaje> {
-  Ruta? _ruta;
-
-  /// Origen y destino con los que se pidió la ruta actual.
-  ///
-  /// Realtime reconstruye esta pantalla cada vez que el chofer reporta
-  /// posición —cada minuto—, y el recorrido entre origen y destino no cambia
-  /// por eso. Sin esta clave se le pediría a OSRM lo mismo una y otra vez.
-  String? _clave;
-
-  @override
-  void initState() {
-    super.initState();
-    _cargarRuta();
-  }
-
-  @override
-  void didUpdateWidget(_MapaViaje anterior) {
-    super.didUpdateWidget(anterior);
-    _cargarRuta();
-  }
-
-  Future<void> _cargarRuta() async {
-    final v = widget.viaje;
-    if (v.origenLat == null ||
-        v.origenLng == null ||
-        v.destinoLat == null ||
-        v.destinoLng == null) {
-      return;
-    }
-
-    final clave = '${v.origenLat},${v.origenLng};${v.destinoLat},${v.destinoLng}';
-    if (clave == _clave) return;
-    _clave = clave;
-
-    final ruta = await RoutingService.instance.entre(
-      LatLng(v.origenLat!, v.origenLng!),
-      LatLng(v.destinoLat!, v.destinoLng!),
-    );
-    if (mounted && ruta != null) setState(() => _ruta = ruta);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final viaje = widget.viaje;
-    final chofer = widget.chofer;
-    final origen = viaje.origenLat == null || viaje.origenLng == null
-        ? null
-        : LatLng(viaje.origenLat!, viaje.origenLng!);
-    final destino = viaje.destinoLat == null || viaje.destinoLng == null
-        ? null
-        : LatLng(viaje.destinoLat!, viaje.destinoLng!);
-
-    // Sin coordenadas no hay nada que dibujar; el resto de la pantalla sirve
-    // igual.
-    if (origen == null && destino == null) return const SizedBox.shrink();
-
-    final marcadores = <MapMarker>[
-      if (origen != null) MapMarker.origen(origen),
-      if (destino != null) MapMarker.destino(destino),
-      if (chofer != null) MapMarker.chofer(LatLng(chofer.lat, chofer.lng)),
-    ];
-
-    // El mapa se centra en el chofer mientras se mueve; si todavía no reportó,
-    // en el punto de recogida.
-    final centro = chofer != null
-        ? LatLng(chofer.lat, chofer.lng)
-        : (origen ?? destino!);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-      child: SizedBox(
-        height: 190,
-        child: RideMap(
-          centro: centro,
-          zoom: chofer != null ? 15 : 13,
-          marcadores: marcadores,
-          // El recorrido real por calles; si OSRM no respondió, la recta
-          // entre los dos puntos, que al menos orienta.
-          ruta: _ruta?.puntos ??
-              (origen != null && destino != null
-                  ? [origen, destino]
-                  : const []),
-        ),
       ),
     );
   }

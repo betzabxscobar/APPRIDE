@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// Vehículo registrado por un conductor, tal como vive en `public.vehiculos`.
 ///
 /// Distinto de [Vehicle] en `vehicle.dart`, que es el resumen que se muestra en
@@ -34,19 +36,27 @@ class FleetVehicle {
       );
 }
 
-/// Los tres documentos que la administración exige para aprobar a un chofer.
+/// Los cuatro documentos que la administración exige para aprobar a un chofer.
+///
+/// El orden es el de la revisión: primero quién es la persona, después qué le
+/// habilita a conducir y por último el vehículo.
 enum DocumentType {
+  cedula('cedula', 'Cédula de identidad',
+      'Foto del frente de tu cédula', Icons.badge_outlined),
   licencia('licencia', 'Licencia de conducir',
-      'Foto del frente de tu licencia vigente'),
-  soat('SOAT', 'SOAT', 'Póliza del seguro obligatorio'),
-  matricula('matricula', 'Matrícula', 'Matrícula del vehículo');
+      'Foto del frente de tu licencia vigente', Icons.credit_card_outlined),
+  soat('SOAT', 'SOAT', 'Póliza del seguro obligatorio',
+      Icons.shield_outlined),
+  matricula('matricula', 'Matrícula', 'Matrícula del vehículo',
+      Icons.description_outlined);
 
-  const DocumentType(this.id, this.label, this.hint);
+  const DocumentType(this.id, this.label, this.hint, this.icon);
 
   /// Valor tal como lo espera la base.
   final String id;
   final String label;
   final String hint;
+  final IconData icon;
 
   static DocumentType fromId(String id) => DocumentType.values.firstWhere(
         (d) => d.id == id,
@@ -168,4 +178,118 @@ class PaymentMethod {
         predeterminado: row['predeterminado'] as bool,
         detalle: row['detalle_tokenizado'] as String?,
       );
+}
+
+/// Un chofer visto por la administración, tal como lo devuelve la vista
+/// `public.conductores_revision`.
+///
+/// Reúne en una fila lo que hace falta para decidir si se aprueba: quién es,
+/// cómo contactarlo, qué vehículos registró y en qué estado está cada uno de
+/// sus documentos. Antes esto no se podía consultar desde la app: los papeles
+/// que subía un chofer no los veía nadie.
+class DriverReview {
+  const DriverReview({
+    required this.id,
+    required this.nombre,
+    required this.email,
+    required this.telefono,
+    required this.fotoUrl,
+    required this.estadoAprobacion,
+    required this.disponible,
+    required this.calificacion,
+    required this.fechaRegistro,
+    required this.vehiculos,
+    required this.documentos,
+  });
+
+  final String id;
+  final String nombre;
+  final String email;
+
+  /// El número que registró la persona. Puede faltar: el registro lo pide,
+  /// pero una cuenta creada antes de esa validación puede no tenerlo.
+  final String? telefono;
+  final String? fotoUrl;
+
+  /// `pendiente`, `aprobado` o `rechazado`.
+  final String estadoAprobacion;
+  final bool disponible;
+  final double? calificacion;
+  final DateTime? fechaRegistro;
+
+  final List<FleetVehicle> vehiculos;
+  final List<DriverDocument> documentos;
+
+  bool get aprobado => estadoAprobacion == 'aprobado';
+  bool get rechazado => estadoAprobacion == 'rechazado';
+
+  FleetVehicle? get vehiculoActivo {
+    for (final v in vehiculos) {
+      if (v.activo) return v;
+    }
+    return vehiculos.isEmpty ? null : vehiculos.first;
+  }
+
+  DriverDocument? documento(DocumentType tipo) {
+    for (final d in documentos) {
+      if (d.tipo == tipo) return d;
+    }
+    return null;
+  }
+
+  int get aprobados =>
+      documentos.where((d) => d.estado == DocumentStatus.aprobado).length;
+
+  int get pendientes =>
+      documentos.where((d) => d.estado == DocumentStatus.pendiente).length;
+
+  /// Los tipos que todavía no están aprobados. Es exactamente lo que
+  /// `revisar_conductor` exige antes de dejar aprobar la cuenta.
+  List<DocumentType> get faltantes => [
+        for (final tipo in DocumentType.values)
+          if (documento(tipo)?.estado != DocumentStatus.aprobado) tipo,
+      ];
+
+  /// Se puede aprobar cuando no falta ningún documento y hay al menos un auto.
+  /// La comprobación de verdad la hace Postgres; esto solo evita ofrecer un
+  /// botón que se sabe que va a rebotar.
+  bool get listoParaAprobar => faltantes.isEmpty && vehiculos.isNotEmpty;
+
+  String get iniciales {
+    final partes = nombre.trim().split(RegExp(r'\s+'));
+    if (partes.isEmpty || partes.first.isEmpty) return '?';
+    if (partes.length == 1) return partes.first[0].toUpperCase();
+    return (partes.first[0] + partes[1][0]).toUpperCase();
+  }
+
+  factory DriverReview.fromMap(Map<String, dynamic> row) {
+    final autos = (row['vehiculos'] as List?) ?? const [];
+    final docs = (row['documentos'] as List?) ?? const [];
+    final nombre = (row['nombre'] as String?)?.trim();
+    final email = (row['email'] as String?) ?? '';
+
+    return DriverReview(
+      id: row['id'] as String,
+      // Sin nombre se usa la parte local del correo: en una lista de revisión,
+      // una fila sin título no se puede distinguir de otra.
+      nombre: (nombre == null || nombre.isEmpty) ? email.split('@').first : nombre,
+      email: email,
+      telefono: (row['telefono'] as String?)?.trim(),
+      fotoUrl: row['foto_url'] as String?,
+      estadoAprobacion: (row['estado_aprobacion'] as String?) ?? 'pendiente',
+      disponible: (row['disponible'] as bool?) ?? false,
+      calificacion: (row['calificacion_promedio'] as num?)?.toDouble(),
+      fechaRegistro: row['fecha_registro'] == null
+          ? null
+          : DateTime.tryParse(row['fecha_registro'] as String)?.toLocal(),
+      vehiculos: [
+        for (final v in autos)
+          FleetVehicle.fromMap(Map<String, dynamic>.from(v as Map)),
+      ],
+      documentos: [
+        for (final d in docs)
+          DriverDocument.fromMap(Map<String, dynamic>.from(d as Map)),
+      ],
+    );
+  }
 }

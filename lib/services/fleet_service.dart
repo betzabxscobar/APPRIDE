@@ -206,6 +206,68 @@ class FleetService {
   }
 
   // ---------------------------------------------------------------------------
+  // Revisión de conductores (administración)
+  //
+  // Aquí no hay ninguna comprobación de rol: la vista `conductores_revision`
+  // es `security_invoker`, así que un chofer que llamara a esto se vería solo
+  // a sí mismo, y `revisar_documento` y `revisar_conductor` rebotan con 42501
+  // si quien llama no es administrativo. La pantalla se limita a no ofrecerlo.
+  // ---------------------------------------------------------------------------
+
+  /// Conductores con sus documentos y vehículos, para el panel de revisión.
+  ///
+  /// [estado] filtra por `estado_aprobacion` (`pendiente`, `aprobado`,
+  /// `rechazado`); en null llegan todos.
+  Future<List<DriverReview>> conductoresParaRevision({String? estado}) async {
+    try {
+      var consulta = _client.from('conductores_revision').select();
+      if (estado != null) consulta = consulta.eq('estado_aprobacion', estado);
+
+      // Los que llevan más esperando primero: en una cola de revisión, lo
+      // último que quieres es que alguien se quede al fondo para siempre.
+      final rows = await consulta.order('fecha_registro');
+      return rows.map(DriverReview.fromMap).toList();
+    } on sb.PostgrestException catch (e) {
+      throw RideException(_traducir(e.message));
+    }
+  }
+
+  /// Un solo conductor, para refrescar su ficha sin recargar la lista entera.
+  Future<DriverReview?> conductorParaRevision(String conductorId) async {
+    try {
+      final row = await _client
+          .from('conductores_revision')
+          .select()
+          .eq('id', conductorId)
+          .maybeSingle();
+      return row == null ? null : DriverReview.fromMap(row);
+    } on sb.PostgrestException catch (e) {
+      throw RideException(_traducir(e.message));
+    }
+  }
+
+  /// Aprueba o rechaza un documento suelto.
+  ///
+  /// El trigger `documentos_notificar` avisa al chofer del resultado, así que
+  /// desde aquí no hay que mandar nada.
+  Future<void> revisarDocumento(String documentoId, bool aprobado) =>
+      _rpc<void>('revisar_documento', {
+        'p_documento_id': documentoId,
+        'p_aprobado': aprobado,
+      });
+
+  /// Aprueba o rechaza la cuenta de chofer.
+  ///
+  /// Aprobar exige que los cuatro documentos estén aprobados y que haya al
+  /// menos un vehículo; si falta algo, Postgres lo rechaza diciendo qué falta.
+  /// Rechazar no exige nada.
+  Future<String> revisarConductor(String conductorId, bool aprobado) =>
+      _rpc<String>('revisar_conductor', {
+        'p_conductor_id': conductorId,
+        'p_aprobado': aprobado,
+      });
+
+  // ---------------------------------------------------------------------------
 
   Future<T> _rpc<T>(String nombre, Map<String, dynamic> params) async {
     try {
@@ -226,6 +288,9 @@ class FleetService {
     }
     if (m.contains('violates foreign key') && m.contains('pagos')) {
       return 'No puedes borrar un método con pagos registrados';
+    }
+    if (m.contains('solo la administracion')) {
+      return 'Solo la administración puede revisar conductores';
     }
     return mensaje;
   }

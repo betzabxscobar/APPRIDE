@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' show LatLng;
 
+import '../core/preferencias.dart';
+
 /// Trazado de la ruta por calles entre dos puntos.
 ///
 /// Antes de esto el mapa unía origen y destino con una línea recta, que
@@ -68,11 +70,99 @@ class RoutingService {
   static bool esServidorPublico(String url) =>
       url.contains('project-osrm.org') || url.contains('openstreetmap.de');
 
+  /// Rutas ya calculadas, para no volver a pedirlas.
+  ///
+  /// Dos motivos, y el segundo es el que importa:
+  ///
+  /// 1. El recorrido entre dos puntos fijos no cambia mientras dura un viaje,
+  ///    y estas pantallas se reconstruyen cada vez que el chofer reporta
+  ///    posición.
+  /// 2. Al reabrir la app después de cerrarla, la ruta del viaje en marcha
+  ///    tiene que verse **ya**, no cuando conteste OSRM. Por eso la caché se
+  ///    guarda en el teléfono y no solo en memoria.
+  ///
+  /// Se guardan pocas y se van tirando las viejas: son listas de cientos de
+  /// puntos y esto es una preferencia, no una base de datos.
+  static const String _claveCache = 'ride.rutas';
+  static const int _maxEnCache = 8;
+
+  final Map<String, Ruta> _cache = {};
+  bool _cacheLeida = false;
+
+  /// Clave del par origen–destino. Cinco decimales son ~1 m: de sobra para
+  /// decidir que es el mismo trayecto, y evita fallar por el ruido del GPS.
+  static String _clave(LatLng origen, LatLng destino) =>
+      '${origen.latitude.toStringAsFixed(5)},'
+      '${origen.longitude.toStringAsFixed(5)};'
+      '${destino.latitude.toStringAsFixed(5)},'
+      '${destino.longitude.toStringAsFixed(5)}';
+
+  void _leerCache() {
+    if (_cacheLeida) return;
+    _cacheLeida = true;
+
+    final crudo = Preferencias.instance.leer(_claveCache);
+    if (crudo == null) return;
+    try {
+      final mapa = Map<String, dynamic>.from(jsonDecode(crudo) as Map);
+      mapa.forEach((clave, valor) {
+        final ruta = Ruta.desdeJson(Map<String, dynamic>.from(valor as Map));
+        if (ruta != null) _cache[clave] = ruta;
+      });
+    } catch (_) {
+      Preferencias.instance.borrar(_claveCache);
+    }
+  }
+
+  Future<void> _guardarCache() async {
+    // Las más nuevas se insertan al final; se recortan las primeras.
+    while (_cache.length > _maxEnCache) {
+      _cache.remove(_cache.keys.first);
+    }
+    await Preferencias.instance.guardar(
+      _claveCache,
+      jsonEncode({for (final e in _cache.entries) e.key: e.value.aJson()}),
+    );
+  }
+
+  /// La ruta guardada para ese par, si existe. No sale a la red.
+  ///
+  /// La pintan las pantallas nada más abrirse, antes de pedir la de verdad.
+  Ruta? enCache(LatLng origen, LatLng destino) {
+    _leerCache();
+    return _cache[_clave(origen, destino)];
+  }
+
   /// Recorrido entre dos puntos, o `null` si no se pudo calcular.
   ///
   /// Nunca lanza: un fallo aquí no debe romper la pantalla, porque el mapa se
   /// entiende igual sin la línea. Quien llama decide si cae a la recta.
-  Future<Ruta?> entre(LatLng origen, LatLng destino) async {
+  ///
+  /// [recordar] en `false` salta la caché por completo. Es lo que usa el tramo
+  /// del chofer hacia el punto de recogida: su origen es una posición que se
+  /// mueve, así que guardarla llenaría la caché de rutas de un solo uso y
+  /// echaría fuera la del viaje, que sí hay que poder repintar al reabrir.
+  Future<Ruta?> entre(
+    LatLng origen,
+    LatLng destino, {
+    bool recordar = true,
+  }) async {
+    if (!recordar) return _pedirRuta(origen, destino);
+
+    _leerCache();
+    final clave = _clave(origen, destino);
+    final guardada = _cache[clave];
+    if (guardada != null) return guardada;
+
+    final calculada = await _pedirRuta(origen, destino);
+    if (calculada != null) {
+      _cache[clave] = calculada;
+      await _guardarCache();
+    }
+    return calculada;
+  }
+
+  Future<Ruta?> _pedirRuta(LatLng origen, LatLng destino) async {
     // OSRM espera longitud,latitud — al revés que casi todo lo demás.
     final coords = '${origen.longitude},${origen.latitude}'
         ';${destino.longitude},${destino.latitude}';
@@ -174,6 +264,40 @@ class Ruta {
 
   final double metros;
   final Duration duracion;
+
+  /// Para guardar la ruta en el teléfono. Los puntos van con cinco decimales
+  /// —un metro— porque a la escala del mapa nadie distingue más, y a cientos
+  /// de puntos por ruta la diferencia de tamaño sí se nota.
+  Map<String, dynamic> aJson() => {
+        'm': metros,
+        's': duracion.inSeconds,
+        'p': [
+          for (final punto in puntos)
+            [
+              double.parse(punto.latitude.toStringAsFixed(5)),
+              double.parse(punto.longitude.toStringAsFixed(5)),
+            ],
+        ],
+      };
+
+  /// Reconstruye una ruta guardada. Devuelve `null` si el dato no sirve, para
+  /// que una caché corrupta no rompa el mapa.
+  static Ruta? desdeJson(Map<String, dynamic> json) {
+    try {
+      final puntos = [
+        for (final par in json['p'] as List)
+          LatLng((par[0] as num).toDouble(), (par[1] as num).toDouble()),
+      ];
+      if (puntos.length < 2) return null;
+      return Ruta(
+        puntos: puntos,
+        metros: (json['m'] as num).toDouble(),
+        duracion: Duration(seconds: (json['s'] as num).toInt()),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// «5,1 km» o «850 m».
   String get distanciaTexto => metros >= 1000

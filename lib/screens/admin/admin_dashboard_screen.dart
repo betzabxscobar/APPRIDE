@@ -6,6 +6,7 @@ import '../../models/app_user.dart';
 import '../../models/user_role.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/panel_switcher.dart';
+import 'driver_review_screen.dart';
 
 /// Secciones del panel, las mismas de la barra lateral de WEB-RIDE.
 enum _Section {
@@ -157,6 +158,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           _Section.usuarios =>
             _UserList(users: _users, error: _error, loading: _loadingUsers),
+          // La revisión de conductores dejó de ser una pantalla de espera: es
+          // donde se ven los papeles que suben —cédula, licencia, SOAT y
+          // matrícula— junto con su vehículo y su teléfono.
+          _Section.conductores => const DriverReviewPanel(),
           _ => _Placeholder(
               section: _section,
               onBack: () => setState(() => _section = _Section.resumen),

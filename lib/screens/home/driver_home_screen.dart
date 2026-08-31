@@ -17,10 +17,12 @@ import '../../screens/trips/driver_trips_screen.dart';
 import '../../services/location_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/ride_service.dart';
+import '../../services/trip_session_store.dart';
 import '../../widgets/map_controls.dart';
 import '../../widgets/panel_switcher.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/ride_map.dart';
+import '../../widgets/user_avatar.dart';
 import 'account_sheet.dart';
 
 /// Home del rol conductor.
@@ -59,6 +61,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _mapaListo = false;
   double _hoja = _hojaInicial;
 
+  /// Si ya se reabrió solo el viaje que estaba en marcha. Una sola vez: si el
+  /// chofer sale a propósito de la pantalla del viaje, no se le vuelve a
+  /// meter dentro.
+  bool _reabierto = false;
+
   /// Refleja el estado real guardado en `public.conductores`, no una bandera
   /// local: antes el interruptor cambiaba de color sin que el servidor se
   /// enterara, así que la pantalla mentía.
@@ -67,6 +74,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   @override
   void initState() {
     super.initState();
+    // Lo último que se supo del viaje, para que la tarjeta esté desde el
+    // primer frame en vez de aparecer cuando conteste el servidor.
+    _activo = TripSessionStore.instance.cacheado;
     _cargar();
     _ubicar();
     try {
@@ -103,10 +113,30 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           _activo = activo;
         });
         _ajustarLatido();
+        await TripSessionStore.instance.guardar(activo);
+        _reabrirViaje(activo);
       }
     } catch (_) {
-      // Sin conexión la pantalla sigue usable.
+      // Sin conexión la pantalla sigue usable. Si había un viaje guardado del
+      // arranque, igual se reabre: es cuando más falta hace.
+      _reabrirViaje(_activo);
     }
+  }
+
+  /// Vuelve a la pantalla del viaje que quedó a medias.
+  ///
+  /// Cerrar la app en mitad de una carrera dejaba al chofer en el mapa de
+  /// inicio, sin la ruta ni los botones para avanzar el viaje. El viaje seguía
+  /// en Postgres; lo que faltaba era el camino de vuelta.
+  void _reabrirViaje(Trip? viaje) {
+    if (_reabierto || viaje == null || !viaje.status.esActivo) return;
+    _reabierto = true;
+
+    // Después del frame: `_cargar` corre desde `initState` y desde Realtime, y
+    // navegar mientras se construye la pantalla lanza excepción.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _abrirViajes();
+    });
   }
 
   Future<void> _ubicar() async {
@@ -225,6 +255,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _abrirViajes() async {
+    // Abrir la pantalla del viaje cuenta como reabrirlo, se llegue por donde
+    // se llegue. Sin esto, salir de ella con el viaje aun vivo hacia que
+    // `_cargar` volviera a meter dentro al chofer una y otra vez.
+    _reabierto = true;
+
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const DriverTripsScreen()),
     );
@@ -337,18 +372,20 @@ class _BarraFlotante extends StatelessWidget {
                 onTap: () => showAccountSheet(context, user),
                 customBorder: const CircleBorder(),
                 child: Tooltip(
-                  message: 'Cuenta',
+                  message: 'Cuenta y configuración',
                   child: SizedBox(
                     width: 48,
                     height: 48,
                     child: Center(
-                      child: Text(
-                        user.initials,
-                        style: TextStyle(
-                          fontSize: AppText.small,
-                          fontWeight: FontWeight.w800,
-                          color: disponible ? ride.success : ride.inkMuted,
-                        ),
+                      child: UserAvatar(
+                        iniciales: user.initials,
+                        fotoUrl: user.fotoUrl,
+                        radio: 24,
+                        // Verde en línea, gris fuera: el color del avatar es
+                        // lo que dice de un vistazo si está trabajando.
+                        color: disponible ? ride.success : ride.inkMuted,
+                        // Sin fondo propio: la cápsula del mapa ya lo pone.
+                        fondo: Colors.transparent,
                       ),
                     ),
                   ),
