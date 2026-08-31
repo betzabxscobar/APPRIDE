@@ -263,15 +263,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => _abrir(const PaymentMethodsScreen()),
             ),
 
-          const SizedBox(height: 26),
-          const _Titulo('Vista'),
-          const SizedBox(height: 4),
-          Text(
-            'Cambia la pantalla que ves. Tu rol y tus permisos no cambian.',
-            style: TextStyle(fontSize: AppText.label, color: ride.inkMuted),
-          ),
-          const SizedBox(height: 12),
-          PanelSwitcher(onSwitched: () => Navigator.of(context).pop()),
+          // El bloque entero solo aparece si de verdad hay a dónde cambiar.
+          // `PanelSwitcher` se esconde solo cuando hay una sola vista, y sin
+          // esta condición el título y su explicación quedarían encima de un
+          // hueco vacío: le pasa a cualquier pasajero y a cualquier admin.
+          if (AuthService.instance.availableViews.length > 1) ...[
+            const SizedBox(height: 26),
+            const _Titulo('Vista'),
+            const SizedBox(height: 4),
+            Text(
+              'Cambia la pantalla que ves. Tu rol y tus permisos no cambian.',
+              style: TextStyle(fontSize: AppText.label, color: ride.inkMuted),
+            ),
+            const SizedBox(height: 12),
+            PanelSwitcher(onSwitched: () => Navigator.of(context).pop()),
+          ],
 
           const SizedBox(height: 26),
           OutlinedButton.icon(
