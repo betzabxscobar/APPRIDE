@@ -223,3 +223,53 @@ comprobación es de Diego, con el APK en el teléfono.
 Cambia con la capa: sobre el respaldo rasterizado solo se acredita a
 OpenStreetMap; sobre el vectorial, `© OpenMapTiles © OpenStreetMap`, que es lo
 que exigen las condiciones de OpenFreeMap.
+
+### Estilos propios (2026-08-31, tras probar el APK)
+
+Probando en Quito salieron dos cosas que los estilos de OpenFreeMap no cubren:
+
+1. **El estilo oscuro no tiene ni un nombre de lugar.** `dark`, `positron` y
+   `fiord` son mapas base minimalistas: **cero** capas de POI. En modo oscuro no
+   se veia una farmacia, un restaurante ni una parada.
+2. **En claro los nombres salen tarde.** `liberty` los suelta por rango: los
+   importantes en z15, el resto en z16 y z17.
+
+| Estilo | Etiquetas POI | Nombres de calle | Fondo |
+|---|---|---|---|
+| liberty | 4 | 6 | claro |
+| bright | 4 | 6 | claro |
+| positron | **0** | 6 | claro |
+| dark | **0** | 2 | oscuro |
+| fiord | **0** | 2 | oscuro |
+
+`tool/generar_estilos_mapa.dart` parte de los de OpenFreeMap, lleva las capas de
+POI de `liberty` al oscuro —recoloreadas— y adelanta **un** nivel el zoom al que
+aparecen en los dos. Un nivel y no tres: las etiquetas se pisan entre ellas y un
+mapa ilegible es peor que uno con pocos nombres. El resultado vive en
+`assets/mapa/` y va dentro de la app.
+
+Efecto secundario bueno: el estilo ya no se descarga, asi que el mapa sale
+dibujado en el primer frame en vez de empezar rasterizado. Las teselas siguen
+viniendo de la red y actualizandose solas; lo unico congelado es el dibujo.
+
+### Cuantos nombres hay, de verdad
+
+Comparado contra Google Maps, el mapa parece tener menos sitios. Medido en un
+cuadro de ~900 m alrededor de la Av. 10 de Agosto (Quito):
+
+| | Nombres |
+|---|---|
+| Lo que tiene OpenStreetMap ahi | 394 |
+| Lo que viaja en la tesela de OpenFreeMap | 171 (43 %) |
+| Lo que viaja en la tesela de VersaTiles | 128 (32 %) |
+
+OpenFreeMap gana, y por eso se queda. El resto lo recorta el propio esquema de
+teselas por rango de importancia.
+
+**Lo que no se arregla cambiando de estilo ni de proveedor:** lo que no esta en
+OpenStreetMap. El Instituto Tecnologico Sudamericano de Quito, por ejemplo, no
+existe en OSM —si estan el de Cuenca y el de Loja—, asi que ningun mapa basado
+en OSM puede dibujarlo. Google tiene su propia base de negocios, que es de pago
+y pide tarjeta. Lo que si se puede hacer es **anadirlo a OpenStreetMap**: es
+gratis, lo edita cualquiera, y arregla a la vez el mapa y el buscador de
+direcciones, que tambien sale de OSM via Photon.

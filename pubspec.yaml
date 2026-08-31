@@ -71,6 +71,11 @@ flutter:
   uses-material-design: true
 
   assets:
+    # Los estilos del mapa. Van dentro de la app, no se descargan: asi el mapa
+    # sale dibujado en el primer frame y no hace falta red para el estilo, solo
+    # para las teselas. Se regeneran con tool/generar_estilos_mapa.dart.
+    - assets/mapa/claro.json
+    - assets/mapa/oscuro.json
     - assets/images/logo.png
     - assets/images/fondo.png
     - assets/images/fondoInicio.jpeg

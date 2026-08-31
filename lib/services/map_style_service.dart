@@ -25,6 +25,22 @@ import 'package:flutter_map_vector_tiles/flutter_map_vector_tiles.dart';
 /// La atribución sí es obligatoria y la pone [RideMap] en el mapa:
 /// «© OpenMapTiles © OpenStreetMap».
 ///
+/// ## Por qué los estilos van dentro de la app
+///
+/// Los de OpenFreeMap no servían tal cual. `dark` no tiene **ni una** capa de
+/// nombres de lugar —es un mapa base minimalista—, así que en modo oscuro no
+/// se veía una sola farmacia ni parada; y en claro los nombres no salían hasta
+/// z15–z17, que es más cerca de lo que se mira un mapa de viajes.
+///
+/// `tool/generar_estilos_mapa.dart` parte de los suyos, lleva las capas de
+/// nombres al oscuro y adelanta un nivel el zoom al que aparecen. El resultado
+/// vive en `assets/mapa/`.
+///
+/// De paso sale gratis una mejora: al no descargarse, el estilo está listo en
+/// el primer frame y el mapa ya no empieza en rasterizado para saltar a
+/// vectorial un segundo después. Las **teselas** sí siguen viniendo de la red
+/// y actualizándose solas; lo que queda congelado es el cómo se dibujan.
+///
 /// ## Vida de los estilos
 ///
 /// Se cargan una vez y se quedan en memoria mientras viva la app. No se
@@ -37,10 +53,9 @@ class MapStyleService {
 
   static final MapStyleService instance = MapStyleService._();
 
-  /// Estilos de OpenFreeMap. Hay más (`bright`, `positron`, `fiord`); estos
-  /// dos son los que combinan con el tema de la app.
-  static const String _urlClaro = 'https://tiles.openfreemap.org/styles/liberty';
-  static const String _urlOscuro = 'https://tiles.openfreemap.org/styles/dark';
+  /// Los estilos generados, dentro de la app. Ver la nota de la clase.
+  static const String _urlClaro = 'asset://assets/mapa/claro.json';
+  static const String _urlOscuro = 'asset://assets/mapa/oscuro.json';
 
   final Map<bool, Style> _cargados = {};
   final Map<bool, Future<Style?>> _enCurso = {};
