@@ -46,6 +46,7 @@ dependencies:
   # directamente: el tema elegido y el viaje en marcha tienen que sobrevivir a
   # que se cierre la app.
   shared_preferences: ^2.5.3
+  flutter_map_vector_tiles: ^2.8.1
 
 dev_dependencies:
   flutter_test:

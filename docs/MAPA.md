@@ -155,3 +155,71 @@ nombres de calle repetidos devuelven el de otro país.
 La licencia ODbL obliga a acreditar OpenStreetMap allí donde se muestren sus
 datos, así que el crédito del mapa no se puede quitar. En las pantallas con hoja
 arrastrable sube con la hoja (`margenCredito`) para que nunca quede detrás.
+
+## Teselas vectoriales: OpenFreeMap (2026-08-31)
+
+Diego dijo que el mapa se veía desactualizado. Conviene separar dos cosas que
+suenan igual:
+
+- **Los datos NO estaban viejos.** `tile.openstreetmap.org` se refresca de forma
+  continua.
+- **El dibujo sí.** Son teselas *rasterizadas*: imágenes PNG de 256 px con el
+  estilo clásico de OSM, de hace más de una década. En un teléfono moderno hay
+  que ampliarlas, y se ven borrosas y anticuadas.
+
+Lo que arregla eso son las **teselas vectoriales**: no traen el dibujo, traen
+los datos, y los pinta el teléfono a la resolución de su pantalla.
+
+### Proveedor: OpenFreeMap
+
+**Sin clave, sin cuenta, sin tarjeta y sin cupo.** Es la única condición que
+importa aquí: CARTO, Mapbox y Esri murieron todos en el mismo sitio, pidiendo
+una clave (ver arriba).
+
+- Estilo claro: `https://tiles.openfreemap.org/styles/liberty`
+- Estilo oscuro: `https://tiles.openfreemap.org/styles/dark`
+
+El oscuro es un estilo de verdad, no el truco de invertir los colores de una
+imagen clara que hacía falta con OSM.
+
+### Plugin: `flutter_map_vector_tiles`
+
+`vector_map_tiles`, el más conocido, **no vale**: ni su versión estable ni sus
+betas pasan de `flutter_map ^7`, y aquí hay 8.3.1. Usarlo obligaría a bajar de
+versión flutter_map y a rehacer el mapa entero.
+
+`flutter_map_vector_tiles` sí soporta `flutter_map ^8.2`. **Es un paquete
+joven** (2 likes, publicador sin verificar), y por eso el mapa nunca depende de
+que funcione: ver el respaldo, abajo.
+
+### El respaldo importa más que el estilo
+
+`RideMap` pinta **siempre** las teselas rasterizadas de OpenStreetMap primero, y
+cambia a las vectoriales cuando el estilo termina de cargar. Si OpenFreeMap no
+responde, si el paquete falla o si no hay red, el mapa se queda con el estilo de
+siempre. **Nunca hay un hueco gris.** Un mapa feo es infinitamente mejor que un
+mapa que no está.
+
+### Lo que se verificó, y cómo
+
+La lección de CARTO fue que un `200 OK` no prueba nada: sus teselas devolvían
+`200 image/png` con «API KEY REQUIRED» dibujado dentro. Así que esta vez se
+comprobó el contenido:
+
+| Qué | Resultado |
+|---|---|
+| Los cinco estilos | JSON de MapLibre v8, sin `{key}` |
+| TileJSON | compilación `20260823`, datos de OSM de 8 días antes |
+| Una tesela real de Quito (z14) | 347 KB de MVT, con capas `water`, `building`, `transportation`, `place`, `landuse`, `boundary` |
+| Fuentes (`glyphs`) | 76 KB de protobuf — sin esto no habría etiquetas |
+| Iconos (`sprite`) | PNG de 512×263 **abierto y mirado**: iconos reales, ningún aviso de clave dentro |
+
+**Lo que NO está verificado: cómo se ve.** En este entorno no se puede renderizar
+Flutter, así que nadie ha visto todavía este mapa dibujado en una pantalla. Esa
+comprobación es de Diego, con el APK en el teléfono.
+
+### Atribución
+
+Cambia con la capa: sobre el respaldo rasterizado solo se acredita a
+OpenStreetMap; sobre el vectorial, `© OpenMapTiles © OpenStreetMap`, que es lo
+que exigen las condiciones de OpenFreeMap.

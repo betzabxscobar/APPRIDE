@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_vector_tiles/flutter_map_vector_tiles.dart'
+    show Style, VectorTileLayer;
 // Solo LatLng: latlong2 exporta tambien una clase Path que taparia la de
 // Flutter y rompe cualquier CustomPainter de este archivo.
 import 'package:latlong2/latlong.dart' show LatLng;
@@ -7,22 +9,35 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import '../core/app_colors.dart';
 import '../core/app_theme.dart';
 import '../core/ride_colors.dart';
+import '../services/map_style_service.dart';
 
 /// Mapa base de Ride.
 ///
-/// Teselas de OpenStreetMap y rutas de OSRM. **Sin claves, sin cuentas y sin
-/// cuotas**: es lo que hace que la app funcione recién clonada, sin
-/// configuración previa.
+/// Teselas **vectoriales** de OpenFreeMap y rutas de OSRM. **Sin claves, sin
+/// cuentas y sin cuotas**: es lo que hace que la app funcione recién clonada,
+/// sin configuración previa.
 ///
-/// En modo oscuro las teselas claras se invierten con el filtro de
-/// `flutter_map`, porque OSM no publica un estilo oscuro.
+/// Antes eran teselas rasterizadas de OpenStreetMap —imágenes ya dibujadas—.
+/// Los datos estaban al día, pero el dibujo era el estilo clásico de OSM y en
+/// una pantalla de teléfono se veía borroso, porque hay que ampliar imágenes
+/// de 256 px. Lo vectorial lo pinta el propio teléfono a su resolución. Ver
+/// [MapStyleService].
+///
+/// Las de OpenStreetMap **siguen ahí como respaldo**: es lo que se ve mientras
+/// baja el estilo, y lo que queda si OpenFreeMap no responde. Un mapa con el
+/// estilo viejo es mucho mejor que un hueco gris.
+///
+/// En ese respaldo, y solo en él, el modo oscuro invierte las teselas claras
+/// con el filtro de `flutter_map`, porque OSM no publica un estilo oscuro.
+/// OpenFreeMap sí lo tiene, así que en vectorial no hace falta el truco.
 ///
 /// Se probaron proveedores más bonitos —CARTO, Mapbox, Esri— y todos exigen
 /// clave, cuenta o las tres cosas. La comparación completa, con lo que costó
 /// cada uno, está en `docs/MAPA.md`.
 ///
-/// La atribución a OpenStreetMap es obligatoria: su licencia ODbL la exige allí
-/// donde se muestren los datos.
+/// La atribución es obligatoria: la licencia ODbL de OpenStreetMap la exige
+/// allí donde se muestren los datos, y OpenMapTiles —el esquema de las teselas
+/// de OpenFreeMap— también.
 class RideMap extends StatelessWidget {
   const RideMap({
     super.key,
@@ -79,9 +94,6 @@ class RideMap extends StatelessWidget {
   /// que fiarse.
   final ({LatLng punto, double precision})? miUbicacion;
 
-  static const String _urlTeselas =
-      'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-
   @override
   Widget build(BuildContext context) {
     return FlutterMap(
@@ -110,20 +122,7 @@ class RideMap extends StatelessWidget {
         ),
       ),
       children: [
-        TileLayer(
-          urlTemplate: _urlTeselas,
-          userAgentPackageName: 'com.example.ride',
-          // `maxNativeZoom` (19 por defecto) es el tope de lo que sirve OSM: a
-          // partir de ahí flutter_map reutiliza la tesela de z19 y la escala.
-          //
-          // `maxZoom` NO se toca: es hasta dónde se *dibuja* la capa, y su
-          // valor por defecto es infinito justamente para que siempre haya
-          // teselas. Ponerlo en 19 dejaba el mapa en negro al acercarse más.
-          maxNativeZoom: 19,
-          // OSM no publica estilo oscuro, asi que en modo oscuro se invierten
-          // sus teselas claras con el filtro de flutter_map.
-          tileBuilder: context.ride.isDark ? darkModeTileBuilder : null,
-        ),
+        _CapaBase(oscuro: context.ride.isDark),
         if (rutas.any((r) => r.puntos.length >= 2))
           PolylineLayer(
             polylines: [
@@ -187,6 +186,86 @@ class RideMap extends StatelessWidget {
           ),
         _CreditoOSM(margen: margenCredito),
       ],
+    );
+  }
+}
+
+/// El fondo del mapa: vectorial si se pudo, rasterizado si no.
+///
+/// Empieza siempre por el respaldo rasterizado, que se pinta en el primer
+/// frame sin esperar a nadie, y cambia al vectorial en cuanto el estilo está
+/// listo. Así el mapa nunca aparece vacío mientras se descarga el estilo, que
+/// la primera vez son unos 40 KB más las fuentes.
+class _CapaBase extends StatefulWidget {
+  const _CapaBase({required this.oscuro});
+
+  final bool oscuro;
+
+  @override
+  State<_CapaBase> createState() => _CapaBaseState();
+}
+
+class _CapaBaseState extends State<_CapaBase> {
+  static const String _urlTeselas =
+      'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+  Style? _estilo;
+
+  @override
+  void initState() {
+    super.initState();
+    // Si otra pantalla ya lo cargó, esto lo tiene desde el primer frame.
+    _estilo = MapStyleService.instance.cacheado(oscuro: widget.oscuro);
+    _cargar();
+  }
+
+  @override
+  void didUpdateWidget(_CapaBase anterior) {
+    super.didUpdateWidget(anterior);
+    // El teléfono cambió de claro a oscuro, o la persona lo cambió en
+    // Configuración: toca el otro estilo.
+    if (anterior.oscuro != widget.oscuro) {
+      _estilo = MapStyleService.instance.cacheado(oscuro: widget.oscuro);
+      _cargar();
+    }
+  }
+
+  Future<void> _cargar() async {
+    if (_estilo != null) return;
+
+    final oscuro = widget.oscuro;
+    final estilo = await MapStyleService.instance.estilo(oscuro: oscuro);
+    // El tema pudo cambiar mientras se descargaba: ese estilo ya no sirve.
+    if (!mounted || oscuro != widget.oscuro) return;
+    setState(() => _estilo = estilo);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final estilo = _estilo;
+    if (estilo != null) {
+      return VectorTileLayer(
+        theme: estilo.theme,
+        tileProviders: estilo.providers,
+        rasterSources: estilo.rasterSources,
+        sprites: estilo.sprites,
+      );
+    }
+
+    return TileLayer(
+      urlTemplate: _urlTeselas,
+      userAgentPackageName: 'com.example.ride',
+      // `maxNativeZoom` (19 por defecto) es el tope de lo que sirve OSM: a
+      // partir de ahí flutter_map reutiliza la tesela de z19 y la escala.
+      //
+      // `maxZoom` NO se toca: es hasta dónde se *dibuja* la capa, y su valor
+      // por defecto es infinito justamente para que siempre haya teselas.
+      // Ponerlo en 19 dejaba el mapa en negro al acercarse más.
+      maxNativeZoom: 19,
+      // OSM no publica estilo oscuro, así que aquí se invierten sus teselas
+      // claras con el filtro de flutter_map. El estilo vectorial oscuro no lo
+      // necesita: nace oscuro.
+      tileBuilder: widget.oscuro ? darkModeTileBuilder : null,
     );
   }
 }
@@ -345,11 +424,15 @@ class _PuntaPin extends CustomPainter {
   bool shouldRepaint(_PuntaPin old) => old.color != color;
 }
 
-/// Atribución a OpenStreetMap y a CARTO.
+/// Atribución a OpenStreetMap y a OpenMapTiles.
 ///
 /// No es decorativa y no se puede quitar: la licencia ODbL obliga a acreditar
-/// la fuente de los datos allí donde se muestren, y las condiciones de CARTO
-/// obligan a acreditar también el estilo.
+/// la fuente de los datos allí donde se muestren, y OpenFreeMap exige
+/// acreditar también el esquema de sus teselas.
+///
+/// Cambia con la capa que se esté viendo: sobre el respaldo rasterizado solo
+/// hay datos de OpenStreetMap, y acreditar a OpenMapTiles ahí sería acreditar
+/// a quien no ha puesto nada.
 class _CreditoOSM extends StatelessWidget {
   const _CreditoOSM({required this.margen});
 
@@ -369,7 +452,9 @@ class _CreditoOSM extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
-          '© OpenStreetMap',
+          MapStyleService.instance.hayVectorial
+              ? '© OpenMapTiles © OpenStreetMap'
+              : '© OpenStreetMap',
           style: TextStyle(fontSize: AppText.micro, color: ride.inkMuted),
         ),
       ),

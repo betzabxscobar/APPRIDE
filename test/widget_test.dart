@@ -10,6 +10,7 @@ import 'package:ride/models/app_user.dart';
 import 'package:ride/models/fleet.dart';
 import 'package:ride/services/geocoding_service.dart';
 import 'package:ride/services/h3_service.dart';
+import 'package:ride/services/map_style_service.dart';
 import 'package:ride/services/places_service.dart';
 import 'package:ride/services/routing_service.dart';
 import 'package:ride/widgets/ride_map.dart';
@@ -170,6 +171,13 @@ void main() {
   group('Zoom del mapa', () {
     testWidgets('Al acercarse mas alla de z19 se siguen viendo teselas',
         (tester) async {
+      // El mapa usa teselas vectoriales de OpenFreeMap, con las de
+      // OpenStreetMap como respaldo. Aqui se comprueba el respaldo, que es lo
+      // unico que se puede montar sin red; ademas, dejar que intente cargar el
+      // estilo deja un temporizador vivo y la prueba falla por eso.
+      MapStyleService.instance.soloRaster = true;
+      addTearDown(() => MapStyleService.instance.soloRaster = false);
+
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light,
