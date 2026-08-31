@@ -52,3 +52,7 @@ app.*.map.json
 # Configuracion local de herramientas de desarrollo. Lleva rutas absolutas de
 # la maquina de cada quien, asi que no sirve compartirla.
 .claude/
+
+# Cache incremental del compilador de Kotlin. La crea el build de Android y
+# solo vale para esta maquina.
+/android/.kotlin/

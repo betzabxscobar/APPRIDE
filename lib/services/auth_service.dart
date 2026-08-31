@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
@@ -32,7 +34,16 @@ class AuthService extends ChangeNotifier {
   static const int adminPasswordMinLength = 10;
 
   static const String _profileColumns =
-      'id, email, full_name, phone, role, must_change_password, created_at';
+      'id, email, full_name, phone, role, foto_url, must_change_password, '
+      'created_at';
+
+  /// Bucket público de las fotos de perfil.
+  ///
+  /// Público a propósito: una foto de perfil la ve la otra parte del viaje, y
+  /// firmar una URL nueva cada vez que se pinta un avatar sería una llamada de
+  /// red por cada tarjeta de la lista. Los documentos, que sí son sensibles,
+  /// viven en `documentos`, que es privado.
+  static const String _bucketAvatares = 'avatares';
 
   sb.SupabaseClient get _client => sb.Supabase.instance.client;
 
@@ -206,6 +217,239 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Mi cuenta
+  //
+  // Todo lo de aquí lo hace la persona sobre su propio perfil. El rol no
+  // aparece por ningún lado a propósito: el trigger `prevent_role_self_edit()`
+  // rechaza cualquier intento de cambiárselo uno mismo, así que ofrecerlo
+  // sería ofrecer un botón que siempre falla.
+  // ---------------------------------------------------------------------------
+
+  /// Vuelve a leer el perfil de la base y avisa a las pantallas.
+  ///
+  /// Se usa después de cambiar algo y al volver de una pantalla que pudo
+  /// tocarlo. Si no hay sesión no hace nada.
+  Future<AppUser?> refrescarPerfil() async {
+    if (_client.auth.currentSession == null) return null;
+    try {
+      _currentUser = await _loadProfile();
+      notifyListeners();
+    } on AuthException {
+      // Sin red se conserva el perfil que ya había: es preferible a vaciar la
+      // pantalla.
+    }
+    return _currentUser;
+  }
+
+  /// Cambia el nombre y el teléfono.
+  ///
+  /// El teléfono no es un adorno: es lo que ve la otra parte del viaje en
+  /// `viajes_detalle` para poder llamarse.
+  Future<AppUser> actualizarDatos({
+    required String nombre,
+    required String telefono,
+  }) async {
+    return _run(() async {
+      final user = _currentUser;
+      if (user == null) throw const AuthException('Debes iniciar sesión');
+
+      final nombreLimpio = nombre.trim();
+      final telefonoLimpio = telefono.trim();
+      if (nombreLimpio.length < 3) {
+        throw const AuthException('Ingresa tu nombre completo');
+      }
+
+      try {
+        await _client.from('profiles').update({
+          'full_name': nombreLimpio,
+          'phone': telefonoLimpio.isEmpty ? null : telefonoLimpio,
+        }).eq('id', user.id);
+      } on sb.PostgrestException catch (error) {
+        throw AuthException(_translate(error.message));
+      }
+
+      final actualizado = await _loadProfile();
+      _currentUser = actualizado;
+      return actualizado;
+    });
+  }
+
+  /// Sube la foto de perfil y la deja guardada en `profiles.foto_url`.
+  ///
+  /// La ruta empieza por el id del usuario (`<uid>/perfil.jpg`) porque las
+  /// políticas de Storage comparan ese primer segmento con `auth.uid()`: es lo
+  /// que impide escribir en la carpeta de otro.
+  ///
+  /// `upsert` reemplaza la anterior en vez de acumular archivos, y por eso la
+  /// URL guardada lleva un `?v=` con la marca de tiempo: la ruta no cambia y
+  /// sin ese parámetro el teléfono seguiría enseñando la foto vieja.
+  Future<AppUser> cambiarFoto(File archivo) async {
+    return _run(() async {
+      final user = _currentUser;
+      if (user == null) throw const AuthException('Debes iniciar sesión');
+
+      final ruta = '${user.id}/perfil.jpg';
+      try {
+        await _client.storage.from(_bucketAvatares).upload(
+              ruta,
+              archivo,
+              fileOptions: const sb.FileOptions(
+                upsert: true,
+                contentType: 'image/jpeg',
+              ),
+            );
+      } on sb.StorageException catch (error) {
+        throw AuthException(_traducirStorage(error.message));
+      }
+
+      final url = _client.storage.from(_bucketAvatares).getPublicUrl(ruta);
+      final version = DateTime.now().millisecondsSinceEpoch;
+
+      try {
+        await _client
+            .from('profiles')
+            .update({'foto_url': '$url?v=$version'}).eq('id', user.id);
+      } on sb.PostgrestException {
+        throw const AuthException('Subimos la foto pero no pudimos guardarla');
+      }
+
+      final actualizado = await _loadProfile();
+      _currentUser = actualizado;
+      return actualizado;
+    });
+  }
+
+  /// Quita la foto y vuelve a las iniciales.
+  Future<AppUser> quitarFoto() async {
+    return _run(() async {
+      final user = _currentUser;
+      if (user == null) throw const AuthException('Debes iniciar sesión');
+
+      try {
+        await _client.storage
+            .from(_bucketAvatares)
+            .remove(['${user.id}/perfil.jpg']);
+      } on sb.StorageException {
+        // Si el archivo ya no estaba, da igual: lo que importa es dejar el
+        // perfil sin foto.
+      }
+
+      try {
+        await _client
+            .from('profiles')
+            .update({'foto_url': null}).eq('id', user.id);
+      } on sb.PostgrestException {
+        throw const AuthException('No pudimos quitar tu foto');
+      }
+
+      final actualizado = await _loadProfile();
+      _currentUser = actualizado;
+      return actualizado;
+    });
+  }
+
+  /// Pide el cambio de correo.
+  ///
+  /// Se comprueba antes la contraseña actual volviendo a iniciar sesión: sin
+  /// eso, un teléfono desbloqueado y prestado un minuto basta para llevarse la
+  /// cuenta a otro correo.
+  ///
+  /// El correo **no cambia al volver de aquí**. Supabase manda un enlace de
+  /// confirmación —a la dirección nueva, y también a la vieja si el proyecto
+  /// tiene activada la confirmación doble— y solo entonces se hace efectivo.
+  /// El trigger `on_auth_user_email_changed` es el que copia el correo nuevo a
+  /// `public.profiles` en ese momento.
+  Future<void> cambiarCorreo({
+    required String nuevoCorreo,
+    required String contrasena,
+  }) async {
+    _setLoading(true);
+    try {
+      final user = _currentUser;
+      if (user == null) throw const AuthException('Debes iniciar sesión');
+
+      final correo = _normalize(nuevoCorreo);
+      if (correo == _normalize(user.email)) {
+        throw const AuthException('Ese ya es tu correo actual');
+      }
+
+      await _reautenticar(contrasena);
+
+      try {
+        await _client.auth.updateUser(sb.UserAttributes(email: correo));
+      } on sb.AuthException catch (error) {
+        throw AuthException(_translate(error.message));
+      }
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Cambia la contraseña.
+  ///
+  /// Igual que el correo: primero se comprueba la actual. Supabase deja
+  /// cambiarla solo con la sesión abierta, y esa comodidad es justo el agujero
+  /// que se cierra aquí.
+  Future<void> cambiarContrasena({
+    required String actual,
+    required String nueva,
+  }) async {
+    _setLoading(true);
+    try {
+      final user = _currentUser;
+      if (user == null) throw const AuthException('Debes iniciar sesión');
+
+      // Las cuentas administrativas tienen su propio mínimo, más largo.
+      final minimo = user.role.isAdministrative ? adminPasswordMinLength : 8;
+      if (nueva.length < minimo) {
+        throw AuthException(
+          'La contraseña debe tener mínimo $minimo caracteres',
+        );
+      }
+      if (nueva == actual) {
+        throw const AuthException('Elige una contraseña distinta a la actual');
+      }
+
+      await _reautenticar(actual);
+
+      try {
+        await _client.auth.updateUser(sb.UserAttributes(password: nueva));
+      } on sb.AuthException catch (error) {
+        throw AuthException(_translate(error.message));
+      }
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Comprueba que quien está delante del teléfono sabe la contraseña.
+  ///
+  /// Se hace con `signInWithPassword` sobre el mismo correo: si la contraseña
+  /// es correcta simplemente se renueva la sesión que ya había, y si no lo es
+  /// Supabase responde con credenciales inválidas y la sesión abierta sigue
+  /// intacta.
+  Future<void> _reautenticar(String contrasena) async {
+    final user = _currentUser;
+    if (user == null) throw const AuthException('Debes iniciar sesión');
+    if (contrasena.isEmpty) {
+      throw const AuthException('Ingresa tu contraseña actual');
+    }
+
+    try {
+      await _client.auth.signInWithPassword(
+        email: _normalize(user.email),
+        password: contrasena,
+      );
+    } on sb.AuthException catch (error) {
+      final normalizado = error.message.toLowerCase();
+      if (normalizado.contains('invalid login credentials')) {
+        throw const AuthException('Tu contraseña actual no es correcta.');
+      }
+      throw AuthException(_translate(error.message));
+    }
+  }
+
   /// Usuarios visibles para la sesión administrativa activa.
   ///
   /// No filtra en el cliente: las políticas RLS deciden qué filas llegan, así
@@ -347,6 +591,7 @@ class AuthService extends ChangeNotifier {
       email: email,
       phone: (row['phone'] as String?) ?? '',
       role: UserRole.fromId((row['role'] as String?) ?? 'passenger'),
+      fotoUrl: row['foto_url'] as String?,
       isVerified: true,
       mustChangePassword: (row['must_change_password'] as bool?) ?? false,
       createdAt: createdAt == null ? null : DateTime.tryParse(createdAt),
@@ -397,7 +642,26 @@ class AuthService extends ChangeNotifier {
     if (normalized.contains('database error saving new user')) {
       return 'Este correo no puede registrarse con ese rol.';
     }
+    if (normalized.contains('a user with this email address has already')) {
+      return 'Ese correo ya está en uso por otra cuenta.';
+    }
+    if (normalized.contains('new password should be different')) {
+      return 'Elige una contraseña distinta a la actual.';
+    }
     return message;
+  }
+
+  /// Los errores de Storage llegan en inglés y con jerga de bucket.
+  String _traducirStorage(String message) {
+    final normalized = message.toLowerCase();
+    if (normalized.contains('exceeded the maximum allowed size') ||
+        normalized.contains('too large')) {
+      return 'La foto pesa más de 2 MB. Usa una más liviana.';
+    }
+    if (normalized.contains('mime type') || normalized.contains('not allowed')) {
+      return 'Formato no admitido. Sube una imagen JPG, PNG o WebP.';
+    }
+    return 'No pudimos subir la foto. Inténtalo de nuevo.';
   }
 }
 

@@ -262,13 +262,17 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
                     marcadores: marcadores,
                     // El recorrido real si ya llegó; si no, la recta entre los
                     // dos puntos para no dejar el mapa sin nada.
-                    ruta: _ruta?.puntos ??
-                        (marcadores.length == 2
-                            ? [
-                                LatLng(_origen!.lat, _origen!.lng),
-                                LatLng(_destino!.lat, _destino!.lng),
-                              ]
-                            : const []),
+                    rutas: [
+                      MapRoute.viaje(
+                        _ruta?.puntos ??
+                            (marcadores.length == 2
+                                ? [
+                                    LatLng(_origen!.lat, _origen!.lng),
+                                    LatLng(_destino!.lat, _destino!.lng),
+                                  ]
+                                : const []),
+                      ),
+                    ],
                     onListo: () {
                       _mapaListo = true;
                       _encuadrar();

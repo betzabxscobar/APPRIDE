@@ -7,7 +7,6 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import '../core/app_colors.dart';
 import '../core/app_theme.dart';
 import '../core/ride_colors.dart';
-import '../services/routing_service.dart';
 
 /// Mapa base de Ride.
 ///
@@ -30,7 +29,7 @@ class RideMap extends StatelessWidget {
     required this.centro,
     this.zoom = 15,
     this.marcadores = const [],
-    this.ruta = const [],
+    this.rutas = const [],
     this.controlador,
     this.onTap,
     this.interactivo = true,
@@ -43,8 +42,16 @@ class RideMap extends StatelessWidget {
   final double zoom;
   final List<MapMarker> marcadores;
 
-  /// Puntos que se unen con una línea: el recorrido del viaje.
-  final List<LatLng> ruta;
+  /// Trazados a dibujar, en orden: el último queda encima.
+  ///
+  /// Son varios y no uno porque un viaje asignado tiene **dos** tramos que hay
+  /// que ver a la vez: el que hace el chofer para llegar a recoger y el del
+  /// viaje en sí. Ver [MapRoute].
+  ///
+  /// El mapa solo los pinta. Quién los calcula y cuándo se recalculan es
+  /// asunto de la pantalla: antes esto pedía la ruta a OSRM por su cuenta, y
+  /// con dos tramos habría acabado pidiendo lo que ya tenía la pantalla.
+  final List<MapRoute> rutas;
 
   final MapController? controlador;
   final void Function(LatLng punto)? onTap;
@@ -117,7 +124,28 @@ class RideMap extends StatelessWidget {
           // sus teselas claras con el filtro de flutter_map.
           tileBuilder: context.ride.isDark ? darkModeTileBuilder : null,
         ),
-        if (ruta.length >= 2) _CapaRuta(puntos: ruta),
+        if (rutas.any((r) => r.puntos.length >= 2))
+          PolylineLayer(
+            polylines: [
+              for (final r in rutas)
+                if (r.puntos.length >= 2)
+                  Polyline(
+                    points: r.puntos,
+                    strokeWidth: r.grosor,
+                    color: r.color,
+                    // Sin `const`: el assert de StrokePattern.dashed mira el
+                    // largo de la lista y eso no se puede evaluar en tiempo de
+                    // compilacion.
+                    pattern: r.discontinua
+                        ? StrokePattern.dashed(segments: const [14, 9])
+                        : const StrokePattern.solid(),
+                    // El borde blanco es lo que hace que la línea se lea sobre
+                    // un parque verde o una avenida clara.
+                    borderStrokeWidth: 1.5,
+                    borderColor: Colors.white.withValues(alpha: 0.7),
+                  ),
+            ],
+          ),
         if (miUbicacion != null) ...[
           CircleLayer(
             circles: [
@@ -188,69 +216,42 @@ class MapMarker {
       );
 }
 
-/// El trazado del viaje.
+/// Un trazado sobre el mapa.
 ///
-/// Dibuja de entrada la recta entre los puntos que le pasan —para que siempre
-/// haya algo— y, cuando son exactamente dos, le pide a OSRM el recorrido real
-/// por calles y lo sustituye al llegar. Si OSRM no responde, se queda la recta.
-class _CapaRuta extends StatefulWidget {
-  const _CapaRuta({required this.puntos});
+/// Hay dos, y distinguirlos importa: mientras el chofer va de camino, en la
+/// pantalla se ven a la vez el trecho que le falta para llegar a recoger y el
+/// viaje que vendrá después. Si los dos fueran una línea azul continua no se
+/// sabría dónde acaba uno y empieza el otro.
+class MapRoute {
+  const MapRoute({
+    required this.puntos,
+    required this.color,
+    this.grosor = 5,
+    this.discontinua = false,
+  });
 
+  /// Vértices del trazado. Con menos de dos no se dibuja nada.
   final List<LatLng> puntos;
 
-  @override
-  State<_CapaRuta> createState() => _CapaRutaState();
-}
+  final Color color;
+  final double grosor;
 
-class _CapaRutaState extends State<_CapaRuta> {
-  List<LatLng>? _porCalles;
+  /// A rayas. Se usa para lo que todavía no ha pasado.
+  final bool discontinua;
 
-  @override
-  void initState() {
-    super.initState();
-    _calcular();
-  }
+  /// El viaje: del punto de recogida al destino. Azul y continuo, es el
+  /// trazado principal.
+  factory MapRoute.viaje(List<LatLng> puntos) =>
+      MapRoute(puntos: puntos, color: AppColors.primary);
 
-  @override
-  void didUpdateWidget(_CapaRuta anterior) {
-    super.didUpdateWidget(anterior);
-    if (!_mismosExtremos(anterior.puntos, widget.puntos)) {
-      _porCalles = null;
-      _calcular();
-    }
-  }
-
-  /// Solo se recalcula si cambió el origen o el destino. El widget se
-  /// reconstruye a cada rato —al moverse el chofer, por ejemplo— y no hay que
-  /// castigar al servidor de OSRM por eso.
-  static bool _mismosExtremos(List<LatLng> a, List<LatLng> b) {
-    if (a.length != b.length || a.isEmpty) return a.length == b.length;
-    return a.first == b.first && a.last == b.last;
-  }
-
-  Future<void> _calcular() async {
-    final puntos = widget.puntos;
-    if (puntos.length != 2) return;
-
-    final ruta = await RoutingService.instance.entre(puntos.first, puntos.last);
-    if (!mounted || ruta == null) return;
-    setState(() => _porCalles = ruta.puntos);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return PolylineLayer(
-      polylines: [
-        Polyline(
-          points: _porCalles ?? widget.puntos,
-          strokeWidth: 5,
-          color: AppColors.primary,
-          borderStrokeWidth: 1.5,
-          borderColor: Colors.white.withValues(alpha: 0.7),
-        ),
-      ],
-    );
-  }
+  /// El camino del chofer hasta el punto de recogida. A rayas y en morado —el
+  /// mismo color que su alfiler— porque es un tramo previo, no el viaje.
+  factory MapRoute.recogida(List<LatLng> puntos) => MapRoute(
+        puntos: puntos,
+        color: AppColors.purple,
+        grosor: 4.5,
+        discontinua: true,
+      );
 }
 
 /// El punto azul de "estoy aquí".

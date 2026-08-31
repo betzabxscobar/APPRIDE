@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/app_theme.dart';
+import 'core/preferencias.dart';
 import 'core/ride_colors.dart';
 import 'core/supabase_config.dart';
+import 'core/theme_controller.dart';
 import 'services/auth_service.dart';
+import 'services/trip_session_store.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/auth/first_access_screen.dart';
 import 'screens/auth/auth_screen.dart';
@@ -16,10 +19,21 @@ import 'screens/home/welcome_home_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'widgets/ride_logo.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // `runApp` va primero y sin `await` delante a propósito.
+  // Lo único que se espera antes de pintar son las preferencias del teléfono,
+  // que es una lectura local y no sale a la red. Tiene que ir antes porque de
+  // ahí sale el tema: leerlo después haría que la app arrancase en claro y
+  // saltase a oscuro en el primer frame, que es justo lo que se nota.
+  //
+  // Nunca bloquea de verdad: `cargar` se traga sus propios fallos y lleva
+  // tope de tiempo.
+  await Preferencias.instance.cargar();
+  ThemeController.instance.cargar();
+  TripSessionStore.instance.cargar();
+
+  // `runApp` va sin `await` de Supabase delante a propósito.
   //
   // Antes la inicialización de Supabase se esperaba aquí, antes de pintar
   // nada. Si esa llamada tardaba o fallaba, `runApp` no llegaba a ejecutarse
@@ -149,15 +163,20 @@ class RideApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Ride',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      // La app sigue el ajuste del teléfono. No hay interruptor propio: en
-      // móvil la gente espera que respete lo que ya eligió en el sistema.
-      themeMode: ThemeMode.system,
-      home: const _Arranque(),
+    // El tema puede cambiar en cualquier momento desde Configuración, así que
+    // el MaterialApp entero escucha a [ThemeController]. Por defecto sigue
+    // siendo el ajuste del teléfono, que es lo que la gente espera en móvil;
+    // lo que hay ahora es la posibilidad de fijarlo.
+    return AnimatedBuilder(
+      animation: ThemeController.instance,
+      builder: (context, _) => MaterialApp(
+        title: 'Ride',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: ThemeController.instance.mode,
+        home: const _Arranque(),
+      ),
     );
   }
 }
@@ -173,6 +192,14 @@ class _AppRoot extends StatefulWidget {
 class _AppRootState extends State<_AppRoot> {
   bool _showSplash = true;
 
+  /// La bienvenida es para quien todavía no ha entrado.
+  ///
+  /// Antes se mostraba siempre, también a quien ya tenía la sesión abierta: al
+  /// reabrir la app había que pasar por una pantalla de presentación y tocar
+  /// «continuar» para volver a lo que se estaba haciendo. Con un viaje en
+  /// marcha eso es exactamente lo que no puede pasar.
+  late final bool _mostrarBienvenida = !AuthService.instance.isAuthenticated;
+
   @override
   Widget build(BuildContext context) {
     if (_showSplash) {
@@ -180,6 +207,9 @@ class _AppRootState extends State<_AppRoot> {
         onDone: () => setState(() => _showSplash = false),
       );
     }
+
+    if (!_mostrarBienvenida) return const AuthGate();
+
     return WelcomeHomeScreen(
       onContinue: () {
         Navigator.of(context).push(

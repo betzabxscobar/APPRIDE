@@ -1,12 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../../core/app_theme.dart';
 import '../../core/ride_colors.dart';
 import '../../models/trip.dart';
+import '../../services/location_service.dart';
 import '../../services/ride_service.dart';
+import '../../services/trip_session_store.dart';
 import '../../widgets/auth_feedback.dart';
 import '../../widgets/ride_card.dart';
+import '../../widgets/trip_route_map.dart';
 import 'rate_trip_sheet.dart';
 
 /// Trabajo del chofer: ponerse en línea, tomar solicitudes y llevar el viaje.
@@ -23,25 +29,45 @@ class DriverTripsScreen extends StatefulWidget {
 
 class _DriverTripsScreenState extends State<DriverTripsScreen> {
   sb.RealtimeChannel? _canal;
+  Timer? _rastreo;
 
   DriverState _estado = const DriverState.sinCuenta();
   List<Trip> _solicitudes = const [];
   Trip? _activo;
+
+  /// Dónde está el chofer. Sale de su propio GPS, no de la base: es él.
+  LatLng? _yo;
 
   bool _cargando = true;
   bool _ocupado = false;
   String? _error;
   bool _calificacionOfrecida = false;
 
+  /// Cada cuánto se lee el GPS mientras hay un viaje asignado.
+  ///
+  /// Es lo que mueve el alfiler del chofer en la pantalla del pasajero. El
+  /// latido del home no basta: solo corre si el chofer está *disponible*, y
+  /// con un viaje encima puede haberse puesto fuera de línea para no recibir
+  /// más solicitudes. Un viaje asignado tiene que reportar posición pase lo
+  /// que pase, o la otra persona deja de ver por dónde viene el auto.
+  static const Duration _cadaCuanto = Duration(seconds: 30);
+
   @override
   void initState() {
     super.initState();
+    // Lo último que se supo del viaje, para no arrancar con la pantalla vacía
+    // tras cerrar y reabrir la app.
+    _activo = TripSessionStore.instance.cacheado;
+    if (_activo != null) _cargando = false;
+
     _refrescar();
     _canal = RideService.instance.escucharViajes(_refrescar);
+    _rastreo = Timer.periodic(_cadaCuanto, (_) => _reportarPosicion());
   }
 
   @override
   void dispose() {
+    _rastreo?.cancel();
     final canal = _canal;
     if (canal != null) RideService.instance.cerrarCanal(canal);
     super.dispose();
@@ -63,12 +89,36 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
         _solicitudes = solicitudes;
         _cargando = false;
       });
+
+      // Que el viaje siga ahí aunque se cierre la app.
+      await TripSessionStore.instance.guardar(activo);
+      await _reportarPosicion();
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _error = 'No pudimos actualizar tus viajes.';
         _cargando = false;
       });
+    }
+  }
+
+  /// Lee el GPS, lo pinta en el mapa y lo manda a la base si hay viaje.
+  ///
+  /// Se traga los fallos: si el GPS no responde en este intento, lo reintenta
+  /// en el siguiente. Lo que no puede es tumbar la pantalla del chofer, que la
+  /// necesita para trabajar.
+  Future<void> _reportarPosicion() async {
+    final viaje = _activo;
+    try {
+      final pos = await LocationService.instance.posicionActual();
+      if (!mounted) return;
+      setState(() => _yo = LatLng(pos.lat, pos.lng));
+
+      if (viaje != null && viaje.status.esActivo) {
+        await RideService.instance.reportarPosicion(pos.lat, pos.lng, viaje.id);
+      }
+    } catch (_) {
+      // Sin GPS el mapa se ve igual, solo que sin el alfiler del auto.
     }
   }
 
@@ -141,6 +191,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
                   if (_activo != null)
                     _ViajeActivo(
                       viaje: _activo!,
+                      yo: _yo,
                       ocupado: _ocupado,
                       onAvanzar: () => _accion(
                         () => RideService.instance.avanzar(_activo!.id).then((_) {}),
@@ -333,6 +384,7 @@ class _ListaSolicitudes extends StatelessWidget {
 class _ViajeActivo extends StatelessWidget {
   const _ViajeActivo({
     required this.viaje,
+    required this.yo,
     required this.ocupado,
     required this.onAvanzar,
     required this.onFinalizar,
@@ -340,6 +392,10 @@ class _ViajeActivo extends StatelessWidget {
   });
 
   final Trip viaje;
+
+  /// La posición del propio chofer. Es la que dibuja el tramo de recogida.
+  final LatLng? yo;
+
   final bool ocupado;
   final VoidCallback onAvanzar;
   final VoidCallback onFinalizar;
@@ -358,6 +414,18 @@ class _ViajeActivo extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // El mismo mapa que ve el pasajero: primero el camino hasta el punto
+        // de recogida y, cuando arranca el viaje, el que lleva al destino.
+        TripRouteMap(
+          viaje: viaje,
+          chofer: yo,
+          onTocar: () => TripRouteFullScreen.abrir(
+            context,
+            viaje: viaje,
+            chofer: yo,
+          ),
+        ),
+        const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(

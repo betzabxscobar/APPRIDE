@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart' show LatLng;
 
 import 'package:ride/core/app_theme.dart';
 import 'package:ride/core/busqueda_config.dart';
+import 'package:ride/core/theme_controller.dart';
 import 'package:ride/models/app_user.dart';
 import 'package:ride/models/fleet.dart';
 import 'package:ride/services/geocoding_service.dart';
@@ -579,9 +580,12 @@ void main() {
   });
 
   group('Flota y documentos', () {
-    test('Los tres tipos coinciden con el CHECK de la base', () {
+    test('Los cuatro tipos coinciden con el CHECK de la base', () {
+      // El orden importa: es el que ve el chofer al subirlos y el que sigue la
+      // administración al revisarlos. La cédula va primero porque identifica a
+      // la persona; el resto habilita a conducir y al vehículo.
       expect(DocumentType.values.map((d) => d.id).toList(),
-          ['licencia', 'SOAT', 'matricula']);
+          ['cedula', 'licencia', 'SOAT', 'matricula']);
     });
 
     test('Los estados coinciden con el CHECK de la base', () {
@@ -733,6 +737,228 @@ void main() {
         AuthService.instance.changeInitialPassword('ClaveDefinitiva123'),
         throwsA(isA<AuthException>()),
       );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Lo que tiene que sobrevivir a que se cierre la app
+  // ---------------------------------------------------------------------------
+
+  group('Guardar el viaje en el teléfono', () {
+    // `TripSessionStore` guarda el viaje como JSON y lo reconstruye al
+    // arrancar. Si `toMap` y `fromMap` dejan de hablar el mismo idioma, la app
+    // reabriría con datos a medias y nadie se enteraría hasta verlo en un
+    // teléfono. Por eso se prueba la ida y la vuelta, no cada campo suelto.
+    final viaje = Trip(
+      id: 'v-1',
+      status: TripStatus.conductorEnCamino,
+      pasajeroId: 'p-1',
+      conductorId: 'c-1',
+      tarifaEstimada: 4.25,
+      fechaSolicitud: DateTime(2026, 8, 31, 14, 30),
+      tarifaNombre: 'Diurna',
+      pasajeroNombre: 'Andrea',
+      conductorNombre: 'Diego',
+      conductorTelefono: '0999999999',
+      vehiculoPlaca: 'PDC-1234',
+      vehiculoMarca: 'Kia',
+      vehiculoModelo: 'Rio',
+      origenTexto: 'La Carolina',
+      destinoTexto: 'Cumbayá',
+      origenLat: -0.1807,
+      origenLng: -78.4678,
+      destinoLat: -0.2050,
+      destinoLng: -78.4300,
+    );
+
+    test('Un viaje guardado y releído es el mismo viaje', () {
+      final copia = Trip.fromMap(viaje.toMap());
+
+      expect(copia.id, viaje.id);
+      expect(copia.status, viaje.status);
+      expect(copia.conductorId, viaje.conductorId);
+      expect(copia.tarifaEstimada, viaje.tarifaEstimada);
+      expect(copia.fechaSolicitud, viaje.fechaSolicitud);
+      expect(copia.conductorNombre, viaje.conductorNombre);
+      expect(copia.vehiculoPlaca, viaje.vehiculoPlaca);
+      expect(copia.origenTexto, viaje.origenTexto);
+      expect(copia.destinoTexto, viaje.destinoTexto);
+      expect(copia.origenLat, viaje.origenLat);
+      expect(copia.destinoLng, viaje.destinoLng);
+    });
+
+    test('Los estados sin fecha no se inventan una al releerse', () {
+      final copia = Trip.fromMap(viaje.toMap());
+      expect(copia.fechaInicio, isNull);
+      expect(copia.fechaFin, isNull);
+      expect(copia.tarifaFinal, isNull);
+    });
+  });
+
+  group('Rutas guardadas', () {
+    // La ruta del viaje se guarda en el teléfono para que al reabrir la app se
+    // vea en el primer frame en vez de esperar a OSRM.
+    final ruta = Ruta(
+      puntos: const [
+        LatLng(-0.180700, -78.467800),
+        LatLng(-0.190123, -78.450456),
+        LatLng(-0.205000, -78.430000),
+      ],
+      metros: 4820,
+      duracion: const Duration(minutes: 13),
+    );
+
+    test('Una ruta guardada y releída dibuja el mismo trazado', () {
+      final copia = Ruta.desdeJson(ruta.aJson())!;
+
+      expect(copia.puntos.length, ruta.puntos.length);
+      expect(copia.metros, ruta.metros);
+      expect(copia.duracion, ruta.duracion);
+      // Se guarda con cinco decimales —un metro— así que se compara con esa
+      // tolerancia, no por igualdad exacta.
+      for (var i = 0; i < ruta.puntos.length; i++) {
+        expect(copia.puntos[i].latitude,
+            closeTo(ruta.puntos[i].latitude, 0.00001));
+        expect(copia.puntos[i].longitude,
+            closeTo(ruta.puntos[i].longitude, 0.00001));
+      }
+    });
+
+    test('Una caché corrupta devuelve null en vez de romper el mapa', () {
+      expect(Ruta.desdeJson({'basura': true}), isNull);
+      // Con un solo punto no hay línea que dibujar.
+      expect(
+        Ruta.desdeJson({
+          'm': 10.0,
+          's': 5,
+          'p': [
+            [-0.1, -78.4],
+          ],
+        }),
+        isNull,
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Revisión de conductores
+  // ---------------------------------------------------------------------------
+
+  group('Ficha de revisión del conductor', () {
+    /// Una fila como la que devuelve `public.conductores_revision`.
+    Map<String, dynamic> fila({
+      List<String> aprobados = const [],
+      List<String> pendientes = const [],
+      bool conAuto = true,
+      String? nombre = 'Javier Conforme',
+    }) {
+      return {
+        'id': 'c-1',
+        'nombre': nombre,
+        'email': 'javier@ride.app',
+        'telefono': '0988888888',
+        'foto_url': null,
+        'estado_aprobacion': 'pendiente',
+        'disponible': false,
+        'calificacion_promedio': null,
+        'fecha_registro': '2026-08-20T10:00:00Z',
+        'vehiculos': conAuto
+            ? [
+                {
+                  'id': 'v-1',
+                  'placa': 'PDC-1234',
+                  'marca': 'Kia',
+                  'modelo': 'Rio',
+                  'anio': 2022,
+                  'color': 'Blanco',
+                  'activo': true,
+                },
+              ]
+            : <Map<String, dynamic>>[],
+        'documentos': [
+          for (final tipo in aprobados)
+            {
+              'id': 'd-$tipo',
+              'tipo_documento': tipo,
+              'estado': 'aprobado',
+              'url_archivo': 'c-1/$tipo.jpg',
+              'fecha_subida': '2026-08-21T10:00:00Z',
+            },
+          for (final tipo in pendientes)
+            {
+              'id': 'd-$tipo',
+              'tipo_documento': tipo,
+              'estado': 'pendiente',
+              'url_archivo': 'c-1/$tipo.jpg',
+              'fecha_subida': '2026-08-21T10:00:00Z',
+            },
+        ],
+      };
+    }
+
+    test('Sin documentos, faltan los cuatro', () {
+      final conductor = DriverReview.fromMap(fila());
+      expect(conductor.faltantes.length, DocumentType.values.length);
+      expect(conductor.listoParaAprobar, isFalse);
+    });
+
+    test('Un documento subido pero sin revisar sigue faltando', () {
+      // Es la trampa de contar «documentos entregados» en vez de «aprobados»:
+      // subirlos no es lo mismo que validarlos.
+      final conductor = DriverReview.fromMap(
+        fila(pendientes: ['cedula', 'licencia', 'SOAT', 'matricula']),
+      );
+      expect(conductor.pendientes, 4);
+      expect(conductor.aprobados, 0);
+      expect(conductor.listoParaAprobar, isFalse);
+    });
+
+    test('Con los cuatro aprobados y un auto, se puede aprobar', () {
+      final conductor = DriverReview.fromMap(
+        fila(aprobados: ['cedula', 'licencia', 'SOAT', 'matricula']),
+      );
+      expect(conductor.faltantes, isEmpty);
+      expect(conductor.listoParaAprobar, isTrue);
+    });
+
+    test('Con los papeles en regla pero sin vehículo, todavía no', () {
+      // Es la misma condición que exige `revisar_conductor`: aprobar aquí
+      // solo daría un error del servidor.
+      final conductor = DriverReview.fromMap(
+        fila(
+          aprobados: ['cedula', 'licencia', 'SOAT', 'matricula'],
+          conAuto: false,
+        ),
+      );
+      expect(conductor.faltantes, isEmpty);
+      expect(conductor.listoParaAprobar, isFalse);
+    });
+
+    test('Sin nombre se usa el correo, para que la fila no salga vacía', () {
+      final conductor = DriverReview.fromMap(fila(nombre: null));
+      expect(conductor.nombre, 'javier');
+      expect(conductor.iniciales, 'J');
+    });
+  });
+
+  group('Tema elegido', () {
+    test('Las tres opciones tienen nombre, explicación e icono propios', () {
+      final etiquetas =
+          ThemeMode.values.map(ThemeController.etiqueta).toSet();
+      final detalles = ThemeMode.values.map(ThemeController.detalle).toSet();
+      final iconos = ThemeMode.values.map(ThemeController.icono).toSet();
+
+      expect(etiquetas.length, ThemeMode.values.length);
+      expect(detalles.length, ThemeMode.values.length);
+      expect(iconos.length, ThemeMode.values.length);
+    });
+
+    test('Sin nada guardado, manda el ajuste del teléfono', () {
+      // `cargar` sin preferencias abiertas cae al valor por defecto. Es lo que
+      // pasa en un teléfono nuevo y en cualquier arranque donde el
+      // almacenamiento local falle.
+      ThemeController.instance.cargar();
+      expect(ThemeController.instance.mode, ThemeMode.system);
     });
   });
 }

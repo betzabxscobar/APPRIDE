@@ -14,10 +14,12 @@ import '../../screens/trips/request_trip_screen.dart';
 import '../../screens/trips/trip_tracking_screen.dart';
 import '../../services/location_service.dart';
 import '../../services/ride_service.dart';
+import '../../services/trip_session_store.dart';
 import '../../widgets/map_controls.dart';
 import '../../widgets/panel_switcher.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/ride_map.dart';
+import '../../widgets/user_avatar.dart';
 import 'account_sheet.dart';
 
 /// Home del rol pasajero: punto de entrada para pedir un viaje y seguirlo.
@@ -59,9 +61,17 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   /// `MapController.move` revienta si el mapa todavía no está montado.
   bool _mapaListo = false;
 
+  /// Si ya se reabrió solo el viaje que estaba en marcha.
+  ///
+  /// Una sola vez por sesión de pantalla: si la persona sale a propósito del
+  /// seguimiento con el viaje aún vivo, no se le vuelve a meter dentro.
+  bool _reabierto = false;
+
   @override
   void initState() {
     super.initState();
+    // Lo último que se supo del viaje. Se pinta ya, sin esperar al servidor.
+    _activo = TripSessionStore.instance.cacheado;
     _cargar();
     _ubicar();
     try {
@@ -84,10 +94,33 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   Future<void> _cargar() async {
     try {
       final viaje = await RideService.instance.viajeActivo();
-      if (mounted) setState(() => _activo = viaje);
+      if (!mounted) return;
+      setState(() => _activo = viaje);
+      await TripSessionStore.instance.guardar(viaje);
+      _reabrirViaje(viaje);
     } catch (_) {
       // Sin conexión la pantalla sigue usable; el viaje aparece al reintentar.
+      // Con un viaje guardado del arranque, igual se reabre: es justo cuando
+      // más falta hace no perderlo de vista.
+      _reabrirViaje(_activo);
     }
+  }
+
+  /// Vuelve al seguimiento del viaje que quedó a medias.
+  ///
+  /// Antes, cerrar la app durante un viaje equivalía a perderlo: al volver a
+  /// abrir aparecía el mapa de inicio y había que acordarse de tocar la
+  /// tarjeta. El viaje nunca se perdió —está en Postgres— pero el camino de
+  /// vuelta no existía.
+  void _reabrirViaje(Trip? viaje) {
+    if (_reabierto || viaje == null || !viaje.status.esActivo) return;
+    _reabierto = true;
+
+    // Después del frame: `_cargar` corre desde `initState` y desde Realtime, y
+    // navegar mientras se construye la pantalla lanza excepción.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _abrirSeguimiento(viaje.id);
+    });
   }
 
   Future<void> _ubicar() async {
@@ -145,6 +178,12 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   }
 
   Future<void> _abrirSeguimiento(String viajeId) async {
+    // Abrir el seguimiento cuenta como reabrirlo, se llegue por donde se
+    // llegue. Sin esto, salir del seguimiento con el viaje aun vivo hacia que
+    // `_cargar` volviera a meter dentro a la persona: no habria forma de
+    // volver al mapa de inicio.
+    _reabierto = true;
+
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => TripTrackingScreen(viajeId: viajeId)),
     );
@@ -258,18 +297,19 @@ class _BarraFlotante extends StatelessWidget {
                 onTap: () => showAccountSheet(context, user),
                 customBorder: const CircleBorder(),
                 child: Tooltip(
-                  message: 'Cuenta',
+                  message: 'Cuenta y configuración',
                   child: SizedBox(
                     width: 48,
                     height: 48,
                     child: Center(
-                      child: Text(
-                        user.initials,
-                        style: TextStyle(
-                          fontSize: AppText.small,
-                          fontWeight: FontWeight.w800,
-                          color: ride.accent,
-                        ),
+                      child: UserAvatar(
+                        iniciales: user.initials,
+                        fotoUrl: user.fotoUrl,
+                        radio: 24,
+                        color: ride.accent,
+                        // Sin fondo propio: la cápsula del mapa ya lo pone, y
+                        // dos círculos superpuestos se ven como un error.
+                        fondo: Colors.transparent,
                       ),
                     ),
                   ),

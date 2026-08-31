@@ -205,6 +205,41 @@ class Trip {
     return vehiculoColor == null ? base : '$base · $vehiculoColor';
   }
 
+  /// El viaje con los mismos nombres de columna con los que llegó.
+  ///
+  /// Sirve para guardarlo en el teléfono y volver a construirlo con
+  /// [Trip.fromMap] sin una rama aparte. Lo usa `TripSessionStore` para que,
+  /// al reabrir la app, el viaje en marcha se pinte antes de que conteste el
+  /// servidor. Es una copia para mostrar, no una fuente de verdad: en cuanto
+  /// llega la fila real se reemplaza.
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'estado': status.id,
+        'pasajero_id': pasajeroId,
+        'conductor_id': conductorId,
+        'tarifa_estimada': tarifaEstimada,
+        'tarifa_final': tarifaFinal,
+        'fecha_solicitud': fechaSolicitud.toIso8601String(),
+        'fecha_inicio': fechaInicio?.toIso8601String(),
+        'fecha_fin': fechaFin?.toIso8601String(),
+        'tarifa_nombre': tarifaNombre,
+        'pasajero_nombre': pasajeroNombre,
+        'pasajero_telefono': pasajeroTelefono,
+        'conductor_nombre': conductorNombre,
+        'conductor_telefono': conductorTelefono,
+        'conductor_calificacion': conductorCalificacion,
+        'vehiculo_placa': vehiculoPlaca,
+        'vehiculo_marca': vehiculoMarca,
+        'vehiculo_modelo': vehiculoModelo,
+        'vehiculo_color': vehiculoColor,
+        'origen_texto': origenTexto,
+        'destino_texto': destinoTexto,
+        'origen_lat': origenLat,
+        'origen_lng': origenLng,
+        'destino_lat': destinoLat,
+        'destino_lng': destinoLng,
+      };
+
   static double? _double(dynamic v) => v == null ? null : (v as num).toDouble();
   static DateTime? _fecha(dynamic v) =>
       v == null ? null : DateTime.tryParse(v as String)?.toLocal();

@@ -244,7 +244,7 @@ class _EstadoCuenta extends StatelessWidget {
           context.ride.info,
           Icons.hourglass_top,
           'En revisión',
-          'Faltan $aprobados de 3 documentos aprobados'
+          'Faltan $aprobados de ${DocumentType.values.length} documentos aprobados'
               '${estado.tieneVehiculoActivo ? '' : ' y un vehículo en servicio'}.'
         ),
     };

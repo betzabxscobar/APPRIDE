@@ -12,6 +12,7 @@ class AppUser {
     required this.email,
     required this.phone,
     required this.role,
+    this.fotoUrl,
     this.vehicle,
     this.isVerified = false,
     this.mustChangePassword = false,
@@ -23,6 +24,13 @@ class AppUser {
   final String email;
   final String phone;
   final UserRole role;
+
+  /// Foto de perfil, si subió una. Es una URL pública del bucket `avatares`.
+  ///
+  /// Lleva un `?v=` con la marca de tiempo de la subida: la ruta del archivo
+  /// es siempre la misma (`<uid>/perfil.jpg`) y sin ese parámetro el teléfono
+  /// seguiría mostrando la foto vieja desde su caché.
+  final String? fotoUrl;
 
   /// Solo presente cuando el rol es [UserRole.driver].
   final Vehicle? vehicle;
@@ -45,17 +53,22 @@ class AppUser {
   }
 
   AppUser copyWith({
+    String? name,
+    String? email,
+    String? phone,
     UserRole? role,
+    String? fotoUrl,
     Vehicle? vehicle,
     bool? isVerified,
     bool? mustChangePassword,
   }) {
     return AppUser(
       id: id,
-      name: name,
-      email: email,
-      phone: phone,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
       role: role ?? this.role,
+      fotoUrl: fotoUrl ?? this.fotoUrl,
       vehicle: vehicle ?? this.vehicle,
       isVerified: isVerified ?? this.isVerified,
       mustChangePassword: mustChangePassword ?? this.mustChangePassword,
@@ -69,6 +82,7 @@ class AppUser {
         'email': email,
         'phone': phone,
         'role': role.id,
+        'fotoUrl': fotoUrl,
         'vehicle': vehicle?.toMap(),
         'isVerified': isVerified,
         'mustChangePassword': mustChangePassword,
@@ -81,6 +95,7 @@ class AppUser {
         email: map['email'] as String,
         phone: map['phone'] as String,
         role: UserRole.fromId(map['role'] as String),
+        fotoUrl: map['fotoUrl'] as String?,
         vehicle: map['vehicle'] == null
             ? null
             : Vehicle.fromMap(Map<String, dynamic>.from(map['vehicle'] as Map)),

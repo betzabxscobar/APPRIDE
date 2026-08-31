@@ -41,6 +41,11 @@ dependencies:
   latlong2: ^0.10.1
   http: ^1.6.0
   h3_dart: ^0.7.0
+  # Ya venia como dependencia transitiva de supabase_flutter, que la usa para
+  # guardar la sesion. Se declara aqui porque ahora la app tambien la usa
+  # directamente: el tema elegido y el viaje en marcha tienen que sobrevivir a
+  # que se cierre la app.
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:

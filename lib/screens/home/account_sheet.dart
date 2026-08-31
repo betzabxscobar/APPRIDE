@@ -5,6 +5,8 @@ import '../../core/ride_colors.dart';
 import '../../models/app_user.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/panel_switcher.dart';
+import '../../widgets/user_avatar.dart';
+import '../settings/settings_screen.dart';
 
 /// Hoja inferior con el perfil, el cambio de rol y el cierre de sesión.
 ///
@@ -48,19 +50,14 @@ class _AccountSheet extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 27,
-                    backgroundColor: ride.isDark
+                  UserAvatar(
+                    iniciales: user.initials,
+                    fotoUrl: user.fotoUrl,
+                    radio: 27,
+                    color: user.role.accent,
+                    fondo: ride.isDark
                         ? user.role.accent.withValues(alpha: 0.2)
                         : user.role.accentSoft,
-                    child: Text(
-                      user.initials,
-                      style: TextStyle(
-                        fontSize: AppText.h3,
-                        fontWeight: FontWeight.w800,
-                        color: user.role.accent,
-                      ),
-                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -113,6 +110,23 @@ class _AccountSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
+              // La entrada a Configuración va antes que el cambio de panel: es
+              // lo que más gente busca aquí, y hasta ahora sencillamente no
+              // había dónde encontrarla.
+              OutlinedButton.icon(
+                onPressed: () {
+                  // El navegador se toma antes de cerrar la hoja: después del
+                  // `pop`, este contexto ya está desmontado.
+                  final navegador = Navigator.of(context);
+                  navegador.pop();
+                  navegador.push(
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                },
+                icon: const Icon(Icons.settings_outlined, size: 21),
+                label: const Text('Configuración'),
+              ),
+              const SizedBox(height: 18),
               PanelSwitcher(onSwitched: () => Navigator.of(context).pop()),
               const SizedBox(height: 6),
               FilledButton.icon(
