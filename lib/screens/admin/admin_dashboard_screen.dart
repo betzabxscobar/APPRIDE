@@ -6,6 +6,8 @@ import '../../models/app_user.dart';
 import '../../models/user_role.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/panel_switcher.dart';
+import '../../widgets/user_avatar.dart';
+import '../settings/settings_screen.dart';
 import 'driver_review_screen.dart';
 
 /// Secciones del panel, las mismas de la barra lateral de WEB-RIDE.
@@ -96,6 +98,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     await AuthService.instance.signOut();
   }
 
+  Future<void> _abrirConfiguracion() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+    // El nombre o la foto pueden haber cambiado mientras estaba dentro.
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,18 +125,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ],
         ),
         actions: [
+          // El avatar abre Configuración, igual que en las pantallas de
+          // pasajero y de chofer. Antes era un adorno: desde el panel
+          // administrativo no había forma de llegar a la propia cuenta.
           Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: CircleAvatar(
-              radius: 17,
-              backgroundColor: context.ride.infoSoft,
-              child: Text(
-                widget.user.initials,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: context.ride.info,
-                ),
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              tooltip: 'Configuración',
+              onPressed: _abrirConfiguracion,
+              icon: UserAvatar(
+                iniciales: widget.user.initials,
+                fotoUrl: widget.user.fotoUrl,
+                radio: 17,
+                color: context.ride.info,
+                fondo: context.ride.infoSoft,
               ),
             ),
           ),
@@ -142,6 +154,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           setState(() => _section = section);
         },
         onSignOut: _signOut,
+        onSettings: () {
+          Navigator.of(context).pop();
+          _abrirConfiguracion();
+        },
       ),
       body: SafeArea(
         child: switch (_section) {
@@ -180,6 +196,7 @@ class _AdminDrawer extends StatelessWidget {
     required this.active,
     required this.onSelect,
     required this.onSignOut,
+    required this.onSettings,
   });
 
   final AppUser user;
@@ -188,6 +205,7 @@ class _AdminDrawer extends StatelessWidget {
   final _Section active;
   final ValueChanged<_Section> onSelect;
   final Future<void> Function() onSignOut;
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -321,6 +339,19 @@ class _AdminDrawer extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+              child: TextButton.icon(
+                onPressed: onSettings,
+                icon: const Icon(Icons.settings_outlined, size: 18),
+                label: const Text('Configuración'),
+                style: TextButton.styleFrom(
+                  foregroundColor: context.ride.ink,
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                 ),
               ),
             ),

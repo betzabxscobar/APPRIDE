@@ -650,11 +650,26 @@ void main() {
   });
 
   group('Acceso entre paneles', () {
-    test('El superadmin solo llega a paneles administrativos', () {
+    test('El superadmin llega a los cuatro paneles', () {
       expect(UserRole.superadmin.viewsAllowed(), [
         UserRole.superadmin,
         UserRole.admin,
+        UserRole.passenger,
+        UserRole.driver,
       ]);
+    });
+
+    test('Ver la pantalla de chofer no convierte a nadie en chofer', () {
+      // La lista de vistas es de presentacion. Que un superadmin pueda abrir
+      // la pantalla de chofer no le da permisos de chofer: eso lo decide la
+      // base, y ahi el trigger validar_disponibilidad_conductor_real() le
+      // impide ponerse en linea. Esta prueba fija esa separacion para que no
+      // se confunda «puedo mirarlo» con «puedo hacerlo».
+      expect(
+        UserRole.superadmin.viewsAllowed().contains(UserRole.driver),
+        isTrue,
+      );
+      expect(UserRole.superadmin.isDriver, isFalse);
     });
 
     test('El admin NO puede abrir la vista de superadmin', () {

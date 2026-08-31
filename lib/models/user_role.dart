@@ -81,16 +81,20 @@ enum UserRole {
   /// Es la regla central del cambio de panel, aparte a propósito para poder
   /// probarla sin sesión:
   ///
-  /// - `superadmin`: su panel y el panel visto como admin.
+  /// - `superadmin`: su panel, el panel visto como admin, usuario y chofer.
   /// - `admin`: solo su panel. **Nunca** la vista de superadmin.
   /// - `driver`: chofer y usuario.
-  /// - `passenger`: usuario, y chofer solo si ya registró un vehículo.
+  /// - `passenger`: solo usuario.
   ///
-  /// Esto decide qué se ofrece en pantalla. Los permisos sobre los datos los
-  /// sigue resolviendo RLS con el rol real de la cuenta.
+  /// Esto decide qué se ofrece en pantalla, **nada más**. Los permisos sobre
+  /// los datos los sigue resolviendo RLS con el rol real de la cuenta, y ahí
+  /// un superadmin no es un chofer: el trigger
+  /// `validar_disponibilidad_conductor_real()` le impide ponerse en línea y
+  /// `aceptar_viaje` le rechaza tomar carreras. Puede *mirar* esas pantallas
+  /// para revisarlas; no puede trabajar desde ellas.
   List<UserRole> viewsAllowed({bool hasVehicle = false}) {
     return switch (this) {
-      UserRole.superadmin => const [superadmin, admin],
+      UserRole.superadmin => const [superadmin, admin, passenger, driver],
       UserRole.admin => const [admin],
       UserRole.driver => const [driver, passenger],
       UserRole.passenger => const [passenger],

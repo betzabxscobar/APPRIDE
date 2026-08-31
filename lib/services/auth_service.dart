@@ -645,6 +645,18 @@ class AuthService extends ChangeNotifier {
     if (normalized.contains('a user with this email address has already')) {
       return 'Ese correo ya está en uso por otra cuenta.';
     }
+    // `profiles.phone` y `profiles.email` son únicos en la base. Sin esto, el
+    // texto crudo de Postgres —«duplicate key value violates unique
+    // constraint...»— acababa en la pantalla del usuario.
+    if (normalized.contains('profiles_phone_key')) {
+      return 'Ese teléfono ya está registrado en otra cuenta.';
+    }
+    if (normalized.contains('profiles_email_key')) {
+      return 'Ese correo ya está registrado en otra cuenta.';
+    }
+    if (normalized.contains('duplicate key value')) {
+      return 'Esos datos ya están registrados en otra cuenta.';
+    }
     if (normalized.contains('new password should be different')) {
       return 'Elige una contraseña distinta a la actual.';
     }
@@ -660,6 +672,17 @@ class AuthService extends ChangeNotifier {
     }
     if (normalized.contains('mime type') || normalized.contains('not allowed')) {
       return 'Formato no admitido. Sube una imagen JPG, PNG o WebP.';
+    }
+    // Este caso costo encontrarlo: el bucket `avatares` tenia politicas de
+    // escritura pero no de lectura, y `upsert` acaba en un
+    // `INSERT ... ON CONFLICT DO UPDATE ... RETURNING *` que necesita leer la
+    // fila que devuelve. Ya esta arreglado en la base; el mensaje se queda
+    // para que un fallo de permisos no vuelva a esconderse detras de un
+    // «intentalo de nuevo».
+    if (normalized.contains('row-level security') ||
+        normalized.contains('unauthorized') ||
+        normalized.contains('access denied')) {
+      return 'No tienes permiso para guardar tu foto. Avisa al equipo.';
     }
     return 'No pudimos subir la foto. Inténtalo de nuevo.';
   }
