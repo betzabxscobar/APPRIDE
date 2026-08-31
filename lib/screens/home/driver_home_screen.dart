@@ -88,13 +88,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _cargar() async {
     try {
-      // Un superadministrador entra a conducir sin pasar por las validaciones:
-      // esto le deja la cuenta de chofer lista antes de leer su estado. El
-      // servidor comprueba el rol, así que a nadie más le sirve.
-      if (AuthService.instance.currentUser?.role == UserRole.superadmin) {
-        await RideService.instance.prepararChoferSuperadmin();
-      }
-
       final estado = await RideService.instance.estadoConductor();
       final activo = await RideService.instance.viajeActivo();
       if (mounted) {

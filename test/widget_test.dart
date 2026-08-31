@@ -646,20 +646,17 @@ void main() {
   });
 
   group('Acceso entre paneles', () {
-    test('El superadmin llega a los cuatro paneles', () {
+    test('El superadmin solo llega a paneles administrativos', () {
       expect(UserRole.superadmin.viewsAllowed(), [
         UserRole.superadmin,
         UserRole.admin,
-        UserRole.passenger,
-        UserRole.driver,
       ]);
     });
 
     test('El admin NO puede abrir la vista de superadmin', () {
       final vistas = UserRole.admin.viewsAllowed();
       expect(vistas.contains(UserRole.superadmin), isFalse);
-      // Sí conserva su panel y las dos vistas operativas.
-      expect(vistas, [UserRole.admin, UserRole.passenger, UserRole.driver]);
+      expect(vistas, [UserRole.admin]);
     });
 
     test('Ningún rol no administrativo alcanza un panel administrativo', () {
@@ -679,7 +676,7 @@ void main() {
     test('Un pasajero sin vehículo no puede abrir la vista de chofer', () {
       expect(UserRole.passenger.viewsAllowed(), [UserRole.passenger]);
       expect(UserRole.passenger.viewsAllowed(hasVehicle: true),
-          [UserRole.passenger, UserRole.driver]);
+          [UserRole.passenger]);
     });
   });
 
