@@ -41,6 +41,20 @@ class BusquedaConfig {
 
   static bool get usaTomTom => claveValida(tomtomKey);
 
+  /// Países donde opera Ride, en códigos ISO separados por comas.
+  ///
+  /// **No es un lugar por defecto**, es el alcance del servicio: lo que se le
+  /// pasa a TomTom para que no ofrezca sitios de otros países. Sin esto,
+  /// buscar «Terminal» desde Quito devolvía tres aeropuertos de España antes
+  /// que nada de Ecuador, y «Madrigal» sacaba un pueblo de Colombia.
+  ///
+  /// Ojo con la diferencia: el **sesgo** por posición (`lat`/`lon`) sigue
+  /// siendo eso, un sesgo, y ordena lo cercano primero sin descartar nada. La
+  /// posición real de la persona no se toca ni se supone en ningún sitio.
+  ///
+  /// El día que Ride cruce la frontera, se añade el país aquí.
+  static const String paisesServicio = 'EC';
+
   /// Las claves de TomTom son alfanuméricas y largas, sin prefijo distintivo.
   ///
   /// Se descartan URLs por lo mismo que en el resto de la app: es fácil pegar

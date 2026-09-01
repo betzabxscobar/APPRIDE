@@ -82,6 +82,9 @@ class GeocodingService {
               'language': 'es-ES',
               // `typeahead` le dice que el texto puede estar a medio escribir.
               'typeahead': 'true',
+              // Sin esto, «Terminal» devolvía tres aeropuertos de España antes
+              // que nada de Ecuador. Ver BusquedaConfig.paisesServicio.
+              'countrySet': BusquedaConfig.paisesServicio,
               // Sesgo, no filtro: sin `radius`, lo de fuera sigue apareciendo
               // más abajo. Es lo que hace que «terminal» devuelva la de tu
               // ciudad y no la de otro país.
