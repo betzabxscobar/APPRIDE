@@ -536,13 +536,63 @@ class _MiniRuta extends StatelessWidget {
           color: context.ride.accent,
           texto: viaje.origenTexto,
         ),
+        if (viaje.origenReferencia != null)
+          _Referencia(texto: viaje.origenReferencia!),
         const SizedBox(height: 7),
         _Linea(
           icono: Icons.place_outlined,
           color: context.ride.success,
           texto: viaje.destinoTexto,
         ),
+        if (viaje.destinoReferencia != null)
+          _Referencia(texto: viaje.destinoReferencia!),
       ],
+    );
+  }
+}
+
+/// Lo que el pasajero escribió para que le encuentren.
+///
+/// Se destaca en vez de ir como una línea más: cuando existe, suele ser el
+/// dato que decide si el chofer llega o da vueltas. Muchos sitios de Quito no
+/// están en ningún mapa.
+class _Referencia extends StatelessWidget {
+  const _Referencia({required this.texto});
+
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 24, top: 5),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: ride.infoSoft,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: ride.info.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.chat_bubble_outline, size: 14, color: ride.info),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                texto,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                  color: ride.ink,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

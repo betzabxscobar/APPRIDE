@@ -791,6 +791,27 @@ void main() {
       destinoLng: -78.4300,
     );
 
+    test('La referencia para el chofer sobrevive al guardado', () {
+      // Es el dato que salva los sitios que no estan en ningun mapa: si se
+      // perdiera al cerrar y reabrir la app, el chofer se quedaria sin saber
+      // como encontrar a la persona justo cuando mas falta hace.
+      final conReferencia = Trip.fromMap({
+        ...viaje.toMap(),
+        'origen_referencia': 'Edificio del Instituto Sudamericano, porton azul',
+        'destino_referencia': 'Entrada por la calle de atras',
+      });
+      final copia = Trip.fromMap(conReferencia.toMap());
+
+      expect(copia.origenReferencia,
+          'Edificio del Instituto Sudamericano, porton azul');
+      expect(copia.destinoReferencia, 'Entrada por la calle de atras');
+    });
+
+    test('Un viaje sin referencia no se inventa una', () {
+      expect(Trip.fromMap(viaje.toMap()).origenReferencia, isNull);
+      expect(Trip.fromMap(viaje.toMap()).destinoReferencia, isNull);
+    });
+
     test('Un viaje guardado y releído es el mismo viaje', () {
       final copia = Trip.fromMap(viaje.toMap());
 

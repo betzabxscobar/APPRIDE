@@ -160,6 +160,8 @@ class Trip {
     this.vehiculoColor,
     required this.origenTexto,
     required this.destinoTexto,
+    this.origenReferencia,
+    this.destinoReferencia,
     this.origenLat,
     this.origenLng,
     this.destinoLat,
@@ -190,6 +192,16 @@ class Trip {
 
   final String origenTexto;
   final String destinoTexto;
+
+  /// Indicación escrita por el pasajero para encontrar el punto: «edificio del
+  /// Instituto Sudamericano, portón azul».
+  ///
+  /// Existe porque el mapa nunca lo tiene todo. Un sitio que no está en
+  /// OpenStreetMap ni en TomTom se sigue encontrando si alguien lo explica con
+  /// palabras, y el chofer lo lee antes de salir.
+  final String? origenReferencia;
+  final String? destinoReferencia;
+
   final double? origenLat;
   final double? origenLng;
   final double? destinoLat;
@@ -234,6 +246,8 @@ class Trip {
         'vehiculo_color': vehiculoColor,
         'origen_texto': origenTexto,
         'destino_texto': destinoTexto,
+        'origen_referencia': origenReferencia,
+        'destino_referencia': destinoReferencia,
         'origen_lat': origenLat,
         'origen_lng': origenLng,
         'destino_lat': destinoLat,
@@ -266,6 +280,8 @@ class Trip {
         vehiculoColor: row['vehiculo_color'] as String?,
         origenTexto: (row['origen_texto'] as String?) ?? 'Origen',
         destinoTexto: (row['destino_texto'] as String?) ?? 'Destino',
+        origenReferencia: row['origen_referencia'] as String?,
+        destinoReferencia: row['destino_referencia'] as String?,
         origenLat: _double(row['origen_lat']),
         origenLng: _double(row['origen_lng']),
         destinoLat: _double(row['destino_lat']),

@@ -28,8 +28,8 @@ class RideService {
     pasajero_nombre, pasajero_telefono,
     conductor_nombre, conductor_telefono, conductor_calificacion,
     vehiculo_placa, vehiculo_marca, vehiculo_modelo, vehiculo_color,
-    origen_lat, origen_lng, origen_texto,
-    destino_lat, destino_lng, destino_texto
+    origen_lat, origen_lng, origen_texto, origen_referencia,
+    destino_lat, destino_lng, destino_texto, destino_referencia
   ''';
 
   // ---------------------------------------------------------------------------
@@ -88,6 +88,8 @@ class RideService {
     required double destinoLat,
     required double destinoLng,
     required String destinoTexto,
+    String? origenReferencia,
+    String? destinoReferencia,
     double? distanciaKm,
     String? tarifaId,
   }) async {
@@ -108,6 +110,10 @@ class RideService {
       'p_distancia_km': distanciaKm,
       'p_origen_celda_h3_7': h3.celda(origenLat, origenLng),
       'p_celdas_difusion': h3.disco(origenLat, origenLng),
+      // Lo que el pasajero escribió para que le encuentren. La base recorta
+      // los espacios y guarda null si viene vacío.
+      'p_origen_referencia': origenReferencia,
+      'p_destino_referencia': destinoReferencia,
     });
   }
 

@@ -35,6 +35,14 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
   GeoPlace? _destino;
   Quote? _cotizacion;
 
+  /// Lo que el pasajero escribe para que le encuentren.
+  ///
+  /// No es un capricho: hay sitios que no están en ningún mapa. El Instituto
+  /// Sudamericano de Quito no existe en OpenStreetMap, así que por bueno que
+  /// sea el mapa nunca va a salir. Una línea escrita sí lo resuelve, y es lo
+  /// que hacen Uber y DiDi en Latinoamérica por este mismo motivo.
+  final TextEditingController _referenciaChofer = TextEditingController();
+
   /// Recorrido real por calles. `null` mientras se calcula o si OSRM falla.
   Ruta? _ruta;
 
@@ -212,6 +220,8 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
         // La del recorrido real, si llegó a calcularse: es la que produjo el
         // precio del botón.
         distanciaKm: _ruta == null ? null : _ruta!.metros / 1000,
+        // Va con el origen: es donde alguien tiene que encontrarte.
+        origenReferencia: _referenciaChofer.text,
       );
 
       // El historial se guarda después de que el viaje existe: si fallara,
@@ -225,6 +235,12 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
     } finally {
       if (mounted) setState(() => _enviando = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _referenciaChofer.dispose();
+    super.dispose();
   }
 
   bool get _listo =>
@@ -327,6 +343,8 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 18),
+                _CampoReferencia(controlador: _referenciaChofer),
                 if (_error != null) ...[
                   const SizedBox(height: 14),
                   ErrorBanner(message: _error!),
@@ -440,6 +458,75 @@ class _Punto extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Dónde escribir cómo encontrar el punto de recogida.
+///
+/// Va debajo del origen y del destino, y es opcional: quien pide desde una
+/// dirección normal no necesita escribir nada. Aparece porque el mapa tiene
+/// huecos que ningún proveedor cubre, y una frase los tapa mejor que cualquier
+/// cambio de cartografía.
+class _CampoReferencia extends StatelessWidget {
+  const _CampoReferencia({required this.controlador});
+
+  final TextEditingController controlador;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.chat_bubble_outline, size: 17, color: ride.inkMuted),
+            const SizedBox(width: 8),
+            Text(
+              'Referencia para el chofer',
+              style: TextStyle(
+                fontSize: AppText.label,
+                fontWeight: FontWeight.w800,
+                color: ride.ink,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '(opcional)',
+              style: TextStyle(fontSize: AppText.micro, color: ride.inkFaint),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controlador,
+          // El tope es el mismo que acepta la base; sin él, el viaje se
+          // rechazaría al enviarlo y la persona no sabría por qué.
+          maxLength: 160,
+          maxLines: 2,
+          minLines: 1,
+          textCapitalization: TextCapitalization.sentences,
+          style: TextStyle(fontSize: AppText.small, color: ride.ink),
+          decoration: InputDecoration(
+            hintText: 'Edificio del Instituto Sudamericano, portón azul',
+            counterText: '',
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Si tu edificio no sale en el mapa, escríbelo aquí: el chofer lo ve '
+          'antes de salir.',
+          style: TextStyle(
+            fontSize: AppText.micro,
+            height: 1.4,
+            color: ride.inkMuted,
+          ),
+        ),
+      ],
     );
   }
 }

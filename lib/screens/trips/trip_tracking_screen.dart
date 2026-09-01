@@ -317,6 +317,7 @@ class _Ruta extends StatelessWidget {
             color: context.ride.accent,
             titulo: 'Origen',
             valor: viaje.origenTexto,
+            referencia: viaje.origenReferencia,
           ),
           const Divider(height: 22),
           _Fila(
@@ -324,6 +325,7 @@ class _Ruta extends StatelessWidget {
             color: context.ride.success,
             titulo: 'Destino',
             valor: viaje.destinoTexto,
+            referencia: viaje.destinoReferencia,
           ),
         ],
       ),
@@ -337,12 +339,17 @@ class _Fila extends StatelessWidget {
     required this.color,
     required this.titulo,
     required this.valor,
+    this.referencia,
   });
 
   final IconData icono;
   final Color color;
   final String titulo;
   final String valor;
+
+  /// Lo que se escribió para encontrar el punto. Se muestra también aquí para
+  /// que el pasajero vea exactamente lo que está leyendo su chofer.
+  final String? referencia;
 
   @override
   Widget build(BuildContext context) {
@@ -372,6 +379,30 @@ class _Fila extends StatelessWidget {
                   color: context.ride.ink,
                 ),
               ),
+              if (referencia != null) ...[
+                const SizedBox(height: 5),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.chat_bubble_outline,
+                      size: 13,
+                      color: context.ride.info,
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        referencia!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: context.ride.inkMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
