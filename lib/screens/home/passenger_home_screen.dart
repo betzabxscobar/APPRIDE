@@ -197,7 +197,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
     return Scaffold(
       // Solo aparece si un administrador está mirando esta pantalla; para un
       // pasajero de verdad no ocupa espacio.
-      appBar: const ViewingAsBar(),
+      appBar: ViewingAsBar.of(context),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final alto = constraints.maxHeight;

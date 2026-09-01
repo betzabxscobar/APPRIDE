@@ -273,3 +273,49 @@ en OSM puede dibujarlo. Google tiene su propia base de negocios, que es de pago
 y pide tarjeta. Lo que si se puede hacer es **anadirlo a OpenStreetMap**: es
 gratis, lo edita cualquiera, y arregla a la vez el mapa y el buscador de
 direcciones, que tambien sale de OSM via Photon.
+
+## Direcciones equivocadas: falta la clave, no el codigo (2026-08-31)
+
+Diego reporto que las direcciones «son mentira». Dos causas distintas:
+
+**1. TOMTOM_KEY nunca llego a la compilacion.** `lib/core/busqueda_config.dart`
+integra TomTom precisamente porque OSM va flojo en Quito, pero
+`config/credenciales-administrativas.json` no tenia esa clave, asi que **todos**
+los APK entregados hasta hoy corrian solo con Photon. No es un fallo de codigo:
+la clave se saca gratis con un correo en <https://developer.tomtom.com>, sin
+tarjeta, y se pone en ese archivo. Ya aparece en la plantilla para que no vuelva
+a pasar desapercibida.
+
+**2. Photon devolvia codigos postales como si fueran sitios.** Medido con
+geocodificacion inversa en Quito:
+
+| Punto | Lo que contestaba |
+|---|---|
+| Av. 10 de Agosto | `Innova Dentist, Avenida 10 de Agosto` — a 2 m. Bien. |
+| La Carolina | **`170515, Iñaquito`** — un codigo postal como direccion |
+| Loma Puengasi | `Barricada, Conocoto` — parroquia equivocada |
+
+La distancia no era el problema (2–188 m); la **etiqueta** si. Photon devuelve
+features de tipo `postcode` cuyo `name` es el propio numero, y el codigo lo
+tomaba tal cual. `_nombreUtil` los descarta ahora, junto con cualquier nombre
+que sea solo cifras, y baja a barrio o ciudad antes que decir «Sin nombre».
+
+## El boton 3D y «el plugin del mapa actualizado»
+
+Son dos preguntas distintas y conviene no mezclarlas:
+
+- **Mas nombres de sitios NO se arregla con ningun plugin.** El plugin solo
+  dibuja; los nombres vienen de los datos. Cambiar de renderizador deja el mapa
+  exactamente con los mismos sitios. Eso se arregla con mejores datos: TomTom
+  para el buscador, o anadiendo los sitios que faltan a OpenStreetMap.
+- **El 3D si necesita otro plugin.** El boton de Google Maps que levanta los
+  edificios manteniendo el estilo es *camara inclinada + `fill-extrusion`*.
+  `flutter_map` es una libreria **2D**: no tiene inclinacion de camara, asi que
+  no puede hacerlo por diseno.
+
+Para 3D habria que pasar a **MapLibre GL** (`maplibre`, editor verificado, o
+`maplibre_gl`, de la propia organizacion MapLibre). Renderiza vectorial por GPU
+con inclinacion hasta 85 grados y capas `fill-extrusion`, sin clave. **Es un
+reemplazo del motor del mapa, no un anadido**: cambian los marcadores, las
+rutas, el controlador de camara y las cuatro pantallas que lo usan. Decision
+pendiente de Diego.

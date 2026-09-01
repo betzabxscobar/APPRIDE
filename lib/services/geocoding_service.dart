@@ -354,15 +354,20 @@ class GeocodingService {
 
     final calle = p['street'] as String?;
     final numero = p['housenumber'] as String?;
-    final nombreBase = p['name'] as String?;
+    final nombreBase = _nombreUtil(p);
 
     // Un resultado de calle con número se lee mejor como "Av. X 123" que como
     // el nombre suelto que devuelve el servicio.
-    final nombre =
-        nombreBase ??
-        (calle == null
-            ? 'Sin nombre'
-            : (numero == null ? calle : '$calle $numero'));
+    //
+    // Si no hay ni nombre ni calle se baja al barrio y luego a la ciudad, que
+    // dicen poco pero dicen algo. «Sin nombre» era el último recurso y salía
+    // más de lo que debería.
+    final nombre = nombreBase ??
+        (calle != null
+            ? (numero == null ? calle : '$calle $numero')
+            : (p['district'] as String?) ??
+                (p['city'] as String?) ??
+                'Punto en el mapa');
 
     final contexto = [
       if (nombreBase != null && calle != null && calle != nombreBase)
@@ -371,7 +376,7 @@ class GeocodingService {
       p['city'] as String?,
       p['state'] as String?,
       p['country'] as String?,
-    ].whereType<String>().toList();
+    ].whereType<String>().where((t) => t != nombre).toList();
 
     return GeoPlace(
       nombre: nombre,
@@ -379,6 +384,23 @@ class GeocodingService {
       lat: lat,
       lng: lng,
     );
+  }
+
+  /// El `name` que devuelve el servicio, solo si sirve como nombre de sitio.
+  ///
+  /// Photon devuelve también zonas postales, y su `name` es el propio código.
+  /// Sin este filtro, tocar el mapa en La Carolina contestaba «170515» como si
+  /// fuera una dirección: literalmente un número inventado a ojos de quien lo
+  /// lee. Se descarta eso y cualquier nombre que sea solo cifras — un portal
+  /// suelto tampoco es una dirección.
+  static String? _nombreUtil(Map<String, dynamic> p) {
+    final nombre = (p['name'] as String?)?.trim();
+    if (nombre == null || nombre.isEmpty) return null;
+
+    if (p['type'] == 'postcode' || p['osm_key'] == 'postal_code') return null;
+    if (RegExp(r'^[0-9][0-9\s-]*$').hasMatch(nombre)) return null;
+
+    return nombre;
   }
 
   void cancelarEspera() {

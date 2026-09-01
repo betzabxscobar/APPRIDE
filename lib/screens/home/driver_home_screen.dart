@@ -271,7 +271,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final user = widget.user;
 
     return Scaffold(
-      appBar: const ViewingAsBar(),
+      appBar: ViewingAsBar.of(context),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final alto = constraints.maxHeight;

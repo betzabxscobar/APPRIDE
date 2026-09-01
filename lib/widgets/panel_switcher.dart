@@ -10,11 +10,11 @@ import '../services/auth_service.dart';
 /// No es el `displayName` del rol: aquí se nombra la *pantalla*, no la cuenta.
 /// Un superadmin que abre la vista de pasajero no pasa a ser pasajero.
 String panelLabel(UserRole view) => switch (view) {
-      UserRole.superadmin => 'Panel de superadmin',
-      UserRole.admin => 'Panel de administración',
-      UserRole.passenger => 'Vista de usuario',
-      UserRole.driver => 'Vista de chofer',
-    };
+  UserRole.superadmin => 'Panel de superadmin',
+  UserRole.admin => 'Panel de administración',
+  UserRole.passenger => 'Vista de usuario',
+  UserRole.driver => 'Vista de chofer',
+};
 
 /// Selector de panel para moverse entre las vistas que permite la cuenta.
 ///
@@ -96,8 +96,9 @@ class _PanelOption extends StatelessWidget {
     // Los `accentSoft` del rol son tintes muy claros pensados para fondo
     // blanco. Sobre el tema oscuro deslumbran, así que allí el resaltado se
     // hace con el propio acento a baja opacidad.
-    final fondoSeleccion =
-        ride.isDark ? view.accent.withValues(alpha: 0.18) : view.accentSoft;
+    final fondoSeleccion = ride.isDark
+        ? view.accent.withValues(alpha: 0.18)
+        : view.accentSoft;
 
     return Material(
       color: selected ? fondoSeleccion : ride.surfaceAlt,
@@ -147,13 +148,32 @@ class _PanelOption extends StatelessWidget {
 /// Evita la confusión de «¿por qué no veo mis herramientas de administración?»
 /// y da una salida directa de vuelta al panel propio.
 class ViewingAsBar extends StatelessWidget implements PreferredSizeWidget {
-  const ViewingAsBar({super.key});
+  const ViewingAsBar({super.key, this.margenSuperior = 0});
+
+  /// Alto de la barra de estado del teléfono, que hay que dejar libre.
+  ///
+  /// Llega desde fuera porque `preferredSize` no recibe contexto y por tanto no
+  /// puede leer el `MediaQuery`. Usar [ViewingAsBar.of] evita tener que
+  /// pensarlo en cada pantalla.
+  final double margenSuperior;
 
   static const double _alto = 52;
 
+  /// La barra para el `appBar` de un Scaffold, o `null` si no hay nada que
+  /// avisar.
+  ///
+  /// Antes esto era `const ViewingAsBar()` y la barra se dibujaba **debajo del
+  /// reloj y de los iconos del sistema**: el texto se solapaba con la hora y la
+  /// batería. Un `AppBar` normal reserva ese hueco por su cuenta; esto no es un
+  /// AppBar, así que hay que reservarlo a mano.
+  static PreferredSizeWidget? of(BuildContext context) {
+    if (!AuthService.instance.isViewingOtherPanel) return null;
+    return ViewingAsBar(margenSuperior: MediaQuery.paddingOf(context).top);
+  }
+
   @override
   Size get preferredSize => AuthService.instance.isViewingOtherPanel
-      ? const Size.fromHeight(_alto)
+      ? Size.fromHeight(_alto + margenSuperior)
       : Size.zero;
 
   @override
@@ -168,36 +188,39 @@ class ViewingAsBar extends StatelessWidget implements PreferredSizeWidget {
 
     return Material(
       color: ride.infoSoft,
-      child: SizedBox(
-        height: _alto,
-        child: Padding(
-          padding: const EdgeInsets.only(left: 16, right: 6),
-          child: Row(
-            children: [
-              Icon(Icons.visibility_outlined, size: 18, color: ride.info),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Viendo como ${realRole.displayName.toLowerCase()}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: AppText.label,
-                    height: 1.25,
-                    fontWeight: FontWeight.w700,
-                    color: ride.ink,
+      child: Padding(
+        padding: EdgeInsets.only(top: margenSuperior),
+        child: SizedBox(
+          height: _alto,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 16, right: 6),
+            child: Row(
+              children: [
+                Icon(Icons.visibility_outlined, size: 18, color: ride.info),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Viendo como ${realRole.displayName.toLowerCase()}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: AppText.label,
+                      height: 1.25,
+                      fontWeight: FontWeight.w700,
+                      color: ride.ink,
+                    ),
                   ),
                 ),
-              ),
-              TextButton(
-                onPressed: () => AuthService.instance.resetView(),
-                style: TextButton.styleFrom(
-                  foregroundColor: ride.info,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                TextButton(
+                  onPressed: () => AuthService.instance.resetView(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: ride.info,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  child: const Text('Volver a mi panel'),
                 ),
-                child: const Text('Volver a mi panel'),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

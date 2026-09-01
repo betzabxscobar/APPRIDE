@@ -20,10 +20,17 @@ import 'dart:io';
 ///    los importantes en z15, el resto en z16 y z17. A la altura a la que se
 ///    mira un mapa de viajes se ven cuatro etiquetas contadas.
 ///
-/// Los dos se arreglan igual: se copian las capas de POI de `liberty` al
-/// oscuro —recoloreadas— y se baja un nivel el zoom al que aparecen en los
+/// 3. **El oscuro era casi negro.** Su fondo es `rgb(12,12,12)`, y sobre el
+///    teléfono se leía como un agujero, no como un mapa.
+///
+/// Los dos primeros se arreglan igual: se copian las capas de POI de `liberty`
+/// al oscuro —recoloreadas— y se baja un nivel el zoom al que aparecen en los
 /// dos. Un nivel, no tres: las etiquetas se pisan entre ellas y un mapa
 /// ilegible es peor que uno con pocos nombres.
+///
+/// El tercero lo arregla [_aclarar]: sube la luminosidad de los colores
+/// oscuros y les da el azul del tema de la app, para que siga siendo
+/// claramente un mapa de noche pero se distingan las calles.
 ///
 /// Los dos estilos comparten iconos (`sprite`), fuentes (`glyphs`) y origen de
 /// teselas, así que el trasplante no arrastra nada más.
@@ -63,6 +70,10 @@ Future<void> main() async {
   _adelantar(claro['layers'] as List);
   _escribir('${salida.path}/claro.json', claro);
 
+  // El aclarado va ANTES de trasplantar: las capas de nombres ya se colorean
+  // a mano en [_paraOscuro] y pasarlas otra vez por aquí las apagaría.
+  _aclarar(oscuro['layers'] as List);
+
   // Copia recoloreada para fondo oscuro, encima de todo lo demás.
   (oscuro['layers'] as List).addAll(poi.map(_paraOscuro));
   _adelantar(oscuro['layers'] as List);
@@ -85,6 +96,162 @@ void _adelantar(List<dynamic> capas) {
   }
 }
 
+/// Sube el mapa oscuro de «casi negro» a «azul de noche».
+///
+/// El estilo `dark` de OpenFreeMap es gris puro y muy bajo: su fondo es
+/// `rgb(12,12,12)`. En el teléfono no se leía como un mapa nocturno sino como
+/// un hueco negro con rayas.
+///
+/// Se recorren todos los colores y a los **oscuros** se les sube la
+/// luminosidad y se les mete el azul del tema de la app. A los claros no se
+/// les toca: son los textos, y bajarlos los volvería ilegibles.
+void _aclarar(List<dynamic> capas) {
+  for (final capa in capas.cast<Map<String, dynamic>>()) {
+    for (final clave in const ['paint', 'layout']) {
+      final props = capa[clave];
+      if (props is Map) {
+        // `map` sobre un Map dinamico devuelve Map<dynamic,dynamic>, asi que
+        // hay que reconstruir el tipo que espera el JSON de salida.
+        capa[clave] = Map<String, dynamic>.from(
+          _mapearColores(props) as Map,
+        );
+      }
+    }
+  }
+}
+
+/// Recorre cualquier valor del estilo cambiando los colores que encuentre.
+///
+/// Va a ciegas por la estructura a propósito: un color puede estar suelto
+/// (`"#111"`) o dentro de una expresión de MapLibre —interpolaciones por zoom,
+/// `match`, `case`—, y no compensa entender cada forma para encontrarlos.
+Object? _mapearColores(Object? valor) {
+  if (valor is String) return _esColor(valor) ? _aclararColor(valor) : valor;
+  if (valor is List) return valor.map(_mapearColores).toList();
+  if (valor is Map) {
+    return valor.map((k, v) => MapEntry(k, _mapearColores(v)));
+  }
+  return valor;
+}
+
+bool _esColor(String v) {
+  final t = v.trim();
+  return RegExp(r'^#[0-9a-fA-F]{3,8}$').hasMatch(t) ||
+      RegExp(r'^(rgb|rgba|hsl|hsla)\s*\(').hasMatch(t);
+}
+
+/// El azul del tema oscuro de la app, para que el mapa no desentone.
+const double _tonoRide = 205;
+const double _saturacionRide = 0.20;
+
+String _aclararColor(String crudo) {
+  final rgba = _leerColor(crudo);
+  if (rgba == null) return crudo;
+
+  final (r, g, b, a) = rgba;
+  final (h, sat, l) = _aHsl(r, g, b);
+
+  // Los claros son los textos: se dejan como están.
+  if (l >= 0.5) return crudo;
+
+  // 0.10 de suelo para que el negro puro deje de serlo, y 0.55 de pendiente
+  // para no aplastar la diferencia entre el fondo y las calles.
+  final nuevaL = 0.10 + 0.55 * l;
+
+  // Solo se tiñen los grises. Si el color ya tenía tono propio —el azul del
+  // agua, el verde de un parque— se respeta.
+  final tinta = sat < 0.15;
+  final (nr, ng, nb) = _aRgb(
+    tinta ? _tonoRide : h,
+    tinta ? _saturacionRide : sat,
+    nuevaL,
+  );
+
+  return a >= 1 ? 'rgb($nr,$ng,$nb)' : 'rgba($nr,$ng,$nb,$a)';
+}
+
+(int, int, int, double)? _leerColor(String crudo) {
+  final t = crudo.trim();
+
+  if (t.startsWith('#')) {
+    var hex = t.substring(1);
+    if (hex.length == 3) {
+      hex = hex.split('').map((c) => '$c$c').join();
+    }
+    if (hex.length != 6 && hex.length != 8) return null;
+    final v = int.tryParse(hex.substring(0, 6), radix: 16);
+    if (v == null) return null;
+    final a = hex.length == 8
+        ? (int.tryParse(hex.substring(6), radix: 16) ?? 255) / 255
+        : 1.0;
+    return ((v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff, a);
+  }
+
+  final m = RegExp(r'^(rgb|rgba|hsl|hsla)\s*\(([^)]*)\)').firstMatch(t);
+  if (m == null) return null;
+  final partes = m
+      .group(2)!
+      .split(',')
+      .map((x) => x.trim().replaceAll('%', ''))
+      .toList();
+  if (partes.length < 3) return null;
+
+  final n = partes.map((x) => double.tryParse(x) ?? 0).toList();
+  final a = partes.length > 3 ? n[3] : 1.0;
+
+  if (m.group(1)!.startsWith('hsl')) {
+    final (r, g, b) = _aRgb(n[0], n[1] / 100, n[2] / 100);
+    return (r, g, b, a);
+  }
+  return (n[0].round(), n[1].round(), n[2].round(), a);
+}
+
+(double, double, double) _aHsl(int r, int g, int b) {
+  final rr = r / 255, gg = g / 255, bb = b / 255;
+  final max = [rr, gg, bb].reduce((x, y) => x > y ? x : y);
+  final min = [rr, gg, bb].reduce((x, y) => x < y ? x : y);
+  final l = (max + min) / 2;
+  if (max == min) return (0, 0, l);
+
+  final d = max - min;
+  final s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  double h;
+  if (max == rr) {
+    h = (gg - bb) / d + (gg < bb ? 6 : 0);
+  } else if (max == gg) {
+    h = (bb - rr) / d + 2;
+  } else {
+    h = (rr - gg) / d + 4;
+  }
+  return (h * 60, s, l);
+}
+
+(int, int, int) _aRgb(double h, double s, double l) {
+  if (s == 0) {
+    final v = (l * 255).round();
+    return (v, v, v);
+  }
+  final q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  final p = 2 * l - q;
+
+  double canal(double t) {
+    var tt = t;
+    if (tt < 0) tt += 1;
+    if (tt > 1) tt -= 1;
+    if (tt < 1 / 6) return p + (q - p) * 6 * tt;
+    if (tt < 1 / 2) return q;
+    if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+    return p;
+  }
+
+  final hh = (h % 360) / 360;
+  return (
+    (canal(hh + 1 / 3) * 255).round(),
+    (canal(hh) * 255).round(),
+    (canal(hh - 1 / 3) * 255).round(),
+  );
+}
+
 /// La misma capa, con el texto claro sobre un halo oscuro.
 ///
 /// El color del icono no se toca: los del sprite ya son de color y se ven
@@ -94,7 +261,9 @@ Map<String, dynamic> _paraOscuro(Map<String, dynamic> capa) {
   final paint = Map<String, dynamic>.from(copia['paint'] as Map? ?? {});
 
   paint['text-color'] = '#c8d3de';
-  paint['text-halo-color'] = '#0b0b0b';
+  // El halo va a juego con el fondo ya aclarado, no negro puro: un halo mas
+  // oscuro que el mapa recorta las letras como pegatinas.
+  paint['text-halo-color'] = '#111a21';
   paint['text-halo-width'] = 1.4;
   paint['text-halo-blur'] = 0.4;
 
