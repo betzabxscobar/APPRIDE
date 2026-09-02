@@ -8,6 +8,7 @@ import 'core/preferencias.dart';
 import 'core/ride_colors.dart';
 import 'core/supabase_config.dart';
 import 'core/theme_controller.dart';
+import 'services/map_style_service.dart';
 import 'services/auth_service.dart';
 import 'services/trip_session_store.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
@@ -85,6 +86,12 @@ class _ArranqueState extends State<_Arranque> {
       // preguntarlo con la sesión todavía sin cargar: el dueño salía nulo y el
       // viaje se descartaba siempre, justo lo contrario de lo que hace falta.
       TripSessionStore.instance.cargar();
+
+      // Los dos estilos del mapa, claro y oscuro, listos antes de que haga
+      // falta ninguno. Están dentro de la app, así que no dependen de la red;
+      // tenerlos cargados evita que al cambiar de tema se vea un instante el
+      // mapa rasterizado. Si fallara, cada mapa lo vuelve a intentar solo.
+      unawaited(MapStyleService.instance.precargar());
 
       if (mounted) setState(() => _listo = true);
     } on TimeoutException {

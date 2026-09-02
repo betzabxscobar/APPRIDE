@@ -211,47 +211,68 @@ class _CapaBaseState extends State<_CapaBase> {
 
   Style? _estilo;
 
+  /// A qué tema pertenece [_estilo].
+  ///
+  /// Esta pareja es la que arregla el mapa del tema contrario, y va junta a
+  /// propósito. Antes se guardaba solo el estilo y se confiaba en
+  /// `didUpdateWidget` para cambiarlo al vuelo; bastaba que esa comparación no
+  /// llegara a correr —o que llegara tarde— para acabar pintando el mapa de
+  /// noche con la app de día. Ahora no hace falta confiar en nada: si el tema
+  /// del estilo no es el de ahora, [build] no lo pinta y punto.
+  bool? _estiloOscuro;
+
+  /// El estilo que se puede pintar **ahora**, o `null` si el que hay guardado
+  /// es del otro tema.
+  Style? get _estiloVigente =>
+      _estiloOscuro == widget.oscuro ? _estilo : null;
+
   @override
   void initState() {
     super.initState();
-    // Si otra pantalla ya lo cargó, esto lo tiene desde el primer frame.
-    _estilo = MapStyleService.instance.cacheado(oscuro: widget.oscuro);
+    _tomarDeCache();
     _cargar();
   }
 
   @override
   void didUpdateWidget(_CapaBase anterior) {
     super.didUpdateWidget(anterior);
-    // El teléfono cambió de claro a oscuro, o la persona lo cambió en
-    // Configuración: toca el otro estilo.
     if (anterior.oscuro != widget.oscuro) {
-      _estilo = MapStyleService.instance.cacheado(oscuro: widget.oscuro);
+      _tomarDeCache();
       _cargar();
     }
   }
 
+  /// Si otra pantalla ya cargó este estilo, se pinta desde el primer frame.
+  void _tomarDeCache() {
+    final listo = MapStyleService.instance.cacheado(oscuro: widget.oscuro);
+    if (listo == null) return;
+    _estilo = listo;
+    _estiloOscuro = widget.oscuro;
+  }
+
   Future<void> _cargar() async {
-    if (_estilo != null) return;
+    if (_estiloVigente != null) return;
 
     final oscuro = widget.oscuro;
     final estilo = await MapStyleService.instance.estilo(oscuro: oscuro);
-    // El tema pudo cambiar mientras se descargaba: ese estilo ya no sirve.
-    if (!mounted || oscuro != widget.oscuro) return;
-    setState(() => _estilo = estilo);
+    // El tema pudo cambiar mientras cargaba: ese estilo ya no sirve.
+    if (!mounted || oscuro != widget.oscuro || estilo == null) return;
+
+    setState(() {
+      _estilo = estilo;
+      _estiloOscuro = oscuro;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final estilo = _estilo;
+    final estilo = _estiloVigente;
     if (estilo != null) {
       return VectorTileLayer(
-        // La clave es lo que arregla el mapa claro sobre fondo oscuro.
-        //
-        // Al cambiar de tema, Flutter reutiliza el mismo elemento y solo le
-        // cambia las propiedades. `VectorTileLayer` guarda el tema compilado en
-        // su estado y no lo rehace, asi que seguia pintando el estilo anterior:
-        // se veia el mapa de dia con la app de noche. Con una clave distinta
-        // por tema, el elemento se reemplaza y el estilo nuevo entra de verdad.
+        // Una clave por tema: al cambiar, Flutter reemplaza el elemento en vez
+        // de reutilizarlo. `VectorTileLayer` guarda el tema ya compilado en su
+        // estado y no lo rehace, así que sin la clave seguiría pintando el
+        // anterior.
         key: ValueKey(widget.oscuro),
         theme: estilo.theme,
         tileProviders: estilo.providers,
@@ -260,6 +281,8 @@ class _CapaBaseState extends State<_CapaBase> {
       );
     }
 
+    // Mientras carga el estilo que toca. Nunca se pinta el del otro tema: un
+    // mapa de noche bajo una app de día se lee como una app rota.
     return TileLayer(
       urlTemplate: _urlTeselas,
       userAgentPackageName: 'com.example.ride',

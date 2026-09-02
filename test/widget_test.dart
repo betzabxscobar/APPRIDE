@@ -204,6 +204,40 @@ void main() {
     });
   });
 
+  group('El mapa nunca contradice al tema', () {
+    // El sintoma que se vio en el telefono: mapa de noche con la app de dia, y
+    // al reves. La capa base tiene que ir SIEMPRE con el tema de la app.
+    Future<TileLayer> capaCon(WidgetTester tester, ThemeData tema) async {
+      MapStyleService.instance.soloRaster = true;
+      addTearDown(() => MapStyleService.instance.soloRaster = false);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: tema,
+          home: const Scaffold(
+            body: RideMap(centro: LatLng(-0.1807, -78.4678), zoom: 15),
+          ),
+        ),
+      );
+      final capa = tester.widget<TileLayer>(find.byType(TileLayer));
+      tester.takeException();
+      return capa;
+    }
+
+    testWidgets('En claro, las teselas no se invierten', (tester) async {
+      final capa = await capaCon(tester, AppTheme.light);
+      expect(capa.tileBuilder, isNull);
+    });
+
+    testWidgets('En oscuro, las teselas se invierten', (tester) async {
+      // OSM no publica estilo oscuro: el respaldo rasterizado invierte sus
+      // teselas claras. Si esto saliera nulo, el mapa de respaldo se veria
+      // blanco encima de una app negra.
+      final capa = await capaCon(tester, AppTheme.dark);
+      expect(capa.tileBuilder, isNotNull);
+    });
+  });
+
   group('Eleccion de ruta', () {
     Ruta ruta({required double km, required int min}) => Ruta(
           puntos: const [],

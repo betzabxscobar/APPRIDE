@@ -95,6 +95,18 @@ class MapStyleService {
     return _enCurso[oscuro] ??= _cargar(oscuro);
   }
 
+  /// Deja los dos estilos listos.
+  ///
+  /// Son ficheros dentro de la app, no descargas: cargarlos cuesta poco y
+  /// evita el parpadeo al cambiar de tema, que es cuando se veía el mapa
+  /// rasterizado un instante antes de aparecer el vectorial.
+  Future<void> precargar() async {
+    await Future.wait([
+      estilo(oscuro: false),
+      estilo(oscuro: true),
+    ]);
+  }
+
   Future<Style?> _cargar(bool oscuro) async {
     try {
       final estilo = await StyleReader(
