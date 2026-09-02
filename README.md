@@ -370,8 +370,9 @@ llamara a lo mismo seguiría viendo solo los suyos.
 
 **Actor:** administrador o superadministrador.
 
-1. El usuario entra en **Tarifas** y ve las franjas —estándar, nocturna y hora
-   pico— con sus números.
+1. El usuario entra en **Tarifas** y ve las cuatro franjas —estándar, hora pico
+   de mañana, hora pico de tarde y nocturna— con sus horas, sus días y sus
+   números.
 2. Cambia el arranque, el costo por kilómetro, la carrera mínima o el reparto
    del chofer, con el cálculo de un viaje de ejemplo delante para no mover un
    número a ciegas.

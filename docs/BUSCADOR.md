@@ -63,6 +63,16 @@ A diferencia de Google, **no pide tarjeta**: la clave se saca con un correo en
 <https://developer.tomtom.com>. Su plan gratuito da 2 500 peticiones de búsqueda
 al día, con uso comercial permitido.
 
+**Acotado a Ecuador** (`BusquedaConfig.paisesServicio = 'EC'`, que viaja como
+`countrySet`). Sin eso, buscar «Terminal» desde Quito devolvía tres aeropuertos
+de España antes que nada de Ecuador, y «Madrigal» sacaba un pueblo de Colombia.
+No es un lugar por defecto: es el alcance del servicio. El día que Ride cruce
+la frontera se añade el país ahí.
+
+> Ojo con la diferencia. El **sesgo** por posición (`lat`/`lon`) ordena lo
+> cercano primero sin descartar nada; el `countrySet` sí descarta. La posición
+> real de la persona no se supone en ningún sitio.
+
 Antes de compilar con ella, conviene ver si mejora de verdad:
 
 ```sh

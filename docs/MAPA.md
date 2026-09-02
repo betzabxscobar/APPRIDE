@@ -5,11 +5,19 @@ configurar nada.
 
 | Qué | Quién | Clave |
 |---|---|---|
-| Teselas del mapa | [OpenStreetMap](https://www.openstreetmap.org) | ninguna |
+| Teselas del mapa | [OpenFreeMap](https://openfreemap.org/), **vectoriales** | ninguna |
+| Respaldo si no responde | [OpenStreetMap](https://www.openstreetmap.org), rasterizadas | ninguna |
 | Rutas por calles | [OSRM](https://github.com/Project-OSRM/osrm-backend) | ninguna |
 
-En modo oscuro las teselas claras de OSM se invierten con el filtro de
-`flutter_map`, porque OSM no publica un estilo oscuro.
+Desde el 2026-08-31 el mapa es **vectorial**, con estilos propios para claro y
+oscuro. Las teselas rasterizadas de OpenStreetMap siguen ahí como respaldo: se
+pintan primero y se cambia a las vectoriales cuando el estilo termina de
+cargar, así que nunca hay un hueco gris. El detalle está en
+[Teselas vectoriales](#teselas-vectoriales-openfreemap-2026-08-31).
+
+> El filtro que invierte los colores en modo oscuro es **solo del respaldo**.
+> OpenStreetMap no publica un estilo oscuro y hay que invertir sus teselas;
+> el estilo vectorial oscuro sí existe y no necesita el truco.
 
 ## Zoom
 
