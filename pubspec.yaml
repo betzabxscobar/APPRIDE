@@ -78,6 +78,7 @@ flutter:
     - assets/mapa/oscuro.json
     - assets/images/logo.png
     - assets/images/fondo.png
+    - assets/images/fondoCrearCuenta.png
     - assets/images/fondoInicio.jpeg
     - assets/images/FondoNocturno.jpeg
     - assets/images/fondoInicioNocturno.jpeg

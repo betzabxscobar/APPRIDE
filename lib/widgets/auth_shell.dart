@@ -146,16 +146,21 @@ class _MobileHero extends StatelessWidget {
                   ),
                 ),
               ),
-              // 45% del alto: la ilustración llena el header visible (45% del
+              // 45% del alto: la imagen llena el header visible (45% del
               // viewport) y queda por encima de la hoja. El bottom se calcula
-              // para que la base de la ciudad coincida con el borde de la hoja
-              // (con 16px de sangrado) y las figuras no queden escondidas.
+              // para que la base coincida con el borde de la hoja (con 16px
+              // de sangrado). Reemplaza al gráfico pintado _CityArt: así
+              // desaparecen las líneas de la ruta en la vista de crear cuenta.
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: height * 0.55 - 16,
                 height: height * 0.45,
-                child: _CityArt(isDark: isDark),
+                child: Image.asset(
+                  'assets/images/fondoCrearCuenta.png',
+                  fit: BoxFit.cover,
+                  alignment: Alignment.bottomCenter,
+                ),
               ),
               // Velo: más oscuro en modo nocturno para que el texto siga
               // legible sobre edificios más claros.
@@ -328,7 +333,11 @@ class BrandPanel extends StatelessWidget {
                   right: 0,
                   bottom: 0,
                   height: height * 0.43,
-                  child: _CityArt(isDark: isDark),
+                  child: Image.asset(
+                    'assets/images/fondoCrearCuenta.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.bottomCenter,
+                  ),
                 ),
                 Padding(
                   padding: EdgeInsets.symmetric(
@@ -444,194 +453,3 @@ class _TrustBadge extends StatelessWidget {
   }
 }
 
-/// Ilustración de la ciudad (`.city-art`): luna, ruta y edificios.
-/// Colores adaptados al modo nocturno: en oscuro los edificios se aclaran
-/// levemente para contrastar con `ride.hero` (`_heroDark`).
-class _CityArt extends StatelessWidget {
-  const _CityArt({this.isDark = false});
-
-  final bool isDark;
-
-  static const List<double> _buildingHeights = [
-    0.42,
-    0.72,
-    0.53,
-    0.88,
-    0.61,
-    0.76,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final height = constraints.maxHeight;
-
-        // Paleta según tema: en modo oscuro la luna y los edificios deben
-        // ser más luminosos para no fundirse con el fondo navy oscuro.
-        final buildingTop = isDark ? const Color(0xFF234A5E) : const Color(0xFF123B50);
-        final buildingBottom = isDark ? const Color(0xFF0F2F40) : const Color(0xFF0C2D40);
-        final lunaInner = isDark ? const Color(0x44B5EDF7) : const Color(0x2EB5EDF7);
-        final lunaOuter = isDark ? const Color(0x1A69D2F0) : const Color(0x0969D2F0);
-        final overlayEnd = isDark ? const Color(0x243BA4CB) : const Color(0x143BA4CB);
-
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Colors.transparent, overlayEnd],
-            ),
-          ),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                right: width * 0.15,
-                top: height * 0.06,
-                child: Container(
-                  width: 110,
-                  height: 110,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      center: const Alignment(-0.24, -0.24),
-                      colors: [lunaInner, lunaOuter],
-                      stops: const [0, 0.66],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: width * 0.05,
-                right: width * 0.05,
-                bottom: 0,
-                height: height * 0.7,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    for (final (index, fraction) in _buildingHeights.indexed) ...[
-                      Expanded(
-                        child: Container(
-                          height: height * 0.7 * fraction,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [buildingTop, buildingBottom],
-                            ),
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(5),
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (index != _buildingHeights.length - 1)
-                        const SizedBox(width: 10),
-                    ],
-                  ],
-                ),
-              ),
-              Positioned(
-                left: width * 0.14,
-                top: height * 0.24,
-                width: width * 0.58,
-                height: height * 0.42,
-                child: _Route(isDark: isDark),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// Trazo de la ruta con sus tres paradas (`.route`).
-class _Route extends StatelessWidget {
-  const _Route({this.isDark = false});
-
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.skewX(-18 * math.pi / 180),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth;
-
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned.fill(child: CustomPaint(painter: _RoutePainter(isDark: isDark))),
-              Positioned(left: -5, bottom: -8, child: _RouteStop(isDark: isDark)),
-              Positioned(left: width * 0.5, bottom: -8, child: _RouteStop(isDark: isDark)),
-              Positioned(right: -8, top: -6, child: _RouteStop(isDark: isDark)),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _RoutePainter extends CustomPainter {
-  _RoutePainter({this.isDark = false});
-
-  final bool isDark;
-  static const double _radius = 70;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final radius = math.min(_radius, math.min(size.width, size.height));
-    final path = Path()
-      ..moveTo(0, size.height)
-      ..lineTo(size.width - radius, size.height)
-      ..arcToPoint(
-        Offset(size.width, size.height - radius),
-        radius: const Radius.circular(_radius),
-        clockwise: false,
-      )
-      ..lineTo(size.width, 0);
-
-    final glow = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
-      ..color = isDark ? const Color(0xFF7DE2F5).withValues(alpha: 0.45) : const Color(0xFF5ECFEE).withValues(alpha: 0.36)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7);
-
-    final stroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
-      ..color = isDark ? const Color(0xFF8ADFF0) : const Color(0xFF69CDE9);
-
-    canvas
-      ..drawPath(path, glow)
-      ..drawPath(path, stroke);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _RouteStop extends StatelessWidget {
-  const _RouteStop({this.isDark = false});
-
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 13,
-      height: 13,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isDark ? const Color(0xFF14354A) : const Color(0xFF0C2C43),
-        border: Border.all(color: isDark ? const Color(0xFFA5E8F4) : const Color(0xFF8ADFF0), width: 3),
-      ),
-    );
-  }
-}
