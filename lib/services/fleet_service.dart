@@ -33,7 +33,8 @@ class FleetService {
         .select('id, placa, marca, modelo, anio, color, activo, categoria')
         .eq('conductor_id', _uid)
         .order('activo', ascending: false)
-        .order('created_at');
+        // El más antiguo primero: el orden en que los registró.
+        .order('created_at', ascending: true);
     return rows.map(FleetVehicle.fromMap).toList();
   }
 
@@ -228,7 +229,10 @@ class FleetService {
 
       // Los que llevan más esperando primero: en una cola de revisión, lo
       // último que quieres es que alguien se quede al fondo para siempre.
-      final rows = await consulta.order('fecha_registro');
+      // Los que llevan más esperando, primero. `order` es descendente
+      // por defecto, así que sin esto la cola de revisión iba al revés
+      // y el que más esperaba quedaba el último.
+      final rows = await consulta.order('fecha_registro', ascending: true);
       return rows.map(DriverReview.fromMap).toList();
     } on sb.PostgrestException catch (e) {
       throw RideException(_traducir(e.message));

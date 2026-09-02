@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
@@ -143,6 +144,91 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     }
   }
 
+  /// Avanza el viaje. El salto a «en curso» pide el código del pasajero.
+  ///
+  /// El código no se comprueba aquí: se manda a `avanzar_viaje`, que es quien
+  /// lo conoce. Esta pantalla no puede leerlo —la política solo se lo entrega
+  /// al pasajero—, y eso es justo lo que hace que el control sirva de algo.
+  Future<void> _avanzar(Trip viaje) async {
+    String? codigo;
+
+    if (viaje.status == TripStatus.conductorEnOrigen) {
+      codigo = await _pedirCodigo();
+      if (codigo == null) return;
+    }
+
+    await _accion(
+      () => RideService.instance.avanzar(viaje.id, codigo: codigo).then((_) {}),
+    );
+  }
+
+  /// Pide los seis dígitos que el pasajero tiene en su pantalla.
+  Future<String?> _pedirCodigo() {
+    final controlador = TextEditingController();
+
+    return showDialog<String>(
+      context: context,
+      builder: (context) {
+        final ride = context.ride;
+
+        return AlertDialog(
+          title: const Text('Código del pasajero'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Pídele los seis dígitos que le aparecen en su pantalla. Sin '
+                'ellos el viaje no puede empezar.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: ride.inkMuted,
+                ),
+              ),
+              const SizedBox(height: 18),
+              TextField(
+                controller: controlador,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(6),
+                ],
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 10,
+                  color: ride.ink,
+                ),
+                decoration: const InputDecoration(
+                  hintText: '······',
+                  counterText: '',
+                ),
+                onSubmitted: (v) =>
+                    Navigator.of(context).pop(v.length == 6 ? v : null),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final v = controlador.text.trim();
+                if (v.length == 6) Navigator.of(context).pop(v);
+              },
+              child: const Text('Iniciar viaje'),
+            ),
+          ],
+        );
+      },
+    ).whenComplete(controlador.dispose);
+  }
+
   Future<void> _finalizar(Trip viaje) async {
     await _accion(() async {
       final total = await RideService.instance.finalizar(viaje.id);
@@ -196,9 +282,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
                       viaje: _activo!,
                       yo: _yo,
                       ocupado: _ocupado,
-                      onAvanzar: () => _accion(
-                        () => RideService.instance.avanzar(_activo!.id).then((_) {}),
-                      ),
+                      onAvanzar: () => _avanzar(_activo!),
                       onFinalizar: () => _finalizar(_activo!),
                       onCancelar: () => _accion(
                         () => RideService.instance.cancelar(_activo!.id),
@@ -416,7 +500,9 @@ class _ViajeActivo extends StatelessWidget {
   String? get _siguientePaso => switch (viaje.status) {
         TripStatus.aceptado => 'Voy en camino',
         TripStatus.conductorEnCamino => 'Llegué al punto',
-        TripStatus.conductorEnOrigen => 'Iniciar viaje',
+        // Se avisa de que va a pedir un código: tocar un botón y que salte un
+        // diálogo pidiendo algo que no tienes a mano desespera.
+        TripStatus.conductorEnOrigen => 'Iniciar viaje con código',
         _ => null,
       };
 

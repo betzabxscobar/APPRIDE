@@ -10,6 +10,7 @@ import 'package:ride/models/app_user.dart';
 import 'package:ride/models/fleet.dart';
 import 'package:ride/services/geocoding_service.dart';
 import 'package:ride/services/h3_service.dart';
+import 'package:ride/services/ride_service.dart';
 import 'package:ride/services/map_style_service.dart';
 import 'package:ride/services/places_service.dart';
 import 'package:ride/services/routing_service.dart';
@@ -980,6 +981,32 @@ void main() {
       final conductor = DriverReview.fromMap(fila(nombre: null));
       expect(conductor.nombre, 'javier');
       expect(conductor.iniciales, 'J');
+    });
+  });
+
+  group('Posicion del chofer', () {
+    DriverPosition pos(Duration hace) => DriverPosition(
+          lat: -0.18, lng: -78.49,
+          cuando: DateTime.now().subtract(hace),
+        );
+
+    test('Una posicion recien reportada es de fiar', () {
+      expect(pos(const Duration(seconds: 20)).esVieja, isFalse);
+      expect(pos(const Duration(minutes: 2)).esVieja, isFalse);
+    });
+
+    test('Pasados tres minutos, deja de serlo', () {
+      // El chofer reporta cada 30 segundos. Tres minutos sin noticias es que
+      // se quedo sin datos, y el alfiler del mapa esta mintiendo.
+      expect(pos(const Duration(minutes: 3)).esVieja, isTrue);
+      expect(pos(const Duration(hours: 1)).esVieja, isTrue);
+    });
+
+    test('La antiguedad se escribe en palabras', () {
+      expect(pos(const Duration(seconds: 5)).cuandoTexto, 'ahora mismo');
+      expect(pos(const Duration(minutes: 1)).cuandoTexto, 'hace 1 minuto');
+      expect(pos(const Duration(minutes: 12)).cuandoTexto, 'hace 12 minutos');
+      expect(pos(const Duration(hours: 1)).cuandoTexto, 'hace 1 hora');
     });
   });
 

@@ -45,10 +45,10 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
 
   /// Lo que el pasajero escribe para que le encuentren.
   ///
-  /// No es un capricho: hay sitios que no están en ningún mapa. El Instituto
-  /// Sudamericano de Quito no existe en OpenStreetMap, así que por bueno que
-  /// sea el mapa nunca va a salir. Una línea escrita sí lo resuelve, y es lo
-  /// que hacen Uber y DiDi en Latinoamérica por este mismo motivo.
+  /// No es un capricho: hay sitios que no están en ningún mapa, y muchos
+  /// portales no se distinguen desde la calle. Una seña escrita lo resuelve
+  /// donde no llega la cartografía, y es lo que hacen Uber y DiDi en
+  /// Latinoamérica por este mismo motivo.
   final TextEditingController _referenciaChofer = TextEditingController();
 
   /// Recorrido real por calles. `null` mientras se calcula o si OSRM falla.
@@ -707,7 +707,7 @@ class _CampoReferencia extends StatelessWidget {
           textCapitalization: TextCapitalization.sentences,
           style: TextStyle(fontSize: AppText.small, color: ride.ink),
           decoration: InputDecoration(
-            hintText: 'Edificio del Instituto Sudamericano, portón azul',
+            hintText: 'Casa de reja verde, junto a la tienda',
             counterText: '',
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -715,8 +715,7 @@ class _CampoReferencia extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Si tu edificio no sale en el mapa, escríbelo aquí: el chofer lo ve '
-          'antes de salir.',
+          'Una seña para reconocer el sitio. El chofer la ve antes de salir.',
           style: TextStyle(
             fontSize: AppText.micro,
             height: 1.4,

@@ -69,7 +69,10 @@ class ChatService {
           .from('mensajes')
           .select(_columnas)
           .eq('viaje_id', viajeId)
-          .order('fecha');
+          // `order` de postgrest es DESCENDENTE por defecto. Sin esto el
+          // chat salía del revés: el mensaje nuevo arriba y la
+          // conversación creciendo hacia atrás.
+          .order('fecha', ascending: true);
       return rows.map(ChatMessage.fromMap).toList();
     } on sb.PostgrestException catch (e) {
       throw RideException(_traducir(e.message));

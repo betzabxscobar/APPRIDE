@@ -45,7 +45,8 @@ class RideService {
         .from('lugares')
         .select('id, nombre, direccion, latitud, longitud')
         .eq('activo', true)
-        .order('nombre');
+        // Alfabético de verdad: `order` es descendente por defecto.
+        .order('nombre', ascending: true);
     return rows.map(Place.fromMap).toList();
   }
 
@@ -63,7 +64,9 @@ class RideService {
     String? tarifaId,
     String categoria = VehicleCategory.idPorDefecto,
   }) async {
-    final rows = await _client.rpc('cotizar_viaje', params: {
+    final List<dynamic> rows;
+    try {
+      rows = await _rpc<List<dynamic>>('cotizar_viaje', {
       'p_origen_lat': origenLat,
       'p_origen_lng': origenLng,
       'p_destino_lat': destinoLat,
@@ -74,9 +77,19 @@ class RideService {
       'p_distancia_km': distanciaKm,
       // Normalmente null: la tarifa la elige el servidor por la hora.
       'p_tarifa_id': tarifaId,
-      // El tipo de vehículo multiplica el total, mínima incluida.
-      'p_categoria': categoria,
-    }) as List<dynamic>;
+        // El tipo de vehículo multiplica el total, mínima incluida.
+        'p_categoria': categoria,
+      });
+    } on RideException {
+      rethrow;
+    } catch (_) {
+      // Sin red, o el servidor devolvió algo que no se esperaba. Antes esto
+      // se escapaba sin envolver y llegaba a la pantalla como una excepción
+      // cruda de Supabase, que no dice nada y no ofrece reintentar.
+      throw const RideException(
+        'No pudimos calcular el precio. Revisa tu conexión e inténtalo de nuevo.',
+      );
+    }
 
     if (rows.isEmpty) {
       throw const RideException('No pudimos calcular el precio del viaje');
@@ -98,13 +111,22 @@ class RideService {
     required double destinoLng,
     double? distanciaKm,
   }) async {
-    final rows = await _client.rpc('cotizar_categorias', params: {
-      'p_origen_lat': origenLat,
-      'p_origen_lng': origenLng,
-      'p_destino_lat': destinoLat,
-      'p_destino_lng': destinoLng,
-      'p_distancia_km': distanciaKm,
-    }) as List<dynamic>;
+    final List<dynamic> rows;
+    try {
+      rows = await _rpc<List<dynamic>>('cotizar_categorias', {
+        'p_origen_lat': origenLat,
+        'p_origen_lng': origenLng,
+        'p_destino_lat': destinoLat,
+        'p_destino_lng': destinoLng,
+        'p_distancia_km': distanciaKm,
+      });
+    } on RideException {
+      rethrow;
+    } catch (_) {
+      throw const RideException(
+        'No pudimos calcular los precios. Revisa tu conexión e inténtalo de nuevo.',
+      );
+    }
 
     return [
       for (final r in rows)
@@ -121,7 +143,8 @@ class RideService {
         .from('categorias_vehiculo')
         .select('id, nombre, descripcion, factor, pasajeros, icono, orden')
         .eq('activo', true)
-        .order('orden');
+        // Moto, Estándar, Confort, XL — en ese orden, no al revés.
+        .order('orden', ascending: true);
     return rows.map(VehicleCategory.fromMap).toList();
   }
 
@@ -221,7 +244,9 @@ class RideService {
         .select(_detalle)
         .eq('estado', 'BUSCANDO_CONDUCTOR')
         .isFilter('conductor_id', null)
-        .order('fecha_solicitud');
+        // La solicitud que lleva más tiempo esperando, primero: quien
+        // pidió antes no debe quedarse al fondo de la lista.
+        .order('fecha_solicitud', ascending: true);
 
     final viajes = rows.map(Trip.fromMap).toList();
 
@@ -258,9 +283,36 @@ class RideService {
       _rpc<void>('aceptar_viaje', {'p_viaje_id': viajeId});
 
   /// Pasa al siguiente estado del recorrido.
-  Future<TripStatus> avanzar(String viajeId) async {
-    final estado = await _rpc<String>('avanzar_viaje', {'p_viaje_id': viajeId});
+  ///
+  /// El último salto —de «estoy en el punto» a «en curso»— exige el [codigo]
+  /// de seis dígitos que el pasajero tiene en su pantalla y le dicta al
+  /// chofer. Los pasos anteriores no lo piden: no cobran nada.
+  Future<TripStatus> avanzar(String viajeId, {String? codigo}) async {
+    final estado = await _rpc<String>('avanzar_viaje', {
+      'p_viaje_id': viajeId,
+      'p_codigo': codigo,
+    });
     return TripStatus.fromId(estado);
+  }
+
+  /// El código que el pasajero le tiene que dictar al chofer.
+  ///
+  /// Devuelve `null` si todavía no existe —el chofer no ha llegado al punto—
+  /// o si quien pregunta no es el pasajero de ese viaje. Eso último no lo
+  /// decide esta función: la política `codigos_solo_el_pasajero` no le entrega
+  /// la fila a nadie más, ni al propio chofer. Por eso el código vive en su
+  /// tabla y no en una columna de `viajes`: RLS filtra filas, no columnas.
+  Future<String?> codigoDeInicio(String viajeId) async {
+    try {
+      final fila = await _client
+          .from('codigos_viaje')
+          .select('codigo')
+          .eq('viaje_id', viajeId)
+          .maybeSingle();
+      return fila?['codigo'] as String?;
+    } on sb.PostgrestException {
+      return null;
+    }
   }
 
   /// Cierra el viaje y deja registrado el cobro.
@@ -296,11 +348,11 @@ class RideService {
   /// Sale de `public.ubicaciones`, no de `conductores`: RLS deja al pasajero
   /// leer las ubicaciones de su propio viaje, pero no la posición suelta de una
   /// persona. Así el seguimiento solo funciona mientras dura el viaje.
-  Future<({double lat, double lng})?> posicionDelChofer(String viajeId) async {
+  Future<DriverPosition?> posicionDelChofer(String viajeId) async {
     try {
       final fila = await _client
           .from('ubicaciones')
-          .select('latitud, longitud')
+          .select('latitud, longitud, registrado_en')
           .eq('viaje_id', viajeId)
           .eq('tipo', 'posicion_actual')
           .order('registrado_en', ascending: false)
@@ -308,9 +360,11 @@ class RideService {
           .maybeSingle();
 
       if (fila == null) return null;
-      return (
+      return DriverPosition(
         lat: (fila['latitud'] as num).toDouble(),
         lng: (fila['longitud'] as num).toDouble(),
+        cuando: DateTime.tryParse(fila['registrado_en'] as String)?.toLocal() ??
+            DateTime.now(),
       );
     } on sb.PostgrestException {
       return null;
@@ -491,6 +545,17 @@ class RideService {
     if (m.contains('violates row-level security')) {
       return 'No tienes permiso para hacer eso';
     }
+    if (m.contains('el codigo no coincide')) {
+      return 'El código no coincide. Pídeselo otra vez al pasajero.';
+    }
+    if (m.contains('demasiados intentos')) {
+      return 'Demasiados intentos fallidos. Pídele al pasajero que cancele '
+          'el viaje y lo vuelva a pedir.';
+    }
+    if (m.contains('no tiene codigo de inicio')) {
+      return 'Este viaje todavía no tiene código. Marca primero que llegaste '
+          'al punto.';
+    }
     return mensaje;
   }
 }
@@ -536,6 +601,40 @@ class DriverState {
       return 'Registra un vehículo y márcalo como activo para recibir viajes.';
     }
     return '';
+  }
+}
+
+/// Dónde estaba el chofer y **cuándo** se supo.
+///
+/// La hora no es un adorno. Si el teléfono del chofer se queda sin datos, la
+/// última posición se queda congelada y el alfiler sigue ahí, quieto, como si
+/// fuera actual. El pasajero espera mirando un auto que en realidad ya no está
+/// donde dice. Con la marca de tiempo se puede avisar.
+class DriverPosition {
+  const DriverPosition({
+    required this.lat,
+    required this.lng,
+    required this.cuando,
+  });
+
+  final double lat;
+  final double lng;
+  final DateTime cuando;
+
+  Duration get antiguedad => DateTime.now().difference(cuando);
+
+  /// El chofer reporta cada 30 segundos. Pasados tres minutos sin noticias, lo
+  /// que se ve en el mapa ya no es de fiar.
+  bool get esVieja => antiguedad.inMinutes >= 3;
+
+  /// «hace 2 min», «ahora mismo».
+  String get cuandoTexto {
+    final m = antiguedad.inMinutes;
+    if (m < 1) return 'ahora mismo';
+    if (m == 1) return 'hace 1 minuto';
+    if (m < 60) return 'hace $m minutos';
+    final h = antiguedad.inHours;
+    return h == 1 ? 'hace 1 hora' : 'hace $h horas';
   }
 }
 

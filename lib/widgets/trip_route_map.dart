@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart' show Distance, LatLng, LengthUnit;
 import '../core/app_theme.dart';
 import '../core/ride_colors.dart';
 import '../models/trip.dart';
+import '../services/auth_service.dart';
 import '../services/routing_service.dart';
 import 'ride_map.dart';
 
@@ -132,7 +133,17 @@ class _TripRouteMapState extends State<TripRouteMap> {
     _claveViaje = clave;
 
     final ruta = await RoutingService.instance.entre(origen, destino);
-    if (!mounted || ruta == null) return;
+    if (!mounted) return;
+
+    if (ruta == null) {
+      // La clave se marca ANTES de pedir la ruta, para no pedir dos veces lo
+      // mismo. Si la petición falla hay que soltarla: si no, el trayecto queda
+      // marcado como «ya pedido» y no se reintenta nunca — el mapa se queda
+      // con la línea recta para siempre aunque vuelva la red.
+      _claveViaje = null;
+      return;
+    }
+
     setState(() => _viaje = ruta);
     _encuadrar();
   }
@@ -166,6 +177,14 @@ class _TripRouteMapState extends State<TripRouteMap> {
     // Si el chofer siguió moviéndose mientras OSRM respondía, esta ruta ya no
     // es la buena: la que valga llegará en la siguiente vuelta.
     if (_origenRecogida != desde) return;
+
+    if (ruta == null) {
+      // Igual que arriba: sin soltar el origen, este tramo no se vuelve a
+      // pedir hasta que el chofer se mueva 60 m.
+      _origenRecogida = null;
+      return;
+    }
+
     setState(() => _recogida = ruta);
     _encuadrar();
   }
@@ -256,6 +275,11 @@ class _TripRouteMapState extends State<TripRouteMap> {
                 recogida: _recogida,
                 recorrido: _viaje,
                 mostrandoRecogida: _mostrarRecogida,
+                // Quién está mirando cambia lo que hay que decir. Se deduce
+                // del propio viaje: no hace falta que la pantalla lo pase.
+                soyElChofer: widget.viaje.conductorId != null &&
+                    widget.viaje.conductorId ==
+                        AuthService.instance.currentUser?.id,
               ),
             ),
           ],
@@ -276,6 +300,7 @@ class _Pildora extends StatelessWidget {
     required this.recogida,
     required this.recorrido,
     required this.mostrandoRecogida,
+    required this.soyElChofer,
   });
 
   final Trip viaje;
@@ -283,16 +308,24 @@ class _Pildora extends StatelessWidget {
   final Ruta? recorrido;
   final bool mostrandoRecogida;
 
+  /// El mismo mapa lo miran los dos, pero «tu chofer viene en camino» no tiene
+  /// sentido en la pantalla del chofer: el que viene es él.
+  final bool soyElChofer;
+
   @override
   Widget build(BuildContext context) {
     final ride = context.ride;
     final tramo = mostrandoRecogida ? recogida : recorrido;
 
+    final enElPunto = viaje.status == TripStatus.conductorEnOrigen;
+
     final titulo = mostrandoRecogida
-        ? (viaje.status == TripStatus.conductorEnOrigen
-            ? 'Tu chofer ya está en el punto'
-            : 'Tu chofer viene en camino')
-        : 'Recorrido hasta el destino';
+        ? (soyElChofer
+            ? (enElPunto ? 'Estás en el punto de recogida' : 'Vas a recoger')
+            : (enElPunto
+                ? 'Tu chofer ya está en el punto'
+                : 'Tu chofer viene en camino'))
+        : (soyElChofer ? 'Camino al destino' : 'Recorrido hasta el destino');
 
     // Sin ruta calculada no se inventa un tiempo: se enseña solo el título.
     final detalle =

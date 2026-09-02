@@ -797,10 +797,19 @@ class _ImplementationStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const steps = [
+      // Lo que de verdad está funcionando. Se quedó desfasado: seguía
+      // diciendo que Supabase estaba «preparada para el integrador» cuando
+      // llevaba semanas conectada, y que los viajes eran «el siguiente
+      // módulo» con el ciclo entero ya andando. Un tablero que miente sobre
+      // el avance es peor que no tenerlo.
       (true, 'Acceso por roles', 'Admin y superadmin diferenciados'),
       (true, 'Primer acceso seguro', 'Cambio de contraseña administrativa'),
-      (false, 'Conexión con Supabase', 'Preparada para el integrador'),
-      (false, 'Gestión de viajes', 'Siguiente módulo funcional'),
+      (true, 'Conexión con Supabase', 'Base, autenticación, RLS y tiempo real'),
+      (true, 'Ciclo de viajes', 'Pedir, aceptar, seguir en el mapa y cobrar'),
+      (true, 'Tipos de vehículo', 'Moto, estándar, confort y XL con su tarifa'),
+      (true, 'Revisión de conductores', 'Documentos y aprobación desde el panel'),
+      (true, 'Chat y código de inicio', 'Mensajes del viaje y verificación de 6 dígitos'),
+      (false, 'Firma de producción', 'Pendiente: hoy se firma con la de depuración'),
     ];
 
     return _Card(

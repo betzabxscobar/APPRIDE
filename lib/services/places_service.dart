@@ -73,7 +73,8 @@ class PlacesService {
           .from('lugares')
           .select('nombre, direccion, latitud, longitud')
           .eq('activo', true)
-          .order('nombre')
+          // Alfabético de verdad: `order` es descendente por defecto.
+          .order('nombre', ascending: true)
           .limit(limite);
       return rows
           .map((r) => GeoPlace(

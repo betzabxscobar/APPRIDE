@@ -39,8 +39,11 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   String? _error;
   bool _calificacionOfrecida = false;
 
-  /// Dónde va el chofer ahora mismo.
-  LatLng? _posicionChofer;
+  /// Dónde va el chofer y cuándo se supo.
+  DriverPosition? _posicionChofer;
+
+  /// El código que hay que dictarle al chofer para arrancar.
+  String? _codigo;
 
   /// Cada cuánto se vuelve a preguntar dónde está el chofer.
   ///
@@ -91,6 +94,15 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
 
       await _ubicarChofer();
 
+      // Solo existe mientras el chofer espera en el punto. Antes no se ha
+      // generado y después ya se usó.
+      if (viaje != null && viaje.status == TripStatus.conductorEnOrigen) {
+        final codigo = await RideService.instance.codigoDeInicio(viaje.id);
+        if (mounted) setState(() => _codigo = codigo);
+      } else if (_codigo != null) {
+        if (mounted) setState(() => _codigo = null);
+      }
+
       if (viaje != null && viaje.status == TripStatus.finalizado) {
         _ofrecerCalificacion(viaje);
       }
@@ -111,7 +123,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
 
     final pos = await RideService.instance.posicionDelChofer(viaje.id);
     if (!mounted || pos == null) return;
-    setState(() => _posicionChofer = LatLng(pos.lat, pos.lng));
+    setState(() => _posicionChofer = pos);
   }
 
   /// Al terminar el viaje se abre la calificación una sola vez.
@@ -185,14 +197,32 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                   children: [
                     TripRouteMap(
                       viaje: viaje,
-                      chofer: _posicionChofer,
+                      chofer: _posicionChofer == null
+                          ? null
+                          : LatLng(
+                              _posicionChofer!.lat,
+                              _posicionChofer!.lng,
+                            ),
                       onTocar: () => TripRouteFullScreen.abrir(
                         context,
                         viaje: viaje,
-                        chofer: _posicionChofer,
+                        chofer: _posicionChofer == null
+                            ? null
+                            : LatLng(
+                                _posicionChofer!.lat,
+                                _posicionChofer!.lng,
+                              ),
                       ),
                     ),
+                    if (_posicionChofer?.esVieja ?? false) ...[
+                      const SizedBox(height: 10),
+                      _PosicionVieja(posicion: _posicionChofer!),
+                    ],
                     const SizedBox(height: 16),
+                    if (_codigo != null) ...[
+                      _CodigoDeInicio(codigo: _codigo!),
+                      const SizedBox(height: 16),
+                    ],
                     _EstadoActual(viaje: viaje),
                     const SizedBox(height: 16),
                     _Ruta(viaje: viaje),
@@ -234,6 +264,120 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                       ),
                   ],
                 ),
+    );
+  }
+}
+
+/// El código que el pasajero le dicta al chofer para arrancar el viaje.
+///
+/// Se enseña en grande y separado por dígitos porque se lee en voz alta, a
+/// veces por la ventanilla y con ruido. Solo aparece mientras el chofer espera
+/// en el punto.
+///
+/// Que exista es lo que impide subirse al auto equivocado, y también que un
+/// chofer arranque el cobro sin haber recogido a nadie.
+class _CodigoDeInicio extends StatelessWidget {
+  const _CodigoDeInicio({required this.codigo});
+
+  final String codigo;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: ride.accentSoft,
+        borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+        border: Border.all(color: ride.accent.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock_outline, size: 17, color: ride.accent),
+              const SizedBox(width: 8),
+              Text(
+                'CÓDIGO PARA INICIAR',
+                style: TextStyle(
+                  fontSize: 11,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w800,
+                  color: ride.accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            // Separado de dos en dos: así se dicta sin equivocarse.
+            '${codigo.substring(0, 2)} ${codigo.substring(2, 4)} '
+            '${codigo.substring(4, 6)}',
+            style: AppTheme.display(
+              38,
+              color: ride.ink,
+              letterSpacing: 4,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Dáselo a tu chofer para que empiece el viaje. No se lo des a '
+            'nadie más.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.4,
+              color: ride.inkMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Aviso de que el alfiler del chofer no se ha movido en un rato.
+///
+/// Si su teléfono se queda sin datos, la última posición se congela y el mapa
+/// sigue enseñando el auto ahí, quieto, como si fuera actual. Quien espera se
+/// queda mirando algo que ya no es verdad. Decirlo cuesta una línea.
+class _PosicionVieja extends StatelessWidget {
+  const _PosicionVieja({required this.posicion});
+
+  final DriverPosition posicion;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: ride.infoSoft,
+        borderRadius: BorderRadius.circular(AppTheme.radiusField),
+        border: Border.all(color: ride.info.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.gps_off_outlined, size: 18, color: ride.info),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Text(
+              'La posición del chofer es de ${posicion.cuandoTexto}. Puede que '
+              'se haya quedado sin señal; el punto del mapa no está al día.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: ride.ink,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
