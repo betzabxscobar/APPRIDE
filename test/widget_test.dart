@@ -16,6 +16,7 @@ import 'package:ride/services/routing_service.dart';
 import 'package:ride/widgets/ride_map.dart';
 import 'package:ride/models/trip.dart';
 import 'package:ride/models/user_role.dart';
+import 'package:ride/models/vehicle_category.dart';
 import 'package:ride/models/vehicle.dart';
 import 'package:ride/screens/auth/auth_screen.dart';
 import 'package:ride/screens/home/account_sheet.dart';
@@ -797,13 +798,13 @@ void main() {
       // como encontrar a la persona justo cuando mas falta hace.
       final conReferencia = Trip.fromMap({
         ...viaje.toMap(),
-        'origen_referencia': 'Edificio del Instituto Sudamericano, porton azul',
+        'origen_referencia': 'Edificio Blanco con porton azul, 3 pisos',
         'destino_referencia': 'Entrada por la calle de atras',
       });
       final copia = Trip.fromMap(conReferencia.toMap());
 
       expect(copia.origenReferencia,
-          'Edificio del Instituto Sudamericano, porton azul');
+          'Edificio Blanco con porton azul, 3 pisos');
       expect(copia.destinoReferencia, 'Entrada por la calle de atras');
     });
 
@@ -979,6 +980,63 @@ void main() {
       final conductor = DriverReview.fromMap(fila(nombre: null));
       expect(conductor.nombre, 'javier');
       expect(conductor.iniciales, 'J');
+    });
+  });
+
+  group('Tipos de vehiculo', () {
+    VehicleCategory cat(String id, String icono, int pasajeros) =>
+        VehicleCategory.fromMap({
+          'id': id,
+          'nombre': id,
+          'descripcion': '',
+          'pasajeros': pasajeros,
+          'icono': icono,
+          'orden': 1,
+        });
+
+    test('Cada tipo tiene su propio icono', () {
+      final iconos = {
+        for (final i in ['moto', 'auto', 'confort', 'van'])
+          i: VehicleCategory.iconoDe(i),
+      };
+      // Cuatro tipos, cuatro dibujos distintos: si dos compartieran icono, en
+      // el selector no se distinguirian de un vistazo.
+      expect(iconos.values.toSet().length, 4);
+    });
+
+    test('Un icono desconocido no rompe la pantalla', () {
+      // La base puede ganar una categoria nueva sin que la app se actualice.
+      expect(VehicleCategory.iconoDe('helicoptero'), isNotNull);
+      expect(VehicleCategory.iconoDe(null), isNotNull);
+    });
+
+    test('La capacidad se escribe en singular y en plural', () {
+      expect(cat('moto', 'moto', 1).capacidad, '1 pasajero');
+      expect(cat('xl', 'van', 6).capacidad, 'hasta 6 pasajeros');
+    });
+
+    test('El precio de cada tipo llega del servidor, no se calcula aqui', () {
+      // Se leen tal cual: multiplicarlos en el cliente por el factor daria
+      // numeros que no cuadran con el cobro, porque el redondeo y la carrera
+      // minima no son lineales.
+      final q = CategoryQuote.fromMap({
+        'categoria': 'moto',
+        'nombre': 'Moto',
+        'descripcion': 'Rapido y economico',
+        'pasajeros': 1,
+        'icono': 'moto',
+        'orden': 1,
+        'total': 3.56,
+        'distancia_km': 6.2,
+        'minutos_estimados': 14,
+        'gana_conductor': 3.03,
+        'aplico_minima': false,
+      });
+
+      expect(q.categoria.id, 'moto');
+      expect(q.total, 3.56);
+      expect(q.ganaConductor, 3.03);
+      expect(q.categoria.capacidad, '1 pasajero');
     });
   });
 

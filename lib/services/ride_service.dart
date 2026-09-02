@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../models/trip.dart';
+import '../models/vehicle_category.dart';
 import 'auth_service.dart';
 import 'h3_service.dart';
 
@@ -29,7 +30,8 @@ class RideService {
     conductor_nombre, conductor_telefono, conductor_calificacion,
     vehiculo_placa, vehiculo_marca, vehiculo_modelo, vehiculo_color,
     origen_lat, origen_lng, origen_texto, origen_referencia,
-    destino_lat, destino_lng, destino_texto, destino_referencia
+    destino_lat, destino_lng, destino_texto, destino_referencia,
+    categoria, categoria_nombre, categoria_icono
   ''';
 
   // ---------------------------------------------------------------------------
@@ -59,6 +61,7 @@ class RideService {
     required double destinoLng,
     double? distanciaKm,
     String? tarifaId,
+    String categoria = VehicleCategory.idPorDefecto,
   }) async {
     final rows = await _client.rpc('cotizar_viaje', params: {
       'p_origen_lat': origenLat,
@@ -71,6 +74,8 @@ class RideService {
       'p_distancia_km': distanciaKm,
       // Normalmente null: la tarifa la elige el servidor por la hora.
       'p_tarifa_id': tarifaId,
+      // El tipo de vehículo multiplica el total, mínima incluida.
+      'p_categoria': categoria,
     }) as List<dynamic>;
 
     if (rows.isEmpty) {
@@ -79,6 +84,46 @@ class RideService {
     return Quote.fromMap(Map<String, dynamic>.from(rows.first as Map));
   }
 
+
+  /// El precio de **cada** tipo de vehículo para el mismo trayecto.
+  ///
+  /// Una sola llamada en vez de una por categoría, y los números salen del
+  /// servidor ya calculados: multiplicarlos aquí por el factor daría cifras
+  /// que no cuadran con lo que se cobra, porque el redondeo y la carrera
+  /// mínima no son lineales.
+  Future<List<CategoryQuote>> cotizarCategorias({
+    required double origenLat,
+    required double origenLng,
+    required double destinoLat,
+    required double destinoLng,
+    double? distanciaKm,
+  }) async {
+    final rows = await _client.rpc('cotizar_categorias', params: {
+      'p_origen_lat': origenLat,
+      'p_origen_lng': origenLng,
+      'p_destino_lat': destinoLat,
+      'p_destino_lng': destinoLng,
+      'p_distancia_km': distanciaKm,
+    }) as List<dynamic>;
+
+    return [
+      for (final r in rows)
+        CategoryQuote.fromMap(Map<String, dynamic>.from(r as Map)),
+    ];
+  }
+
+  /// Los tipos de vehículo disponibles, sin precios.
+  ///
+  /// Lo usa el formulario del vehículo del chofer, donde no hay trayecto que
+  /// cotizar.
+  Future<List<VehicleCategory>> categorias() async {
+    final rows = await _client
+        .from('categorias_vehiculo')
+        .select('id, nombre, descripcion, factor, pasajeros, icono, orden')
+        .eq('activo', true)
+        .order('orden');
+    return rows.map(VehicleCategory.fromMap).toList();
+  }
 
   /// Crea la solicitud. Devuelve el id del viaje.
   Future<String> solicitar({
@@ -92,6 +137,7 @@ class RideService {
     String? destinoReferencia,
     double? distanciaKm,
     String? tarifaId,
+    String categoria = VehicleCategory.idPorDefecto,
   }) async {
     // El disco de celdas se calcula aquí porque una política RLS no puede
     // generarlo: H3 no existe dentro de Postgres. Si va en null, la difusión
@@ -114,6 +160,7 @@ class RideService {
       // los espacios y guarda null si viene vacío.
       'p_origen_referencia': origenReferencia,
       'p_destino_referencia': destinoReferencia,
+      'p_categoria': categoria,
     });
   }
 
@@ -175,7 +222,35 @@ class RideService {
         .eq('estado', 'BUSCANDO_CONDUCTOR')
         .isFilter('conductor_id', null)
         .order('fecha_solicitud');
-    return rows.map(Trip.fromMap).toList();
+
+    final viajes = rows.map(Trip.fromMap).toList();
+
+    // Solo las del tipo de vehículo que conduce.
+    //
+    // `aceptar_viaje` ya lo rechaza en el servidor, pero enseñarle a un
+    // motorizado viajes que piden una van solo sirve para que toque «Aceptar»
+    // y se lleve un error. El filtro de verdad está en la base; este es para
+    // no ofrecer lo que va a fallar.
+    final mia = await categoriaDeMiVehiculo();
+    if (mia == null) return viajes;
+    return viajes.where((v) => v.categoria == null || v.categoria == mia).toList();
+  }
+
+  /// Categoría del vehículo que el chofer tiene en servicio, o `null`.
+  Future<String?> categoriaDeMiVehiculo() async {
+    final uid = AuthService.instance.currentUser?.id;
+    if (uid == null) return null;
+    try {
+      final fila = await _client
+          .from('vehiculos')
+          .select('categoria')
+          .eq('conductor_id', uid)
+          .eq('activo', true)
+          .maybeSingle();
+      return fila?['categoria'] as String?;
+    } on sb.PostgrestException {
+      return null;
+    }
   }
 
   /// Toma una solicitud. Falla si otro chofer se adelantó.

@@ -162,6 +162,9 @@ class Trip {
     required this.destinoTexto,
     this.origenReferencia,
     this.destinoReferencia,
+    this.categoria,
+    this.categoriaNombre,
+    this.categoriaIcono,
     this.origenLat,
     this.origenLng,
     this.destinoLat,
@@ -201,6 +204,13 @@ class Trip {
   /// palabras, y el chofer lo lee antes de salir.
   final String? origenReferencia;
   final String? destinoReferencia;
+
+  /// Tipo de vehículo que se pidió: `moto`, `estandar`, `confort`, `xl`.
+  ///
+  /// Puede ser `null` en viajes anteriores a que existieran las categorías.
+  final String? categoria;
+  final String? categoriaNombre;
+  final String? categoriaIcono;
 
   final double? origenLat;
   final double? origenLng;
@@ -248,6 +258,9 @@ class Trip {
         'destino_texto': destinoTexto,
         'origen_referencia': origenReferencia,
         'destino_referencia': destinoReferencia,
+        'categoria': categoria,
+        'categoria_nombre': categoriaNombre,
+        'categoria_icono': categoriaIcono,
         'origen_lat': origenLat,
         'origen_lng': origenLng,
         'destino_lat': destinoLat,
@@ -282,6 +295,9 @@ class Trip {
         destinoTexto: (row['destino_texto'] as String?) ?? 'Destino',
         origenReferencia: row['origen_referencia'] as String?,
         destinoReferencia: row['destino_referencia'] as String?,
+        categoria: row['categoria'] as String?,
+        categoriaNombre: row['categoria_nombre'] as String?,
+        categoriaIcono: row['categoria_icono'] as String?,
         origenLat: _double(row['origen_lat']),
         origenLng: _double(row['origen_lng']),
         destinoLat: _double(row['destino_lat']),

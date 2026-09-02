@@ -7,10 +7,12 @@ import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../../core/app_theme.dart';
 import '../../core/ride_colors.dart';
 import '../../models/trip.dart';
+import '../../models/vehicle_category.dart';
 import '../../services/location_service.dart';
 import '../../services/ride_service.dart';
 import '../../services/trip_session_store.dart';
 import '../../widgets/auth_feedback.dart';
+import '../../widgets/category_chip.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/trip_route_map.dart';
 import 'rate_trip_sheet.dart';
@@ -364,6 +366,14 @@ class _ListaSolicitudes extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: CategoryChip(
+                    nombre: viaje.categoriaNombre,
+                    icono: viaje.categoriaIcono,
+                  ),
+                ),
                 const SizedBox(height: 10),
                 _MiniRuta(viaje: viaje),
                 const SizedBox(height: 12),
@@ -434,7 +444,11 @@ class _ViajeActivo extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(Icons.local_taxi, size: 20, color: viaje.status.color),
+              Icon(
+                VehicleCategory.iconoDe(viaje.categoriaIcono),
+                size: 20,
+                color: viaje.status.color,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(

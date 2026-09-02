@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/ride_colors.dart';
 import '../../models/fleet.dart';
+import '../../models/vehicle_category.dart';
 import '../../services/fleet_service.dart';
 import '../../services/ride_service.dart';
 import '../../widgets/auth_feedback.dart';
@@ -44,6 +45,10 @@ class _FormularioVehiculoState extends State<_FormularioVehiculo> {
   bool _guardando = false;
   String? _error;
 
+  /// Tipos de vehículo, del catálogo de la base. Vacío mientras cargan.
+  List<VehicleCategory> _categorias = const [];
+  late String _categoria;
+
   bool get _esEdicion => widget.vehiculo != null;
 
   @override
@@ -55,6 +60,20 @@ class _FormularioVehiculoState extends State<_FormularioVehiculo> {
     _modelo = TextEditingController(text: v?.modelo ?? '');
     _anio = TextEditingController(text: v?.anio.toString() ?? '');
     _color = TextEditingController(text: v?.color ?? '');
+    _categoria = v?.categoria ?? VehicleCategory.idPorDefecto;
+    _cargarCategorias();
+  }
+
+  /// El catálogo sale de la base, no está escrito aquí: si mañana se añade un
+  /// tipo nuevo, aparece solo.
+  Future<void> _cargarCategorias() async {
+    try {
+      final lista = await RideService.instance.categorias();
+      if (mounted) setState(() => _categorias = lista);
+    } catch (_) {
+      // Sin catálogo se guarda con el tipo que ya tenía —o el estándar— y el
+      // formulario sigue sirviendo para el resto de los datos.
+    }
   }
 
   @override
@@ -96,6 +115,7 @@ class _FormularioVehiculoState extends State<_FormularioVehiculo> {
         anio: int.parse(_anio.text.trim()),
         color: _color.text.trim().isEmpty ? null : _color.text.trim(),
         vehiculoId: widget.vehiculo?.id,
+        categoria: _categoria,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -201,6 +221,16 @@ class _FormularioVehiculoState extends State<_FormularioVehiculo> {
                   ),
                 ],
               ),
+              if (_categorias.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                _TipoDeVehiculo(
+                  opciones: _categorias,
+                  elegida: _categoria,
+                  onElegir: _guardando
+                      ? null
+                      : (id) => setState(() => _categoria = id),
+                ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: 14),
                 ErrorBanner(message: _error!),
@@ -217,6 +247,126 @@ class _FormularioVehiculoState extends State<_FormularioVehiculo> {
                 onPressed:
                     _guardando ? null : () => Navigator.of(context).pop(false),
                 child: const Text('Cancelar'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// De qué tipo es el vehículo: moto, auto, confort o van.
+///
+/// No es un adorno: decide qué viajes le llegan al chofer y a qué precio se
+/// cobran. Un motorizado no ve las solicitudes que pidieron una van, y al
+/// revés.
+class _TipoDeVehiculo extends StatelessWidget {
+  const _TipoDeVehiculo({
+    required this.opciones,
+    required this.elegida,
+    required this.onElegir,
+  });
+
+  final List<VehicleCategory> opciones;
+  final String elegida;
+  final ValueChanged<String>? onElegir;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'TIPO DE VEHÍCULO',
+          style: TextStyle(
+            fontSize: 11,
+            letterSpacing: 1.1,
+            fontWeight: FontWeight.w800,
+            color: ride.inkMuted,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Decide qué viajes puedes tomar.',
+          style: TextStyle(fontSize: 11.5, color: ride.inkMuted),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final c in opciones)
+              _Ficha(
+                categoria: c,
+                seleccionada: c.id == elegida,
+                onTap: onElegir == null ? null : () => onElegir!(c.id),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _Ficha extends StatelessWidget {
+  const _Ficha({
+    required this.categoria,
+    required this.seleccionada,
+    required this.onTap,
+  });
+
+  final VehicleCategory categoria;
+  final bool seleccionada;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return Material(
+      color: seleccionada ? ride.accentSoft : ride.background,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: seleccionada ? ride.accent : ride.border,
+              width: seleccionada ? 1.8 : 1.2,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                categoria.icon,
+                size: 22,
+                color: seleccionada ? ride.accent : ride.inkMuted,
+              ),
+              const SizedBox(width: 9),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    categoria.nombre,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: ride.ink,
+                    ),
+                  ),
+                  Text(
+                    categoria.capacidad,
+                    style: TextStyle(fontSize: 10.5, color: ride.inkMuted),
+                  ),
+                ],
               ),
             ],
           ),

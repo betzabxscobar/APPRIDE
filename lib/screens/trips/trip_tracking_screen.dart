@@ -10,6 +10,7 @@ import '../../models/trip.dart';
 import '../../services/ride_service.dart';
 import '../../services/trip_session_store.dart';
 import '../../widgets/auth_feedback.dart';
+import '../../widgets/category_chip.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/trip_route_map.dart';
 import 'rate_trip_sheet.dart';
@@ -518,13 +519,25 @@ class _TarjetaPrecio extends StatelessWidget {
           Icon(Icons.payments_outlined, size: 20, color: context.ride.inkMuted),
           const SizedBox(width: 13),
           Expanded(
-            child: Text(
-              cerrado ? 'Total del viaje' : 'Precio estimado',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: context.ride.ink,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  cerrado ? 'Total del viaje' : 'Precio estimado',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: context.ride.ink,
+                  ),
+                ),
+                if (viaje.categoriaNombre != null) ...[
+                  const SizedBox(height: 6),
+                  CategoryChip(
+                    nombre: viaje.categoriaNombre,
+                    icono: viaje.categoriaIcono,
+                  ),
+                ],
+              ],
             ),
           ),
           Text(

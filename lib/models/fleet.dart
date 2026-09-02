@@ -13,6 +13,7 @@ class FleetVehicle {
     required this.anio,
     required this.activo,
     this.color,
+    this.categoria = 'estandar',
   });
 
   final String id;
@@ -22,6 +23,9 @@ class FleetVehicle {
   final int anio;
   final bool activo;
   final String? color;
+
+  /// `moto`, `estandar`, `confort` o `xl`. Decide qué viajes puede tomar.
+  final String categoria;
 
   String get resumen => '$marca $modelo · $anio';
 
@@ -33,6 +37,7 @@ class FleetVehicle {
         anio: (row['anio'] as num).toInt(),
         activo: row['activo'] as bool,
         color: row['color'] as String?,
+        categoria: (row['categoria'] as String?) ?? 'estandar',
       );
 }
 

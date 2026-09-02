@@ -115,3 +115,53 @@ Sin esto la tarifa se quedaba un ~19 % corta en ese trayecto, porque cobraba
   `public.factor_trayecto_urbano()` y `public.velocidad_media_kmh()`.
 - **Cómo se elige la tarifa**: `public.tarifa_vigente()`.
 - **La fórmula**: `public.cotizar_viaje()`.
+
+## Tipos de vehiculo (2026-08-31)
+
+Moto, Estandar, Confort y XL, como en Uber e inDrive.
+
+**La tarifa no se duplica.** Sigue siendo la de `public.tarifas`, con su diurna,
+nocturna y hora pico. Cada tipo solo aplica un **factor** sobre ese precio, asi
+que cambiar la tarifa de la noche sigue afectando a los cuatro a la vez.
+
+| Tipo | Factor | Pasajeros | Ejemplo (viaje de 6,2 km) |
+|---|---|---|---|
+| Moto | 0,65 | 1 | 3,56 |
+| Estandar | 1,00 | 4 | 5,47 |
+| Confort | 1,30 | 4 | 7,11 |
+| XL | 1,55 | 6 | 8,48 |
+
+El factor multiplica **tambien la carrera minima**. Si solo multiplicara el
+bruto, un viaje corto en moto costaria lo mismo que en auto: la minima se lo
+comeria. La minima tambien es un precio.
+
+> **Los factores son una propuesta, no un dato municipal.** La referencia de
+> Quito solo tarifa taxis; no dice nada de motos ni de vans. El 0,65 de la moto
+> sigue lo que hacen inDrive y Uber Moto en la region, donde va entre un 35 y un
+> 45 % por debajo del auto. Se cambian con un UPDATE sobre
+> `public.categorias_vehiculo`, sin recompilar la app:
+>
+> ```sql
+> update public.categorias_vehiculo set factor = 0.70 where id = 'moto';
+> ```
+
+### Como encaja con el resto
+
+- El vehiculo del chofer tiene categoria (`vehiculos.categoria`), y la elige al
+  registrarlo.
+- El viaje guarda la que se pidio (`viajes.categoria`).
+- `aceptar_viaje` **exige que coincidan**: quien conduce una moto no puede tomar
+  un viaje que pidio una van. Sin eso, alguien que pide sitio para seis podria
+  acabar con una moto en la puerta, y pagando precio de van.
+- La lista de solicitudes del chofer filtra ademas en el cliente, para no
+  ofrecerle un boton que el servidor va a rechazar.
+- `cotizar_categorias` devuelve el precio de los cuatro en **una sola llamada**.
+  El selector no los calcula multiplicando por el factor: el redondeo y la
+  minima no son lineales y el numero mostrado no cuadraria con el cobrado.
+
+### Los iconos
+
+La base guarda un nombre logico (`moto`, `auto`, `confort`, `van`) y la app lo
+traduce a un icono de Material. No se guardan iconos en Postgres: un `IconData`
+es un numero de la fuente de iconos de Flutter, y guardarlo ataria la base a una
+version concreta del framework.

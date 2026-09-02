@@ -30,7 +30,7 @@ class FleetService {
   Future<List<FleetVehicle>> misVehiculos() async {
     final rows = await _client
         .from('vehiculos')
-        .select('id, placa, marca, modelo, anio, color, activo')
+        .select('id, placa, marca, modelo, anio, color, activo, categoria')
         .eq('conductor_id', _uid)
         .order('activo', ascending: false)
         .order('created_at');
@@ -48,6 +48,7 @@ class FleetService {
     required int anio,
     String? color,
     String? vehiculoId,
+    String categoria = 'estandar',
   }) async {
     return _rpc<String>('registrar_vehiculo', {
       'p_placa': placa,
@@ -56,6 +57,8 @@ class FleetService {
       'p_anio': anio,
       'p_color': color,
       'p_vehiculo_id': vehiculoId,
+      // De qué tipo es: decide qué viajes puede tomar y a qué precio.
+      'p_categoria': categoria,
     });
   }
 

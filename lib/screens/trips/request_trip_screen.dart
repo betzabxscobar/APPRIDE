@@ -8,6 +8,7 @@ import '../../core/app_theme.dart';
 import '../../core/ride_colors.dart';
 import '../../core/map_defaults.dart';
 import '../../models/trip.dart';
+import '../../models/vehicle_category.dart';
 import '../../services/geocoding_service.dart';
 import '../../services/location_service.dart';
 import '../../services/places_service.dart';
@@ -34,6 +35,13 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
   GeoPlace? _origen;
   GeoPlace? _destino;
   Quote? _cotizacion;
+
+  /// Precio de cada tipo de vehículo para este trayecto, tal como lo devuelve
+  /// el servidor. Vacío mientras no hay origen y destino.
+  List<CategoryQuote> _porCategoria = const [];
+
+  /// El tipo elegido. Arranca en el estándar, que es lo que la base asume.
+  String _categoria = VehicleCategory.idPorDefecto;
 
   /// Lo que el pasajero escribe para que le encuentren.
   ///
@@ -169,6 +177,7 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
     setState(() {
       _cotizando = true;
       _cotizacion = null;
+      _porCategoria = const [];
       _ruta = null;
     });
 
@@ -185,14 +194,27 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
   /// línea recta, que es el mínimo físico, antes de usarlos.
   Future<void> _pedirPrecio(GeoPlace o, GeoPlace d, {double? km}) async {
     try {
-      final q = await RideService.instance.cotizar(
+      // Una sola llamada trae el precio de los cuatro tipos. Antes se pedía
+      // uno solo; con el selector hacen falta todos, y calcularlos aquí
+      // multiplicando por el factor daría números que no cuadran con el cobro.
+      final lista = await RideService.instance.cotizarCategorias(
         origenLat: o.lat,
         origenLng: o.lng,
         destinoLat: d.lat,
         destinoLng: d.lng,
         distanciaKm: km,
       );
-      if (mounted && _sigueVigente(o, d)) setState(() => _cotizacion = q);
+      if (!mounted || !_sigueVigente(o, d)) return;
+
+      setState(() {
+        _porCategoria = lista;
+        // Si el tipo elegido dejó de estar disponible, se vuelve al primero.
+        if (!lista.any((c) => c.categoria.id == _categoria) &&
+            lista.isNotEmpty) {
+          _categoria = lista.first.categoria.id;
+        }
+        _cotizacion = _quoteDe(_categoria);
+      });
     } on RideException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -222,6 +244,7 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
         distanciaKm: _ruta == null ? null : _ruta!.metros / 1000,
         // Va con el origen: es donde alguien tiene que encontrarte.
         origenReferencia: _referenciaChofer.text,
+        categoria: _categoria,
       );
 
       // El historial se guarda después de que el viaje existe: si fallara,
@@ -241,6 +264,24 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
   void dispose() {
     _referenciaChofer.dispose();
     super.dispose();
+  }
+
+  /// La cotización del tipo elegido, en el formato que ya usa la pantalla.
+  Quote? _quoteDe(String categoria) {
+    for (final c in _porCategoria) {
+      if (c.categoria.id != categoria) continue;
+      return Quote(
+        tarifaId: '',
+        tarifaNombre: c.categoria.nombre,
+        km: c.distanciaKm,
+        minutos: c.minutos,
+        total: c.total,
+        ganaConductor: c.ganaConductor,
+        comisionApp: c.total - c.ganaConductor,
+        aplicoMinima: c.aplicoMinima,
+      );
+    }
+    return null;
   }
 
   bool get _listo =>
@@ -341,6 +382,17 @@ class _RequestTripScreenState extends State<RequestTripScreen> {
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(46),
                     ),
+                  ),
+                ],
+                if (_porCategoria.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  _SelectorCategoria(
+                    opciones: _porCategoria,
+                    elegida: _categoria,
+                    onElegir: (id) => setState(() {
+                      _categoria = id;
+                      _cotizacion = _quoteDe(id);
+                    }),
                   ),
                 ],
                 const SizedBox(height: 18),
@@ -456,6 +508,152 @@ class _Punto extends StatelessWidget {
             ),
             Icon(Icons.chevron_right, size: 20, color: context.ride.inkMuted),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Elegir moto, auto, confort o van, con su precio real al lado.
+///
+/// Los precios vienen del servidor, uno por categoría. No se calculan aquí
+/// multiplicando por el factor: el redondeo y la carrera mínima harían que el
+/// número mostrado no coincidiera con el cobrado, y eso en una app de viajes
+/// se lee como un engaño.
+class _SelectorCategoria extends StatelessWidget {
+  const _SelectorCategoria({
+    required this.opciones,
+    required this.elegida,
+    required this.onElegir,
+  });
+
+  final List<CategoryQuote> opciones;
+  final String elegida;
+  final ValueChanged<String> onElegir;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'ELIGE TU VEHÍCULO',
+          style: TextStyle(
+            fontSize: AppText.micro,
+            letterSpacing: 1.1,
+            fontWeight: FontWeight.w800,
+            color: ride.inkMuted,
+          ),
+        ),
+        const SizedBox(height: 10),
+        for (final o in opciones) ...[
+          _OpcionCategoria(
+            opcion: o,
+            seleccionada: o.categoria.id == elegida,
+            onTap: () => onElegir(o.categoria.id),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+}
+
+class _OpcionCategoria extends StatelessWidget {
+  const _OpcionCategoria({
+    required this.opcion,
+    required this.seleccionada,
+    required this.onTap,
+  });
+
+  final CategoryQuote opcion;
+  final bool seleccionada;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+    final cat = opcion.categoria;
+
+    return Material(
+      color: seleccionada ? ride.accentSoft : ride.surface,
+      borderRadius: BorderRadius.circular(AppTheme.radiusField),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppTheme.radiusField),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppTheme.radiusField),
+            border: Border.all(
+              color: seleccionada ? ride.accent : ride.border,
+              width: seleccionada ? 1.8 : 1.2,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                cat.icon,
+                size: 28,
+                color: seleccionada ? ride.accent : ride.inkMuted,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          cat.nombre,
+                          style: TextStyle(
+                            fontSize: AppText.small,
+                            fontWeight: FontWeight.w800,
+                            color: ride.ink,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.person_outline,
+                          size: 13,
+                          color: ride.inkFaint,
+                        ),
+                        Text(
+                          '${cat.pasajeros}',
+                          style: TextStyle(
+                            fontSize: AppText.micro,
+                            fontWeight: FontWeight.w700,
+                            color: ride.inkFaint,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      cat.descripcion,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: AppText.micro,
+                        color: ride.inkMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '\$${opcion.total.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: AppText.h3,
+                  fontWeight: FontWeight.w900,
+                  color: seleccionada ? ride.accent : ride.ink,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

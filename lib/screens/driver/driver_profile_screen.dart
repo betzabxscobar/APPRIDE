@@ -9,6 +9,7 @@ import '../../models/fleet.dart';
 import '../../services/fleet_service.dart';
 import '../../services/ride_service.dart';
 import '../../widgets/auth_feedback.dart';
+import '../../widgets/category_chip.dart';
 import '../../widgets/ride_card.dart';
 import 'vehicle_form_sheet.dart';
 
@@ -364,6 +365,11 @@ class _TarjetaVehiculo extends StatelessWidget {
                   '${vehiculo.placa}${vehiculo.color == null ? '' : ' · ${vehiculo.color}'}',
                   style: TextStyle(fontSize: 12, color: context.ride.inkMuted),
                 ),
+                const SizedBox(height: 6),
+                CategoryChip(
+                  nombre: _nombreCategoria(vehiculo.categoria),
+                  icono: _iconoCategoria(vehiculo.categoria),
+                ),
               ],
             ),
           ),
@@ -507,3 +513,24 @@ class _Vacio extends StatelessWidget {
     );
   }
 }
+
+/// Nombre visible de una categoría a partir de su id.
+///
+/// Se resuelve aquí y no consultando `categorias_vehiculo` porque esta tarjeta
+/// ya tiene el id y una consulta más solo para el rótulo no compensa. Si
+/// llegara un id desconocido —una categoría nueva— se muestra tal cual, que es
+/// mejor que no mostrar nada.
+String _nombreCategoria(String id) => switch (id) {
+      'moto' => 'Moto',
+      'estandar' => 'Estándar',
+      'confort' => 'Confort',
+      'xl' => 'XL',
+      _ => id,
+    };
+
+String _iconoCategoria(String id) => switch (id) {
+      'moto' => 'moto',
+      'confort' => 'confort',
+      'xl' => 'van',
+      _ => 'auto',
+    };
