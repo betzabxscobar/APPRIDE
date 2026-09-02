@@ -5,8 +5,8 @@ puede manipular, así que no puede ser quien diga cuánto cuesta un viaje.
 
 ## Los valores
 
-Salen de las tarifas referenciales de taxi de Quito, **con un 10 % menos** por
-ser aplicativo:
+**Vigentes desde el 2026-09-02.** Salen de las tarifas referenciales de taxi
+de Quito, **con un 10 % menos** por ser aplicativo:
 
 | | Arranque | Por km | Por minuto | Carrera mínima |
 |---|---|---|---|---|
@@ -27,6 +27,23 @@ de noche (0,56 / 0,43 = 1,30).
 > **La hora pico es una suposición.** La referencia municipal no la trae; se
 > dejó a medio camino entre diurna y nocturna (+15 % sobre la diurna). Si hay un
 > número oficial, cambiarlo en la tabla `tarifas`.
+
+## La formula
+
+```
+total = max( (arranque + por_km x km) x factor_del_vehiculo ,
+             carrera_minima x factor_del_vehiculo )
+```
+
+> **`costo_por_minuto` no entra en la cuenta.** La columna existe y se guarda,
+> pero `cotizar_viaje` no la usa: representa tiempo de espera, y una cotizacion
+> hecha antes de salir no sabe cuantos minutos va a estar el auto detenido. Los
+> `minutos_estimados` que devuelve la funcion son para enseñarlos, no para
+> cobrarlos. Cambiar esa columna no cambia lo que paga nadie.
+
+Los factores por tipo de vehiculo —moto 0,65, estandar 1,00, confort 1,30 y
+XL 1,55— multiplican tanto el precio como la carrera minima, asi que la tabla
+de arriba es la de **Estandar** y el resto sale de ahi.
 
 ## El reparto
 
@@ -166,7 +183,13 @@ traduce a un icono de Material. No se guardan iconos en Postgres: un `IconData`
 es un numero de la fuente de iconos de Flutter, y guardarlo ataria la base a una
 version concreta del framework.
 
-## Bajada de precios frente a inDrive (2026-09-01)
+## Bajada de precios frente a inDrive (2026-09-01, revertida el 2026-09-02)
+
+> **Esto ya no esta vigente.** El 2026-09-02 los precios volvieron a los de la
+> tabla de arriba, porque asi se pidio. Queda escrito porque la medicion sigue
+> siendo buena y el problema que describe no se ha ido: con las tarifas de hoy,
+> Ride vuelve a estar por encima de inDrive en el unico trayecto que se midio
+> de verdad.
 
 Medido en Quito, mismo trayecto de 8,4 km hasta la Universidad Central:
 inDrive recomendaba **3,10** y Ride cobraba **4,85**.
@@ -191,7 +214,7 @@ Dos cambios:
 
 Resultado en ese mismo viaje de 8,4 km:
 
-| | Antes | Ahora | inDrive |
+| | Antes, y otra vez hoy | Con la bajada | inDrive |
 |---|---|---|---|
 | Estandar de dia | 3,78 | **2,92** | 3,10 |
 | Estandar de noche | 4,85 | **3,41** | 3,10 |
@@ -199,8 +222,9 @@ Resultado en ese mismo viaje de 8,4 km:
 
 ### Lo que cuesta, y hay que vigilarlo
 
-El chofer se lleva el 85 % de una tarifa mas baja. Ese mismo viaje le pagaba
-**4,12** de noche y ahora le paga **2,90**.
+El chofer se lleva el 85 % de la tarifa. Con la bajada, ese mismo viaje pasaba
+de pagarle **4,12** de noche a **2,90**. Al revertirse vuelve a pagarle 4,12,
+asi que hoy este riesgo no aplica; aplicaria de nuevo si se vuelve a bajar.
 
 El cuello de botella de una app de viajes son los choferes, no los pasajeros.
 Si dejan de conectarse, el numero a mover es este —y la palanca es la tarifa,
