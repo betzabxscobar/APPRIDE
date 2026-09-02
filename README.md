@@ -8,6 +8,12 @@ de validación.
 Los dos clientes comparten autenticación, perfiles, viajes, flota, pagos,
 notificaciones y políticas de seguridad en el mismo proyecto de Supabase.
 
+La superficie que consume la app —funciones, tablas, Realtime y Storage— está
+documentada en [`docs/API.md`](docs/API.md). El mapa, en
+[`docs/MAPA.md`](docs/MAPA.md); el buscador de direcciones, en
+[`docs/BUSCADOR.md`](docs/BUSCADOR.md); los precios, en
+[`docs/TARIFAS.md`](docs/TARIFAS.md).
+
 ## Credenciales del equipo administrativo
 
 Las contraseñas temporales **no están en el código**. Se pasan al compilar
@@ -96,9 +102,12 @@ actual de `main`.
 **Actor:** pasajero autenticado.
 
 1. El pasajero selecciona **Pedir un viaje**.
-2. Define el origen con el GPS o el catálogo y selecciona un destino disponible.
-3. El sistema calcula en el servidor la distancia y la tarifa estimada.
-4. El pasajero confirma la cotización.
+2. Define el origen con el GPS o el buscador y selecciona un destino.
+3. Puede añadir una referencia escrita del punto de recogida —«portón verde,
+   junto a la farmacia»— para que el chofer no dé vueltas.
+4. El sistema cotiza en el servidor los cuatro tipos de vehículo con la misma
+   distancia (`cotizar_categorias`) y el pasajero elige uno.
+5. El pasajero confirma la cotización.
 
 **Resultado:** el viaje queda en búsqueda de conductor y se abre su seguimiento.
 
@@ -128,10 +137,12 @@ actual de `main`.
 
 **Actor:** conductor asignado.
 
-1. El conductor informa sucesivamente que va en camino, llegó al origen e inició el viaje.
-2. Al terminar, selecciona **Finalizar viaje**.
-3. El sistema liquida la tarifa y cierra el recorrido.
-4. El conductor puede calificar al pasajero una sola vez.
+1. El conductor informa sucesivamente que va en camino y que llegó al origen.
+2. Para iniciar el recorrido pide al pasajero el código de seis dígitos y lo
+   escribe (ver CU-A19); sin él, el viaje no arranca.
+3. Al terminar, selecciona **Finalizar viaje**.
+4. El sistema liquida la tarifa y cierra el recorrido.
+5. El conductor puede calificar al pasajero una sola vez.
 
 **Resultado:** el viaje y su cobro quedan finalizados con su historial de estados.
 
@@ -173,8 +184,8 @@ la administración revisa antes de habilitarlo.
 **Actor:** pasajero autenticado.
 
 1. El pasajero busca una dirección o toca directamente un punto del mapa.
-2. La búsqueda se limita a su región y usa TomTom cuando hay una clave válida;
-   en caso contrario utiliza Photon/OpenStreetMap.
+2. La búsqueda se acota a Ecuador y usa TomTom cuando hay una clave válida; en
+   caso contrario utiliza Photon/OpenStreetMap, que en Quito responde peor.
 3. Puede guardar lugares como favoritos y reutilizarlos en viajes posteriores.
 4. La app dibuja el recorrido por calles entre origen y destino con OSRM.
 
@@ -255,19 +266,157 @@ como notificación.
 lo que faltaba era el camino de vuelta y una copia local para pintarlo sin
 esperar a la red.
 
+### CU-A18. Hablar con la otra parte del viaje
+
+**Actor:** pasajero y conductor asignado.
+
+1. Con el viaje ya aceptado, cualquiera de los dos abre el chat desde el
+   seguimiento.
+2. Escribe un mensaje corto: «estoy en la puerta de atrás», «ya salgo», «me
+   dejé la mochila».
+3. El otro lo recibe por Realtime y el botón enseña cuántos quedan sin leer.
+
+**Resultado:** las dos partes se coordinan sin darse el número de teléfono. Los
+mensajes cuelgan del viaje, no de las personas: fuera de un viaje no hay bandeja
+que abrir, y el botón no aparece hasta que hay chofer asignado.
+
+### CU-A19. Verificar el inicio con el código de seis dígitos
+
+**Actor:** pasajero y conductor asignado.
+
+1. Cuando el chofer marca que llegó al origen, la base genera un código de seis
+   dígitos.
+2. El pasajero lo ve en su pantalla de seguimiento. El chofer no puede leerlo:
+   la política `codigos_solo_el_pasajero` no le entrega la fila.
+3. El pasajero se lo dicta y el chofer lo escribe para iniciar el recorrido.
+4. `avanzar_viaje` rechaza el salto si el código no coincide.
+
+**Resultado:** el viaje solo arranca con el pasajero correcto dentro del auto. El
+código vive en su propia tabla y no en una columna de `viajes` porque RLS filtra
+filas, no columnas.
+
+### CU-A20. Consultar el historial de viajes
+
+**Actor:** pasajero o conductor autenticado.
+
+1. El usuario abre la pestaña **Viajes**.
+2. Consulta sus viajes del más nuevo al más viejo, con su estado, su tipo de
+   vehículo y su total.
+3. Puede abrir cualquiera para volver a ver su seguimiento.
+
+**Resultado:** cada quien ve los suyos. La pantalla es la misma para los dos
+roles porque las políticas RLS ya limitan las filas; lo único que cambia es a
+quién se nombra en cada fila.
+
+### CU-A21. Consultar las ganancias
+
+**Actor:** conductor autenticado.
+
+1. El conductor abre la pestaña **Ganancias**.
+2. Consulta lo de hoy, la semana, el mes y el total desde que empezó: viajes
+   cerrados, lo que pagaron los pasajeros, lo que le queda y la comisión.
+
+**Resultado:** el chofer sabe cuánto lleva ganado. Los números los calcula
+`ganancias_conductor` en Postgres, no el teléfono, y cada viaje conserva el
+reparto de la tarifa con la que se cobró: cambiar el porcentaje hoy no reescribe
+lo ya ganado.
+
+### CU-A22. Abrir un caso de soporte
+
+**Actor:** pasajero o conductor autenticado.
+
+1. El usuario abre **Soporte** desde su configuración, o desde un viaje concreto.
+2. Elige una categoría, escribe el asunto y el mensaje.
+3. Consulta el estado de sus casos y la respuesta de la administración.
+
+**Resultado:** queda registrado el caso. Si se abrió desde un viaje, queda atado
+a él y la administración no tiene que preguntar de cuál se trata. El autor no
+puede editarlo después: cambiar el asunto ya respondido dejaría la respuesta sin
+sentido.
+
+### CU-A23. Atender los casos de soporte
+
+**Actor:** administrador o superadministrador.
+
+1. El usuario entra en **Soporte** y filtra por estado.
+2. Los casos que llevan más esperando salen primero: es una cola, no un muro.
+3. Abre uno, ve quién lo escribió y responde.
+
+**Resultado:** el caso queda respondido y su autor lee la respuesta en la app.
+Responder es solo de administración; cada quien lee los suyos y la
+administración los lee todos.
+
+### CU-A24. Supervisar los viajes de la plataforma
+
+**Actor:** administrador o superadministrador.
+
+1. El usuario entra en **Viajes** y filtra por estado: buscando, en curso,
+   finalizados o cancelados.
+2. Abre cualquiera para ver su seguimiento completo.
+
+**Resultado:** la administración ve todos los viajes. No lo filtra el cliente:
+`viajes_participante` incluye `es_administrativo()`, así que un pasajero que
+llamara a lo mismo seguiría viendo solo los suyos.
+
+### CU-A25. Ajustar tarifas y tipos de vehículo
+
+**Actor:** administrador o superadministrador.
+
+1. El usuario entra en **Tarifas** y ve las franjas —estándar, nocturna y hora
+   pico— con sus números.
+2. Cambia el arranque, el costo por kilómetro, la carrera mínima o el reparto
+   del chofer, con el cálculo de un viaje de ejemplo delante para no mover un
+   número a ciegas.
+3. Ajusta también los tipos de vehículo y su multiplicador.
+
+**Resultado:** el precio cambia sin publicar una versión nueva. La app valida
+antes de salir a la red —nada negativo, reparto entre 1 y 100 %, carrera mínima
+no menor que el arranque— y las políticas `tarifas_admin` y `categorias_admin`
+rechazan la escritura de cualquier otra cuenta. Los valores y de dónde salen
+están en [`docs/TARIFAS.md`](docs/TARIFAS.md).
+
+### CU-A26. Probar el flujo de conductor como superadministrador
+
+**Actor:** superadministrador.
+
+1. El usuario cambia a la vista de conductor.
+2. `preparar_chofer_superadmin` le crea —o le aprueba— su fila en `conductores`.
+3. Registra un vehículo y lo pone en servicio.
+
+**Resultado:** la intención es que recorra el ciclo entero sin esperar a que
+alguien apruebe su propia cuenta.
+
+> **Hoy no funciona.** `preparar_chofer_superadmin` solo tiene permiso de
+> ejecución para `service_role`, así que la llamada rebota con 42501 y la app se
+> lo traga en silencio: el superadministrador sigue viendo el bloqueo de cuenta
+> no aprobada. Falta el `grant execute … to authenticated`; el rol ya lo
+> comprueba la función por dentro. Ver [`docs/API.md`](docs/API.md).
+
 ## Alcance actual
 
-- En el panel administrativo móvil están conectados **Resumen**, **Usuarios** y
-  **Conductores**; Viajes, Tarifas y Soporte siguen siendo pantallas de espera.
+- Los seis módulos del panel administrativo móvil están conectados: **Resumen**,
+  **Usuarios**, **Conductores**, **Viajes**, **Tarifas** y **Soporte**. Ya no
+  queda ninguna pantalla de espera.
 - La recuperación abre el navegador porque aún no están configurados los enlaces
   profundos que devolverían al usuario directamente a la aplicación. Lo mismo
   vale para el enlace que confirma un cambio de correo.
 - Pasajero y conductor disponen de un mapa visual con ubicación, puntos del
   viaje, posición del conductor y ruta por calles cuando OSRM responde.
+- El mapa usa teselas **vectoriales** de OpenFreeMap con estilos propios para
+  claro y oscuro, sin claves ni cuotas. Los detalles están en
+  [`docs/MAPA.md`](docs/MAPA.md).
+- **No hay pasarela de pagos.** El único método real es el efectivo. La tarjeta
+  existe en el modelo de datos, pero registrarla exige la tokenización de una
+  pasarela: la app nunca pide ni almacena un número de tarjeta.
 - El precio siempre se calcula en Supabase; la distancia de OSRM se usa para
   presentar la ruta y no autoriza al cliente a fijar la tarifa.
 - El servidor público de OSRM sirve para desarrollo. Para producción debe
   configurarse uno propio siguiendo [`infra/osrm/README.md`](infra/osrm/README.md).
+- Un documento subido en PDF se identifica pero no se previsualiza en la
+  revisión: haría falta un visor de PDF y hoy no hay ninguno en el proyecto.
+- El seguimiento del chofer se refresca cada 30 segundos mientras la aplicación
+  está abierta. No hay rastreo en segundo plano: con la app cerrada, el auto
+  deja de reportar posición hasta que se vuelve a abrir.
 
 ## Configuración opcional
 
@@ -285,9 +434,3 @@ flutter run \
 Sin `TOMTOM_KEY`, la búsqueda cae automáticamente a Photon. Sin `OSRM_URL`, usa
 el servidor público de demostración. Nunca se debe compilar una clave
 `service_role` dentro de la aplicación.
-
-- Un documento subido en PDF se identifica pero no se previsualiza en la
-  revisión: haría falta un visor de PDF y hoy no hay ninguno en el proyecto.
-- El seguimiento del chofer se refresca cada 30 segundos mientras la aplicación
-  está abierta. No hay rastreo en segundo plano: con la app cerrada, el auto
-  deja de reportar posición hasta que se vuelve a abrir.
