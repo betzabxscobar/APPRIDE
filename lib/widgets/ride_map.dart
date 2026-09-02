@@ -245,6 +245,14 @@ class _CapaBaseState extends State<_CapaBase> {
     final estilo = _estilo;
     if (estilo != null) {
       return VectorTileLayer(
+        // La clave es lo que arregla el mapa claro sobre fondo oscuro.
+        //
+        // Al cambiar de tema, Flutter reutiliza el mismo elemento y solo le
+        // cambia las propiedades. `VectorTileLayer` guarda el tema compilado en
+        // su estado y no lo rehace, asi que seguia pintando el estilo anterior:
+        // se veia el mapa de dia con la app de noche. Con una clave distinta
+        // por tema, el elemento se reemplaza y el estilo nuevo entra de verdad.
+        key: ValueKey(widget.oscuro),
         theme: estilo.theme,
         tileProviders: estilo.providers,
         rasterSources: estilo.rasterSources,

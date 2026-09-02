@@ -383,6 +383,20 @@ class RideService {
     );
   }
 
+  /// Lo que lleva ganado el chofer, por periodos.
+  ///
+  /// Lo calcula Postgres, como la tarifa: el dinero no lo puede decir el
+  /// teléfono. Y el reparto sale del porcentaje que tenía la tarifa **de cada
+  /// viaje**, no del de hoy: si el reparto cambia, los viajes viejos siguen
+  /// contando con el suyo.
+  Future<Map<String, DriverEarnings>> ganancias() async {
+    final filas = await _client.rpc('ganancias_conductor') as List<dynamic>;
+    return {
+      for (final f in filas.cast<Map<String, dynamic>>())
+        f['periodo'] as String: DriverEarnings.fromMap(f),
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // Calificaciones
   // ---------------------------------------------------------------------------
@@ -523,6 +537,34 @@ class DriverState {
     }
     return '';
   }
+}
+
+/// Lo ganado en un periodo: hoy, esta semana, este mes o desde siempre.
+class DriverEarnings {
+  const DriverEarnings({
+    required this.viajes,
+    required this.bruto,
+    required this.ganado,
+    required this.comision,
+  });
+
+  final int viajes;
+
+  /// Lo que pagaron los pasajeros.
+  final double bruto;
+
+  /// Lo que le queda al chofer.
+  final double ganado;
+
+  /// Lo que se lleva la app.
+  final double comision;
+
+  factory DriverEarnings.fromMap(Map<String, dynamic> row) => DriverEarnings(
+        viajes: (row['viajes'] as num?)?.toInt() ?? 0,
+        bruto: (row['bruto'] as num?)?.toDouble() ?? 0,
+        ganado: (row['ganado'] as num?)?.toDouble() ?? 0,
+        comision: (row['comision'] as num?)?.toDouble() ?? 0,
+      );
 }
 
 class RideException implements Exception {

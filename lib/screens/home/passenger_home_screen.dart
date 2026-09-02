@@ -10,7 +10,9 @@ import '../../models/app_user.dart';
 import '../../models/trip.dart';
 import '../../screens/notifications/notifications_screen.dart';
 import '../../screens/payments/payment_methods_screen.dart';
+import '../../screens/settings/settings_screen.dart';
 import '../../screens/trips/request_trip_screen.dart';
+import '../../screens/trips/trip_history_screen.dart';
 import '../../screens/trips/trip_tracking_screen.dart';
 import '../../services/location_service.dart';
 import '../../services/ride_service.dart';
@@ -177,6 +179,26 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
     await _abrirSeguimiento(id);
   }
 
+  /// A dónde lleva cada pestaña de la barra inferior.
+  ///
+  /// Hasta ahora no llevaban a ningún sitio: la barra tenía `selectedIndex: 0`
+  /// y ningún `onDestinationSelected`, así que tocar «Viajes» o «Cuenta» no
+  /// hacía nada. Cuatro botones que no responden se leen como una app rota.
+  Future<void> _irA(int indice) async {
+    final destino = switch (indice) {
+      1 => const TripHistoryScreen(),
+      2 => const NotificationsScreen(),
+      3 => const SettingsScreen(),
+      _ => null,
+    };
+    if (destino == null) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => destino),
+    );
+    await _cargar();
+  }
+
   Future<void> _abrirSeguimiento(String viajeId) async {
     // Abrir el seguimiento cuenta como reabrirlo, se llegue por donde se
     // llegue. Sin esto, salir del seguimiento con el viaje aun vivo hacia que
@@ -270,7 +292,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
           );
         },
       ),
-      bottomNavigationBar: const _PassengerNavBar(),
+      bottomNavigationBar: _PassengerNavBar(onIr: _irA),
     );
   }
 }
@@ -657,12 +679,17 @@ class _PriorityCard extends StatelessWidget {
 }
 
 class _PassengerNavBar extends StatelessWidget {
-  const _PassengerNavBar();
+  const _PassengerNavBar({required this.onIr});
+
+  final ValueChanged<int> onIr;
 
   @override
   Widget build(BuildContext context) {
     return NavigationBar(
+      // Inicio siempre marcado: las demás abren una pantalla encima y se
+      // vuelve aquí al cerrarla, así que ninguna llega a «quedarse» activa.
       selectedIndex: 0,
+      onDestinationSelected: onIr,
       destinations: const [
         NavigationDestination(
           icon: Icon(Icons.home_outlined),
@@ -674,10 +701,14 @@ class _PassengerNavBar extends StatelessWidget {
           selectedIcon: Icon(Icons.route),
           label: 'Viajes',
         ),
+        // Era «Mensajes» y no había ningún chat detrás — ni tabla, ni
+        // pantalla. Se llama por lo que de verdad hay: los avisos de tus
+        // viajes y de tu cuenta. Un chat con el chofer es otra cosa y está
+        // por construir.
         NavigationDestination(
-          icon: Icon(Icons.chat_bubble_outline),
-          selectedIcon: Icon(Icons.chat_bubble),
-          label: 'Mensajes',
+          icon: Icon(Icons.notifications_none),
+          selectedIcon: Icon(Icons.notifications),
+          label: 'Avisos',
         ),
         NavigationDestination(
           icon: Icon(Icons.person_outline),

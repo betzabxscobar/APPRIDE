@@ -12,6 +12,9 @@ import '../../models/app_user.dart';
 import '../../models/trip.dart';
 import '../../models/user_role.dart';
 import '../../screens/driver/driver_profile_screen.dart';
+import '../../screens/driver/earnings_screen.dart';
+import '../../screens/settings/settings_screen.dart';
+import '../../screens/trips/trip_history_screen.dart';
 import '../../screens/notifications/notifications_screen.dart';
 import '../../screens/trips/driver_trips_screen.dart';
 import '../../services/auth_service.dart';
@@ -254,6 +257,26 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     await _cargar();
   }
 
+  /// A dónde lleva cada pestaña de la barra inferior.
+  ///
+  /// Hasta ahora ninguna llevaba a ningún sitio: la barra no tenía
+  /// `onDestinationSelected`. «Ganancias» era el caso más llamativo — un chofer
+  /// entra a mirar cuánto lleva hecho y no pasaba nada.
+  Future<void> _irA(int indice) async {
+    final destino = switch (indice) {
+      1 => const EarningsScreen(),
+      2 => const TripHistoryScreen(),
+      3 => const SettingsScreen(),
+      _ => null,
+    };
+    if (destino == null) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => destino),
+    );
+    await _cargar();
+  }
+
   Future<void> _abrirViajes() async {
     // Abrir la pantalla del viaje cuenta como reabrirlo, se llegue por donde
     // se llegue. Sin esto, salir de ella con el viaje aun vivo hacia que
@@ -346,7 +369,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           );
         },
       ),
-      bottomNavigationBar: const _DriverNavBar(),
+      bottomNavigationBar: _DriverNavBar(onIr: _irA),
     );
   }
 }
@@ -912,12 +935,17 @@ class _Label extends StatelessWidget {
 }
 
 class _DriverNavBar extends StatelessWidget {
-  const _DriverNavBar();
+  const _DriverNavBar({required this.onIr});
+
+  final ValueChanged<int> onIr;
 
   @override
   Widget build(BuildContext context) {
     return NavigationBar(
+      // Inicio siempre marcado: las demás abren una pantalla encima y se
+      // vuelve aquí al cerrarla.
       selectedIndex: 0,
+      onDestinationSelected: onIr,
       destinations: const [
         NavigationDestination(
           icon: Icon(Icons.home_outlined),
