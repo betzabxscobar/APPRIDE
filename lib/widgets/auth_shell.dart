@@ -293,6 +293,15 @@ class BrandPanel extends StatelessWidget {
             ),
             child: Stack(
               children: [
+                // Imagen a full-bleed: ocupa toda la mitad izquierda. Va
+                // primero para que aurora y anillo brillen encima de ella.
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/images/fondoCrearCuenta.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.bottomCenter,
+                  ),
+                ),
                 // Aurora superior izquierda (`.brand-panel:before`).
                 Positioned(
                   left: -170,
@@ -326,17 +335,6 @@ class BrandPanel extends StatelessWidget {
                         width: 90,
                       ),
                     ),
-                  ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: height * 0.43,
-                  child: Image.asset(
-                    'assets/images/fondoCrearCuenta.png',
-                    fit: BoxFit.cover,
-                    alignment: Alignment.bottomCenter,
                   ),
                 ),
                 Padding(
