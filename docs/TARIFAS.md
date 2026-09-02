@@ -9,10 +9,10 @@ puede manipular, así que no puede ser quien diga cuánto cuesta un viaje.
 
 | | Arranque | Por km | Por minuto | Carrera mínima |
 |---|---|---|---|---|
-| **Estándar** (resto del día) | 0,35 | 0,25 | 0,07 | 1,00 |
-| **Hora pico mañana** (06:00–08:59, L–V) | 0,38 | 0,27 | 0,08 | 1,08 |
-| **Hora pico tarde** (16:00–19:59, L–V) | 0,38 | 0,27 | 0,08 | 1,08 |
-| **Nocturna** (22:00–04:59) | 0,40 | 0,29 | 0,08 | 1,15 |
+| **Estándar** (resto del día) | 0,35 | 0,25 | 0,07 | 1,20 |
+| **Hora pico mañana** (06:00–08:59, L–V) | 0,38 | 0,27 | 0,08 | 1,30 |
+| **Hora pico tarde** (16:00–19:59, L–V) | 0,38 | 0,27 | 0,08 | 1,30 |
+| **Nocturna** (22:00–04:59) | 0,40 | 0,29 | 0,08 | 1,38 |
 
 ### De dónde salen
 
@@ -94,8 +94,8 @@ total = max( (arranque + por_km x km) x factor_del_vehiculo ,
 > `minutos_estimados` que devuelve la funcion son para enseñarlos, no para
 > cobrarlos. Cambiar esa columna no cambia lo que paga nadie.
 
-Los factores por tipo de vehiculo —moto 0,65, estandar 1,00, confort 1,30 y
-XL 1,55— multiplican tanto el precio como la carrera minima, asi que la tabla
+Los factores por tipo de vehiculo —moto 0,80, estandar 1,00, confort 1,45 y
+XL 1,80— multiplican tanto el precio como la carrera minima, asi que la tabla
 de arriba es la de **Estandar** y el resto sale de ahi.
 
 ## El reparto
@@ -200,22 +200,34 @@ Moto, Estandar, Confort y XL, como en Uber e inDrive.
 nocturna y hora pico. Cada tipo solo aplica un **factor** sobre ese precio, asi
 que cambiar la tarifa de la noche sigue afectando a los cuatro a la vez.
 
-| Tipo | Factor | Pasajeros | Ejemplo (viaje de 6,2 km) |
-|---|---|---|---|
-| Moto | 0,65 | 1 | 3,56 |
-| Estandar | 1,00 | 4 | 5,47 |
-| Confort | 1,30 | 4 | 7,11 |
-| XL | 1,55 | 6 | 8,48 |
+| Tipo | Factor | Pasajeros | Viaje de 4,4 km | Gana el chofer |
+|---|---|---|---|---|
+| Moto | 0,80 | 1 | 1,16 | 0,99 |
+| Estandar | 1,00 | 4 | 1,45 | 1,23 |
+| Confort | 1,45 | 4 | 2,10 | 1,79 |
+| XL | 1,80 | 6 | 2,61 | 2,22 |
+
+**Subieron el 2026-09-02**, desde 0,65 / 1,00 / 1,30 / 1,55. Estaban
+calibrados para unos precios tres veces mayores, y al bajar la tarifa se
+quedaron sin nada que multiplicar: en un viaje de 2 km, un chofer de moto se
+llevaba **55 centavos**.
 
 El factor multiplica **tambien la carrera minima**. Si solo multiplicara el
 bruto, un viaje corto en moto costaria lo mismo que en auto: la minima se lo
 comeria. La minima tambien es un precio.
 
+> **Y por eso la minima se subio con los factores.** Con la minima en 1,00, el
+> suelo de la moto era 1,00 x 0,65 = **0,65**, y de ahi salian los 55 centavos
+> del chofer. Bajar la tarifa sin mirar la minima deja los viajes cortos sin
+> suelo, que es donde el chofer ya gana menos. La minima estandar paso de 1,00
+> a **1,20**; no toca el viaje de 4,4 km, porque 1,45 sigue por encima.
+
 > **Los factores son una propuesta, no un dato municipal.** La referencia de
-> Quito solo tarifa taxis; no dice nada de motos ni de vans. El 0,65 de la moto
-> sigue lo que hacen inDrive y Uber Moto en la region, donde va entre un 35 y un
-> 45 % por debajo del auto. Se cambian con un UPDATE sobre
-> `public.categorias_vehiculo`, sin recompilar la app:
+> Quito solo tarifa taxis; no dice nada de motos ni de vans. La moto va un 20 %
+> por debajo del auto: menos separacion que el 35-45 % de Uber Moto en la
+> region, porque con estos precios un descuento mayor deja al chofer sin nada.
+> Se cambian con un UPDATE sobre `public.categorias_vehiculo`, sin recompilar
+> la app:
 >
 > ```sql
 > update public.categorias_vehiculo set factor = 0.70 where id = 'moto';
