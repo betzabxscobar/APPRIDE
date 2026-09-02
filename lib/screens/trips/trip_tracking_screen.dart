@@ -12,6 +12,7 @@ import '../../services/trip_session_store.dart';
 import '../../widgets/auth_feedback.dart';
 import '../../widgets/category_chip.dart';
 import '../../widgets/chat_button.dart';
+import '../support/support_screen.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/trip_route_map.dart';
 import 'rate_trip_sheet.dart';
@@ -254,6 +255,21 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                           _ocupado ? 'Cancelando…' : 'Cancelar viaje',
                         ),
                       ),
+                    // Un problema con un viaje se cuenta desde el viaje: así
+                    // el caso llega con el viaje adjunto y soporte no tiene
+                    // que preguntar de cuál se trata.
+                    if (viaje.status.esFinal) ...[
+                      TextButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => SupportScreen(viajeId: viaje.id),
+                          ),
+                        ),
+                        icon: const Icon(Icons.support_agent, size: 19),
+                        label: const Text('¿Algo salió mal en este viaje?'),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     if (viaje.status.esFinal)
                       FilledButton(
                         onPressed: () => Navigator.of(context).pop(),

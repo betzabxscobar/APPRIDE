@@ -230,6 +230,21 @@ class RideService {
     return rows.map(Trip.fromMap).toList();
   }
 
+  /// Todos los viajes de la plataforma, para la administración.
+  ///
+  /// No filtra por usuario a propósito: la política `viajes_participante`
+  /// incluye `es_administrativo()`, así que una cuenta administrativa recibe
+  /// todos y cualquier otra recibe solo los suyos. La barrera está en la base.
+  Future<List<Trip>> todosLosViajes({String? estado, int limite = 100}) async {
+    var consulta = _client.from('viajes_detalle').select(_detalle);
+    if (estado != null) consulta = consulta.eq('estado', estado);
+
+    final rows = await consulta
+        .order('fecha_solicitud', ascending: false)
+        .limit(limite);
+    return rows.map(Trip.fromMap).toList();
+  }
+
   // ---------------------------------------------------------------------------
   // Conductor
   // ---------------------------------------------------------------------------

@@ -16,6 +16,8 @@ import 'package:ride/services/places_service.dart';
 import 'package:ride/services/routing_service.dart';
 import 'package:ride/widgets/ride_map.dart';
 import 'package:ride/models/trip.dart';
+import 'package:ride/models/fare.dart';
+import 'package:ride/models/support_ticket.dart';
 import 'package:ride/models/user_role.dart';
 import 'package:ride/models/vehicle_category.dart';
 import 'package:ride/models/vehicle.dart';
@@ -1098,6 +1100,80 @@ void main() {
       expect(q.total, 3.56);
       expect(q.ganaConductor, 3.03);
       expect(q.categoria.capacidad, '1 pasajero');
+    });
+  });
+
+  group('Soporte', () {
+    Map<String, dynamic> fila({String estado = 'abierto', String? respuesta}) => {
+          'id': 't-1',
+          'usuario_id': 'u-1',
+          'viaje_id': null,
+          'categoria': 'pago',
+          'asunto': 'Me cobraron de mas',
+          'mensaje': 'El viaje decia 3,20 y me cobraron 4,10.',
+          'estado': estado,
+          'respuesta': respuesta,
+          'respondido_en': respuesta == null ? null : '2026-09-02T10:00:00Z',
+          'created_at': '2026-09-02T09:00:00Z',
+        };
+
+    test('Un caso sin responder no aparece como respondido', () {
+      final t = SupportTicket.fromMap(fila());
+      expect(t.respondido, isFalse);
+      expect(t.estado, TicketStatus.abierto);
+      expect(t.categoria, TicketCategory.pago);
+    });
+
+    test('Una respuesta en blanco no cuenta como respuesta', () {
+      // La base guarda null cuando se envia vacia, pero un espacio suelto
+      // colandose dejaria el bloque verde de «Respuesta de Ride» sin nada
+      // dentro.
+      expect(SupportTicket.fromMap(fila(respuesta: '   ')).respondido, isFalse);
+      expect(SupportTicket.fromMap(fila(respuesta: 'Ya te devolvimos')).respondido,
+          isTrue);
+    });
+
+    test('Resuelto y cerrado son estados finales; abierto no', () {
+      expect(TicketStatus.resuelto.esFinal, isTrue);
+      expect(TicketStatus.cerrado.esFinal, isTrue);
+      expect(TicketStatus.abierto.esFinal, isFalse);
+      expect(TicketStatus.enProceso.esFinal, isFalse);
+    });
+
+    test('Una categoria desconocida cae en «otro»', () {
+      expect(TicketCategory.fromId('extraterrestre'), TicketCategory.otro);
+      expect(TicketCategory.fromId(null), TicketCategory.otro);
+    });
+  });
+
+  group('Tarifas editables', () {
+    Fare tarifa({double base = 0.40, double km = 0.30, double minima = 1.25}) =>
+        Fare.fromMap({
+          'id': 'f-1',
+          'nombre': 'Tarifa Estandar',
+          'tarifa_base': base,
+          'costo_por_km': km,
+          'costo_por_minuto': 0.08,
+          'carrera_minima': minima,
+          'porcentaje_conductor': 0.85,
+          'activo': true,
+          'hora_desde': null,
+          'hora_hasta': null,
+        });
+
+    test('El ejemplo es arranque mas distancia', () {
+      // La misma cuenta que hace cotizar_viaje: si esto se separa, el panel
+      // ensenaria un precio que no es el que se cobra.
+      expect(tarifa().ejemplo(5), closeTo(0.40 + 0.30 * 5, 0.001));
+    });
+
+    test('La carrera minima hace de suelo', () {
+      // Un viaje de 300 m no puede salir por debajo de la minima.
+      expect(tarifa().ejemplo(0.3), 1.25);
+    });
+
+    test('Sin franja horaria, es la de por defecto', () {
+      expect(tarifa().franja, 'El resto del día');
     });
   });
 

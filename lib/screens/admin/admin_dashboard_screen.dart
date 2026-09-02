@@ -8,6 +8,9 @@ import '../../services/auth_service.dart';
 import '../../widgets/panel_switcher.dart';
 import '../../widgets/user_avatar.dart';
 import '../settings/settings_screen.dart';
+import 'admin_fares_panel.dart';
+import 'admin_support_panel.dart';
+import 'admin_trips_panel.dart';
 import 'driver_review_screen.dart';
 
 /// Secciones del panel, las mismas de la barra lateral de WEB-RIDE.
@@ -178,10 +181,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           // donde se ven los papeles que suben —cédula, licencia, SOAT y
           // matrícula— junto con su vehículo y su teléfono.
           _Section.conductores => const DriverReviewPanel(),
-          _ => _Placeholder(
-              section: _section,
-              onBack: () => setState(() => _section = _Section.resumen),
-            ),
+          _Section.viajes => const AdminTripsPanel(),
+          _Section.tarifas => const AdminFaresPanel(),
+          _Section.soporte => const AdminSupportPanel(),
         },
       ),
     );
@@ -871,57 +873,6 @@ class _ImplementationStatus extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _Placeholder extends StatelessWidget {
-  const _Placeholder({required this.section, required this.onBack});
-
-  final _Section section;
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: context.ride.infoSoft,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(section.icon, size: 28, color: context.ride.info),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              section.label,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: context.ride.ink,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Este módulo se construirá en una siguiente etapa.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.4,
-                color: context.ride.inkMuted,
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextButton(onPressed: onBack, child: const Text('Volver al resumen')),
-          ],
-        ),
       ),
     );
   }

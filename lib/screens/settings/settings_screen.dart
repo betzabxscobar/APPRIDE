@@ -15,6 +15,7 @@ import '../../widgets/user_avatar.dart';
 import '../driver/driver_profile_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../payments/payment_methods_screen.dart';
+import '../support/support_screen.dart';
 import 'account_forms.dart';
 
 /// Configuración: todo lo que una persona puede cambiar de su propia cuenta.
@@ -262,6 +263,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               detalle: 'Efectivo y tarjetas guardadas',
               onTap: () => _abrir(const PaymentMethodsScreen()),
             ),
+          // Para pasajeros y para choferes: hasta ahora ninguno de los dos
+          // tenía a quién escribirle si algo salía mal.
+          _Opcion(
+            icono: Icons.support_agent,
+            titulo: 'Soporte',
+            detalle: 'Cuéntanos si algo salió mal',
+            onTap: () => _abrir(const SupportScreen()),
+          ),
 
           // El bloque entero solo aparece si de verdad hay a dónde cambiar.
           // `PanelSwitcher` se esconde solo cuando hay una sola vista, y sin
