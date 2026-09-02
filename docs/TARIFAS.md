@@ -9,34 +9,38 @@ puede manipular, así que no puede ser quien diga cuánto cuesta un viaje.
 
 | | Arranque | Por km | Por minuto | Carrera mínima |
 |---|---|---|---|---|
-| **Estándar** (resto del día) | 0,35 | 0,25 | 0,07 | 1,20 |
-| **Hora pico mañana** (06:00–08:59, L–V) | 0,38 | 0,27 | 0,08 | 1,30 |
-| **Hora pico tarde** (16:00–19:59, L–V) | 0,38 | 0,27 | 0,08 | 1,30 |
-| **Nocturna** (22:00–04:59) | 0,40 | 0,29 | 0,08 | 1,38 |
+| **Estándar** (resto del día) | 0,65 | 0,25 | 0,07 | 1,50 |
+| **Hora pico mañana** (06:00–08:59, L–V) | 0,68 | 0,27 | 0,08 | 1,60 |
+| **Hora pico tarde** (16:00–19:59, L–V) | 0,68 | 0,27 | 0,08 | 1,60 |
+| **Nocturna** (22:00–04:59) | 0,70 | 0,29 | 0,08 | 1,68 |
 
 ### De dónde salen
 
-De una medición real, no de una tabla de referencia. La regla es **quedar por
-debajo de DiDi**, que era el más barato de los dos que se compararon.
+De una medición real, no de una tabla de referencia. La regla **era** quedar
+por debajo de DiDi. Duró poco: a esos precios el chofer no aceptaba, y una
+tarifa que nadie toma no es barata, es inexistente. Hoy manda **que el viaje
+le salga a cuenta al chofer**, y el precio sale de ahí.
 
 Trayecto medido: parada **El Florón** (Av. 10 de Agosto) → **Universidad
 Central del Ecuador**. 4,4 km, 7 minutos.
 
-| | Precio |
-|---|---|
-| **Ride, estándar** | **1,45** |
-| DiDi | 1,50 |
-| Ride, hora pico | 1,57 |
-| Ride, nocturna | 1,68 |
-| Uber | 2,25 |
+| | Precio | Gana el chofer |
+|---|---|---|
+| DiDi | 1,50 | — |
+| **Ride, estándar** | **1,75** | **1,49** |
+| Ride, hora pico | 1,87 | 1,59 |
+| Ride, nocturna | 1,98 | 1,68 |
+| Uber | 2,25 | — |
 
-La estándar se calibra contra ese 1,45 y las otras dos salen de ahí con su
-recargo: **+8 % la hora pico y +15 % la nocturna**.
+Ride queda **entre DiDi y Uber**, más cerca del primero. Las franjas conservan
+su recargo: **+8 % la hora pico y +15 % la nocturna**.
 
-> **En hora pico y de noche se pasa de DiDi.** 1,57 y 1,68 contra sus 1,50. No
-> hay manera de conservar un recargo por franja y quedar debajo de DiDi a todas
-> horas: o se aplana el recargo, o esas horas se pagan más. Se eligió conservar
-> el recargo, porque conducir de noche y en atasco vale más.
+> **Se intentó quedar por debajo de DiDi y no salió.** Con el estándar en 1,45,
+> un chofer de moto se llevaba 0,99 por este viaje y no hay quien acepte por
+> eso. El 2026-09-02 se subieron 0,30 el arranque y la mínima de las cuatro
+> franjas —0,20 más para el chofer de moto, que era el que peor estaba—, y con
+> eso el estándar se pasa de DiDi. Es el intercambio que se aceptó: sin choferes
+> conectados el precio da igual.
 
 **Qué se comparó y qué no.** DiDi y Uber se consultaron en ese momento, así que
 sus números llevan dentro la demanda que hubiera. Y los 1,50 y 2,25 son de su
@@ -46,7 +50,8 @@ encima de DiDi a propósito, porque no compiten contra lo mismo.
 > **Antes se calculaban de otra forma.** Hasta el 2026-09-02 salían de las
 > tarifas referenciales de taxi de Quito con un 10 % menos. Se abandonó ese
 > método porque dejaba el precio por encima de la competencia real; lo que
-> manda ahora es quedar por debajo de DiDi.
+> manda ahora es que al chofer le salga a cuenta, con DiDi y Uber como
+> referencia de por dónde se puede mover el precio.
 
 ### Las franjas horarias
 
@@ -202,10 +207,10 @@ que cambiar la tarifa de la noche sigue afectando a los cuatro a la vez.
 
 | Tipo | Factor | Pasajeros | Viaje de 4,4 km | Gana el chofer |
 |---|---|---|---|---|
-| Moto | 0,80 | 1 | 1,16 | 0,99 |
-| Estandar | 1,00 | 4 | 1,45 | 1,23 |
-| Confort | 1,45 | 4 | 2,10 | 1,79 |
-| XL | 1,80 | 6 | 2,61 | 2,22 |
+| Moto | 0,80 | 1 | 1,40 | 1,19 |
+| Estandar | 1,00 | 4 | 1,75 | 1,49 |
+| Confort | 1,45 | 4 | 2,54 | 2,16 |
+| XL | 1,80 | 6 | 3,15 | 2,68 |
 
 **Subieron el 2026-09-02**, desde 0,65 / 1,00 / 1,30 / 1,55. Estaban
 calibrados para unos precios tres veces mayores, y al bajar la tarifa se
@@ -220,7 +225,7 @@ comeria. La minima tambien es un precio.
 > suelo de la moto era 1,00 x 0,65 = **0,65**, y de ahi salian los 55 centavos
 > del chofer. Bajar la tarifa sin mirar la minima deja los viajes cortos sin
 > suelo, que es donde el chofer ya gana menos. La minima estandar paso de 1,00
-> a **1,20**; no toca el viaje de 4,4 km, porque 1,45 sigue por encima.
+> a **1,20**, y de ahi a **1,50** con la subida del arranque.
 
 > **Los factores son una propuesta, no un dato municipal.** La referencia de
 > Quito solo tarifa taxis; no dice nada de motos ni de vans. La moto va un 20 %
