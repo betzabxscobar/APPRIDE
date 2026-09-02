@@ -156,7 +156,11 @@ void main() {
     testWidgets('La presentación no desborda en móvil ni escritorio', (
       tester,
     ) async {
-      for (final size in const [Size(320, 568), Size(1440, 900)]) {
+      for (final size in const [
+        Size(320, 568),
+        Size(500, 500),
+        Size(1440, 900),
+      ]) {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
 

@@ -19,7 +19,12 @@ class WelcomeHomeScreen extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 920;
-            final content = _WelcomeContent(wide: wide, onContinue: onContinue);
+            final compactHeight = constraints.maxHeight < 680;
+            final content = _WelcomeContent(
+              wide: wide,
+              compact: compactHeight,
+              onContinue: onContinue,
+            );
             if (wide) {
               return Center(
                 child: ConstrainedBox(
@@ -56,10 +61,9 @@ class WelcomeHomeScreen extends StatelessWidget {
                 ),
               );
             }
-            final heroHeight = (constraints.maxHeight * 0.46).clamp(
-              250.0,
-              430.0,
-            );
+            final heroHeight = compactHeight
+                ? (constraints.maxHeight * 0.34).clamp(150.0, 215.0)
+                : (constraints.maxHeight * 0.46).clamp(250.0, 430.0);
             return SingleChildScrollView(
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
@@ -68,7 +72,7 @@ class WelcomeHomeScreen extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       height: heroHeight,
-                      child: const _HeroVisual(),
+                      child: _HeroVisual(compact: compactHeight),
                     ),
                     content,
                   ],
@@ -83,9 +87,14 @@ class WelcomeHomeScreen extends StatelessWidget {
 }
 
 class _WelcomeContent extends StatelessWidget {
-  const _WelcomeContent({required this.wide, required this.onContinue});
+  const _WelcomeContent({
+    required this.wide,
+    required this.compact,
+    required this.onContinue,
+  });
 
   final bool wide;
+  final bool compact;
   final VoidCallback onContinue;
 
   @override
@@ -97,9 +106,9 @@ class _WelcomeContent extends StatelessWidget {
       color: ride.surface,
       padding: EdgeInsets.fromLTRB(
         horizontal,
-        wide ? 48 : 34,
+        compact ? 22 : (wide ? 48 : 34),
         horizontal,
-        wide ? 48 : 40,
+        compact ? 24 : (wide ? 48 : 40),
       ),
       child: Center(
         child: ConstrainedBox(
@@ -119,45 +128,46 @@ class _WelcomeContent extends StatelessWidget {
                   letterSpacing: 1.5,
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: compact ? 7 : 12),
               Text(
                 'Tu camino, más simple desde el inicio.',
                 textAlign: wide ? TextAlign.left : TextAlign.center,
                 style: AppTheme.display(
-                  wide ? 38 : 29,
+                  compact ? 24 : (wide ? 38 : 29),
                   color: ride.ink,
                   letterSpacing: -1.2,
                   height: 1.12,
                 ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: compact ? 8 : 14),
               Text(
                 'Solicita un viaje, sigue el recorrido y mantén todo bajo control desde un solo lugar.',
                 textAlign: wide ? TextAlign.left : TextAlign.center,
                 style: TextStyle(
                   color: ride.inkMuted,
-                  fontSize: AppText.small,
-                  height: 1.55,
+                  fontSize: compact ? AppText.label : AppText.small,
+                  height: compact ? 1.4 : 1.55,
                 ),
               ),
-              const SizedBox(height: 26),
-              Wrap(
-                alignment: wide ? WrapAlignment.start : WrapAlignment.center,
-                spacing: 10,
-                runSpacing: 10,
-                children: const [
-                  _Benefit(icon: Icons.route_outlined, label: 'Rutas claras'),
-                  _Benefit(
-                    icon: Icons.shield_outlined,
-                    label: 'Viajes seguros',
-                  ),
-                  _Benefit(
-                    icon: Icons.payments_outlined,
-                    label: 'Precio visible',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 30),
+              SizedBox(height: compact ? 14 : 26),
+              if (!compact)
+                Wrap(
+                  alignment: wide ? WrapAlignment.start : WrapAlignment.center,
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: const [
+                    _Benefit(icon: Icons.route_outlined, label: 'Rutas claras'),
+                    _Benefit(
+                      icon: Icons.shield_outlined,
+                      label: 'Viajes seguros',
+                    ),
+                    _Benefit(
+                      icon: Icons.payments_outlined,
+                      label: 'Precio visible',
+                    ),
+                  ],
+                ),
+              SizedBox(height: compact ? 0 : 30),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -210,8 +220,9 @@ class _Benefit extends StatelessWidget {
 }
 
 class _HeroVisual extends StatefulWidget {
-  const _HeroVisual({this.wide = false});
+  const _HeroVisual({this.wide = false, this.compact = false});
   final bool wide;
+  final bool compact;
 
   @override
   State<_HeroVisual> createState() => _HeroVisualState();
@@ -313,15 +324,19 @@ class _HeroVisualState extends State<_HeroVisual>
                         fontSize: (unit * 0.075).clamp(23.0, 39.0),
                         color: dark ? Colors.white : ride.ink,
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Muévete con libertad.',
-                        style: AppTheme.display(
-                          (unit * 0.045).clamp(16.0, 25.0),
-                          color: dark ? const Color(0xFFB8CFDB) : ride.inkMuted,
-                          letterSpacing: -0.5,
+                      if (!widget.compact) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          'Muévete con libertad.',
+                          style: AppTheme.display(
+                            (unit * 0.045).clamp(16.0, 25.0),
+                            color: dark
+                                ? const Color(0xFFB8CFDB)
+                                : ride.inkMuted,
+                            letterSpacing: -0.5,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
