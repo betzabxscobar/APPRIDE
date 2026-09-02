@@ -458,6 +458,17 @@ class _HojaConductor extends StatelessWidget {
     final viaje = activo;
     final vehiculo = user.vehicle;
 
+    // Un admin entra aquí a revisar la pantalla, no a trabajar: en la base,
+    // `validar_disponibilidad_conductor_real()` y `aceptar_viaje` solo admiten
+    // 'driver' y 'superadmin'. Sin esto vería «tu cuenta de chofer todavía no
+    // está creada», que lo mandaría a completar unos papeles que no le van a
+    // servir para nada.
+    final soloRevisa = user.role == UserRole.admin;
+    final motivoBloqueo = soloRevisa
+        ? 'Esta es la vista de chofer, para revisarla. Una cuenta de '
+            'administración no puede ponerse en línea ni tomar viajes.'
+        : estado.motivoBloqueo;
+
     return SheetSurface(
       child: ListView(
         controller: controller,
@@ -469,7 +480,7 @@ class _HojaConductor extends StatelessWidget {
             bloqueado: cambiando || !estado.puedeTrabajar,
             onChanged: onDisponibilidad,
           ),
-          if (!estado.puedeTrabajar && estado.motivoBloqueo.isNotEmpty) ...[
+          if (!estado.puedeTrabajar && motivoBloqueo.isNotEmpty) ...[
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.all(16),
@@ -485,7 +496,7 @@ class _HojaConductor extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      estado.motivoBloqueo,
+                      motivoBloqueo,
                       style: TextStyle(
                         fontSize: AppText.small,
                         height: 1.4,
@@ -515,7 +526,7 @@ class _HojaConductor extends StatelessWidget {
             onPressed: onAbrirPerfil,
             icon: const Icon(Icons.badge_outlined, size: 21),
             label: Text(
-              estado.puedeTrabajar
+              estado.puedeTrabajar || soloRevisa
                   ? 'Mi vehículo y documentos'
                   : 'Completar mi cuenta de chofer',
             ),

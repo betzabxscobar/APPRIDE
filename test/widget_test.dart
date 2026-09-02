@@ -721,7 +721,20 @@ void main() {
     test('El admin NO puede abrir la vista de superadmin', () {
       final vistas = UserRole.admin.viewsAllowed();
       expect(vistas.contains(UserRole.superadmin), isFalse);
-      expect(vistas, [UserRole.admin]);
+      expect(vistas, [UserRole.admin, UserRole.passenger, UserRole.driver]);
+    });
+
+    test('Las dos cuentas administrativas llegan a usuario y chofer', () {
+      // Poder abrirlas no las iguala: en la base, pedir un viaje lo puede
+      // cualquiera de las dos, pero ponerse en linea y aceptar carreras solo
+      // admite ('driver', 'superadmin'). El admin entra a la vista de chofer a
+      // revisarla; trabajar desde ella lo sigue bloqueando Postgres.
+      for (final rol in [UserRole.admin, UserRole.superadmin]) {
+        final vistas = rol.viewsAllowed();
+        expect(vistas, contains(UserRole.passenger), reason: rol.id);
+        expect(vistas, contains(UserRole.driver), reason: rol.id);
+        expect(rol.isDriver, isFalse, reason: rol.id);
+      }
     });
 
     test('Ningún rol no administrativo alcanza un panel administrativo', () {

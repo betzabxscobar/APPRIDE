@@ -162,10 +162,18 @@ solo el superadministrador puede ver perfiles de superadministradores.
 **Actor:** usuario con acceso a más de una vista.
 
 1. El usuario abre el selector de panel.
-2. El sistema ofrece únicamente las vistas habilitadas por su rol y vehículo.
+2. El sistema ofrece únicamente las vistas habilitadas por su rol.
 3. El usuario cambia de vista o regresa a la correspondiente a su cuenta.
 
-**Resultado:** cambia la pantalla, pero no el rol real ni los permisos en Supabase.
+Administrador y superadministrador llegan los dos a la vista de usuario y a la
+de chofer; la de superadministrador sigue siendo solo para él.
+
+**Resultado:** cambia la pantalla, pero no el rol real ni los permisos en
+Supabase. Los dos pueden pedir un viaje de verdad desde la vista de usuario
+—`solicitar_viaje` no mira el rol—, pero conducir es otra cosa: ponerse en línea
+y aceptar carreras solo lo admiten `validar_disponibilidad_conductor_real()` y
+`aceptar_viaje` para `driver` y `superadmin`. Un administrador abre la vista de
+chofer para revisarla y la pantalla se lo dice con esas palabras.
 
 ### CU-A10. Gestionar vehículos y documentos
 
