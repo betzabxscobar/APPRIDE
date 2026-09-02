@@ -383,14 +383,10 @@ están en [`docs/TARIFAS.md`](docs/TARIFAS.md).
 2. `preparar_chofer_superadmin` le crea —o le aprueba— su fila en `conductores`.
 3. Registra un vehículo y lo pone en servicio.
 
-**Resultado:** la intención es que recorra el ciclo entero sin esperar a que
-alguien apruebe su propia cuenta.
-
-> **Hoy no funciona.** `preparar_chofer_superadmin` solo tiene permiso de
-> ejecución para `service_role`, así que la llamada rebota con 42501 y la app se
-> lo traga en silencio: el superadministrador sigue viendo el bloqueo de cuenta
-> no aprobada. Falta el `grant execute … to authenticated`; el rol ya lo
-> comprueba la función por dentro. Ver [`docs/API.md`](docs/API.md).
+**Resultado:** recorre el ciclo entero sin esperar a que alguien apruebe su
+propia cuenta. La función comprueba el rol en el servidor y rebota con 42501
+desde cualquier otra; el vehículo sigue haciendo falta, porque eso no es un
+permiso: un viaje no puede arrancar sin auto asignado.
 
 ## Alcance actual
 

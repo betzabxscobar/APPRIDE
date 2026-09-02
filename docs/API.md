@@ -238,21 +238,47 @@ Dos cosas las decide la base, no la app:
 Para cambiar el correo o la contraseña, la app pide antes la contraseña actual y
 la verifica con un `signInWithPassword` contra la sesión abierta.
 
+## Permisos de ejecución
+
+La regla, desde el 2026-09-02:
+
+> **Ninguna función `security definer` es ejecutable por `anon`.** Todas tienen
+> `EXECUTE` para `authenticated` y `service_role`, y nada más.
+
+Eso no sustituye a la comprobación de dentro —cada función sigue empezando por
+`auth.uid()` o `es_administrativo()`—, la respalda. Una sesión sin autenticar ni
+siquiera llega a ejecutar el cuerpo.
+
+Cinco funciones `security invoker` sí siguen abiertas a `anon`, y está bien que
+lo estén: `cotizar_viaje` y `cotizar_categorias`, que solo calculan un precio, y
+`es_superadmin`, `posicion_vigente_minutos` y `radio_busqueda_km`, que leen
+configuración. Al ser `invoker` corren con los permisos de quien llama, así que
+una sesión anónima que las use ve lo que RLS le deja ver a una sesión anónima:
+nada de nadie.
+
+Al escribir un `revoke`, hacerlo sobre `public` además de sobre el rol:
+
+```sql
+revoke execute on function public.lo_que_sea(uuid) from anon, public;
+```
+
+`anon` hereda de `public`. Si el permiso llegó por ahí, revocárselo solo a `anon`
+no quita nada y deja la sensación de haberlo arreglado.
+
+El estado de partida y los dos arreglos están en
+[`infra/sql/2026-09-02-permisos-de-funciones.sql`](../infra/sql/2026-09-02-permisos-de-funciones.sql).
+
+> **El linter de Supabase avisa de todas las `security definer` que puede llamar
+> `authenticated`, y aquí son casi todas.** No es un hallazgo: es la forma del
+> proyecto. La lógica vive en funciones `definer` justamente para que el cliente
+> no pueda saltársela, y para llamarlas hay que estar autenticado. Comprobar que
+> cada una valida por dentro sí importa; que el linter las liste, no.
+
 ## Lo que falta cerrar
 
-- **Hay funciones `security definer` que siguen concedidas a `anon`:**
-  `solicitar_viaje`, `avanzar_viaje`, `enviar_mensaje`, `marcar_mensajes_leidos`,
-  `registrar_vehiculo`, `abrir_ticket`, `responder_ticket` y
-  `ganancias_conductor`. Hoy no son explotables —todas empiezan comprobando
-  `auth.uid()` o `es_administrativo()` y rebotan con `28000` o `42501`—, pero el
-  permiso sobra: el `revoke` correcto es sobre `public` y no solo sobre `anon`,
-  porque `anon` hereda de `public` y revocarle a él deja el permiso intacto.
-- **`preparar_chofer_superadmin` no la puede ejecutar `authenticated`.** Su
-  `proacl` solo tiene `postgres` y `service_role`, así que la llamada de
-  `driver_home_screen.dart:108` rebota siempre con `42501`. La app se lo traga en
-  silencio a propósito, de modo que no se rompe nada, pero el superadministrador
-  sigue viendo el bloqueo de cuenta no aprobada. Falta el
-  `grant execute … to authenticated`; el rol ya lo comprueba la función por
-  dentro.
+- **La protección contra contraseñas filtradas está apagada.** Supabase Auth
+  puede contrastar cada contraseña nueva con HaveIBeenPwned y rechazar las que
+  ya se filtraron. Es un interruptor del panel, no código. Para una app donde
+  la cuenta guarda viajes, dirección de casa y método de pago, vale la pena.
 - **No hay pasarela de pagos.** `registrar_metodo_pago` acepta un token, pero no
   hay quién lo emita, así que el único método real es el efectivo.
