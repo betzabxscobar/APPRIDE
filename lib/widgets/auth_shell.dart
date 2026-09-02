@@ -194,27 +194,35 @@ class _MobileSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ride = context.ride;
-
-    return Container(
-      width: double.infinity,
-      constraints: BoxConstraints(minHeight: minHeight > 0 ? minHeight : 0),
-      padding: EdgeInsets.fromLTRB(24, 28, 24, 32 + bottomInset),
-      decoration: BoxDecoration(
-        color: ride.surface,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(AppTheme.radiusSheet),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: ride.shadow,
-            blurRadius: 32,
-            offset: const Offset(0, -10),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final horizontal = constraints.maxWidth < 360 ? 18.0 : 24.0;
+        return Container(
+          width: double.infinity,
+          constraints: BoxConstraints(minHeight: minHeight > 0 ? minHeight : 0),
+          padding: EdgeInsets.fromLTRB(
+            horizontal,
+            constraints.maxHeight < 460 ? 22 : 28,
+            horizontal,
+            30 + bottomInset,
           ),
-        ],
-      ),
-      // Centrado, no pegado arriba: en pasos cortos como la bienvenida el
-      // formulario ocupa poco y dejaba media hoja en blanco debajo.
-      child: Align(alignment: Alignment.center, child: child),
+          decoration: BoxDecoration(
+            color: ride.surface,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppTheme.radiusSheet),
+            ),
+            border: Border(top: BorderSide(color: ride.border)),
+            boxShadow: [
+              BoxShadow(
+                color: ride.shadow,
+                blurRadius: 32,
+                offset: const Offset(0, -10),
+              ),
+            ],
+          ),
+          child: Align(alignment: Alignment.center, child: child),
+        );
+      },
     );
   }
 }
@@ -232,10 +240,15 @@ class _FormPanel extends StatelessWidget {
     return ColoredBox(
       color: ride.surface,
       child: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
-            child: Center(child: child),
+        child: LayoutBuilder(
+          builder: (context, constraints) => Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: constraints.maxWidth < 540 ? 28 : 48,
+                vertical: constraints.maxHeight < 650 ? 24 : 40,
+              ),
+              child: Center(child: child),
+            ),
           ),
         ),
       ),
@@ -249,15 +262,20 @@ class BrandPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
-        final headline = (width * 0.1).clamp(45.0, 76.0);
+        final compactHeight = height < 650;
+        final headline = math.min(
+          (width * 0.1).clamp(40.0, 76.0),
+          (height * 0.085).clamp(40.0, 68.0),
+        );
 
         return ClipRect(
           child: DecoratedBox(
-            decoration: const BoxDecoration(gradient: AppColors.brandPanel),
+            decoration: BoxDecoration(gradient: ride.hero),
             child: Stack(
               children: [
                 // Aurora superior izquierda (`.brand-panel:before`).
@@ -302,18 +320,18 @@ class BrandPanel extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal: math.max(32, width * 0.09),
-                    vertical: 48,
+                    vertical: compactHeight ? 28 : 48,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const RideWordmark(color: Colors.white),
-                      SizedBox(height: height * 0.12),
+                      SizedBox(height: (height * 0.1).clamp(32.0, 94.0)),
                       _Headline(size: headline),
-                      const SizedBox(height: 25),
-                      const SizedBox(
-                        width: 450,
-                        child: Text(
+                      SizedBox(height: compactHeight ? 14 : 25),
+                      SizedBox(
+                        width: math.min(450, width * 0.82),
+                        child: const Text(
                           'Una forma más segura, transparente y humana de '
                           'llegar a donde quieres.',
                           style: TextStyle(
@@ -462,7 +480,8 @@ class _CityArt extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    for (final (index, fraction) in _buildingHeights.indexed) ...[
+                    for (final (index, fraction)
+                        in _buildingHeights.indexed) ...[
                       Expanded(
                         child: Container(
                           height: height * 0.7 * fraction,
@@ -528,7 +547,11 @@ class _Route extends StatelessWidget {
             children: [
               Positioned.fill(child: CustomPaint(painter: _RoutePainter())),
               Positioned(left: -5, bottom: -8, child: const _RouteStop()),
-              Positioned(left: width * 0.5, bottom: -8, child: const _RouteStop()),
+              Positioned(
+                left: width * 0.5,
+                bottom: -8,
+                child: const _RouteStop(),
+              ),
               Positioned(right: -8, top: -6, child: const _RouteStop()),
             ],
           );

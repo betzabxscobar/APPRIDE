@@ -25,12 +25,25 @@ class _AuthCardState extends State<AuthCard>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 450),
-  )..forward();
+  );
+  bool _started = false;
 
   late final Animation<double> _curve = CurvedAnimation(
     parent: _controller,
     curve: Curves.easeOutCubic,
   );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = 1;
+    } else {
+      _controller.forward();
+    }
+  }
 
   @override
   void dispose() {
@@ -167,7 +180,9 @@ class PrimaryAction extends StatelessWidget {
           borderRadius: radius,
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: ride.isDark ? 0.4 : 0.3),
+              color: AppColors.primary.withValues(
+                alpha: ride.isDark ? 0.4 : 0.3,
+              ),
               blurRadius: 24,
               offset: const Offset(0, 10),
             ),
@@ -206,15 +221,15 @@ class PrimaryAction extends StatelessWidget {
                               ),
                             )
                           : showArrow
-                              ? const Text(
-                                  '→',
-                                  style: TextStyle(
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
+                          ? const Text(
+                              '→',
+                              style: TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const SizedBox.shrink(),
                     ),
                   ],
                 ),
