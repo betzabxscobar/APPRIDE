@@ -5,28 +5,48 @@ puede manipular, así que no puede ser quien diga cuánto cuesta un viaje.
 
 ## Los valores
 
-**Vigentes desde el 2026-09-02.** Salen de las tarifas referenciales de taxi
-de Quito, **con un 10 % menos** por ser aplicativo:
+**Vigentes desde el 2026-09-02.**
 
 | | Arranque | Por km | Por minuto | Carrera mínima |
 |---|---|---|---|---|
-| **Estándar** (resto del día) | 0,50 | 0,39 | 0,10 | 1,44 |
-| **Nocturna** (22:00–05:00) | 0,65 | 0,50 | 0,13 | 1,87 |
-| **Hora pico** (06:00–09:00) | 0,58 | 0,45 | 0,12 | 1,65 |
+| **Estándar** (resto del día) | 0,45 | 0,32 | 0,09 | 1,30 |
+| **Hora pico** (06:00–09:00) | 0,49 | 0,35 | 0,10 | 1,40 |
+| **Nocturna** (22:00–05:00) | 0,52 | 0,37 | 0,10 | 1,50 |
 
-Cómo se obtuvieron, partiendo del punto medio de cada rango de referencia:
+### De dónde salen
 
-- arranque diurno 0,50–0,60 → 0,55 × 0,9 = **0,50**
-- km diurno 0,40–0,46 → 0,43 × 0,9 = **0,39**
-- minuto 0,10–0,12 → 0,11 × 0,9 = **0,10**
-- carrera mínima 1,45–1,75 → 1,60 × 0,9 = **1,44**
+De una medición real, no de una tabla de referencia. La regla es quedar
+**entre DiDi y Uber**: más caro que el primero, más barato que el segundo.
 
-La nocturna aplica a la diurna la misma subida que la referencia da para el km
-de noche (0,56 / 0,43 = 1,30).
+Trayecto medido: parada **El Florón** (Av. 10 de Agosto) → **Universidad
+Central del Ecuador**. 4,4 km, 7 minutos.
 
-> **La hora pico es una suposición.** La referencia municipal no la trae; se
-> dejó a medio camino entre diurna y nocturna (+15 % sobre la diurna). Si hay un
-> número oficial, cambiarlo en la tabla `tarifas`.
+| | Precio |
+|---|---|
+| DiDi | 1,50 |
+| **Ride, estándar** | **1,86** |
+| **Ride, hora pico** | **2,03** |
+| **Ride, nocturna** | **2,15** |
+| Uber | 2,25 |
+
+Las tres franjas caen dentro del rango, y esa es la regla: se aplica a todas,
+no solo a la estándar. La estándar queda casi en el punto medio exacto, que
+son 1,88.
+
+> **El recargo por franja tuvo que bajar.** Era +30 % de noche y +15 % en hora
+> pico. A +30 %, la nocturna se pasaba de Uber y rompía la regla. Ahora son
+> **+15 % la nocturna y +8 % la hora pico**: sigue costando más de noche, pero
+> sin salirse del techo.
+
+**Qué se comparó y qué no.** DiDi y Uber se consultaron en ese momento, así que
+sus números llevan dentro la demanda que hubiera. Y los 1,50 y 2,25 son de su
+categoría de coche normal: Confort y XL de Ride quedan por encima de 2,25 a
+propósito, porque no compiten contra lo mismo.
+
+> **Antes se calculaban de otra forma.** Hasta el 2026-09-02 salían de las
+> tarifas referenciales de taxi de Quito con un 10 % menos. Se abandonó ese
+> método porque dejaba el precio por encima de la competencia real; lo que
+> manda ahora es el rango DiDi–Uber.
 
 ## La formula
 
@@ -185,11 +205,12 @@ version concreta del framework.
 
 ## Bajada de precios frente a inDrive (2026-09-01, revertida el 2026-09-02)
 
-> **Esto ya no esta vigente.** El 2026-09-02 los precios volvieron a los de la
-> tabla de arriba, porque asi se pidio. Queda escrito porque la medicion sigue
-> siendo buena y el problema que describe no se ha ido: con las tarifas de hoy,
-> Ride vuelve a estar por encima de inDrive en el unico trayecto que se midio
-> de verdad.
+> **Esto ya no esta vigente.** El 2026-09-02 los precios se revirtieron y ese
+> mismo dia se volvieron a ajustar, ahora contra DiDi y Uber (ver «Los
+> valores»). Con las tarifas de hoy este trayecto de 8,4 km sale en **3,14**
+> frente a los 3,10 que recomendaba inDrive: practicamente a la par. La
+> medicion se conserva porque sigue siendo el unico dato que hay de ese
+> trayecto concreto.
 
 Medido en Quito, mismo trayecto de 8,4 km hasta la Universidad Central:
 inDrive recomendaba **3,10** y Ride cobraba **4,85**.
@@ -214,7 +235,7 @@ Dos cambios:
 
 Resultado en ese mismo viaje de 8,4 km:
 
-| | Antes, y otra vez hoy | Con la bajada | inDrive |
+| | Con 0,50 / 0,39 | Con 0,40 / 0,30 | inDrive |
 |---|---|---|---|
 | Estandar de dia | 3,78 | **2,92** | 3,10 |
 | Estandar de noche | 4,85 | **3,41** | 3,10 |
@@ -222,9 +243,13 @@ Resultado en ese mismo viaje de 8,4 km:
 
 ### Lo que cuesta, y hay que vigilarlo
 
-El chofer se lleva el 85 % de la tarifa. Con la bajada, ese mismo viaje pasaba
-de pagarle **4,12** de noche a **2,90**. Al revertirse vuelve a pagarle 4,12,
-asi que hoy este riesgo no aplica; aplicaria de nuevo si se vuelve a bajar.
+El chofer se lleva el 85 % de la tarifa, asi que cada bajada le llega entera.
+Ese viaje de noche le pagaba **4,12** con 0,65/0,50, **2,90** con la bajada de
+inDrive y **3,09** con las tarifas de hoy.
+
+Es el numero a vigilar. El cuello de botella de una app de viajes son los
+choferes, no los pasajeros; si dejan de conectarse, la palanca es la tarifa y
+no la comision.
 
 El cuello de botella de una app de viajes son los choferes, no los pasajeros.
 Si dejan de conectarse, el numero a mover es este —y la palanca es la tarifa,
