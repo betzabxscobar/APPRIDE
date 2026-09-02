@@ -1,0 +1,329 @@
+# El mapa de Ride
+
+**Sin claves, sin cuentas y sin cuotas.** La app funciona recién clonada, sin
+configurar nada.
+
+| Qué | Quién | Clave |
+|---|---|---|
+| Teselas del mapa | [OpenFreeMap](https://openfreemap.org/), **vectoriales** | ninguna |
+| Respaldo si no responde | [OpenStreetMap](https://www.openstreetmap.org), rasterizadas | ninguna |
+| Rutas por calles | [OSRM](https://github.com/Project-OSRM/osrm-backend) | ninguna |
+
+Desde el 2026-08-31 el mapa es **vectorial**, con estilos propios para claro y
+oscuro. Las teselas rasterizadas de OpenStreetMap siguen ahí como respaldo: se
+pintan primero y se cambia a las vectoriales cuando el estilo termina de
+cargar, así que nunca hay un hueco gris. El detalle está en
+[Teselas vectoriales](#teselas-vectoriales-openfreemap-2026-08-31).
+
+> El filtro que invierte los colores en modo oscuro es **solo del respaldo**.
+> OpenStreetMap no publica un estilo oscuro y hay que invertir sus teselas;
+> el estilo vectorial oscuro sí existe y no necesita el truco.
+
+## Zoom
+
+OpenStreetMap sirve teselas **hasta z19**; de z20 en adelante responde `400`.
+
+Eso lo cubre `maxNativeZoom: 19`: a partir de ahí `flutter_map` reutiliza la
+tesela de z19 y la escala, así que se puede seguir acercando y el mapa sigue
+ahí, solo que menos nítido.
+
+> **No poner `maxZoom` en el `TileLayer`.** Ese parámetro es hasta dónde se
+> *dibuja* la capa, no hasta dónde llega la fuente, y su valor por defecto es
+> infinito precisamente para que siempre haya teselas. Fijarlo en 19 dejaba el
+> mapa **en negro** en cuanto te acercabas más. Hay un test que lo vigila:
+> «Zoom del mapa».
+
+El gesto de zoom está acotado en `MapOptions` entre z3 y z21: más allá la tesela
+escalada ya no aporta nada, y más acá el mundo se repite en pantalla.
+
+## Rutas
+
+`lib/services/routing_service.dart` le pide a OSRM el recorrido real por calles
+entre dos puntos. Antes el mapa unía origen y destino con una **línea recta**,
+que atravesaba manzanas y ríos.
+
+`RideMap` lo usa solo: cuando `ruta` trae dos puntos, dibuja la recta de
+entrada —para que siempre haya algo— y la sustituye por el trazado real en
+cuanto llega. Si OSRM no responde, se queda la recta y no pasa nada más.
+
+Solo se recalcula cuando cambian el origen o el destino. En seguimiento la ruta
+se cachea por origen+destino: Realtime reconstruye esa pantalla cada minuto al
+reportar el chofer, y el recorrido no cambia por eso.
+
+> **Estaba escrito pero no conectado.** Hasta el 2026-08-27 `RoutingService` no
+> lo llamaba nadie: las dos pantallas con mapa dibujaban `[origen, destino]`,
+> una recta de dos puntos. Eso era «la ruta se ve muy mal».
+
+### Cuál de las rutas se elige
+
+OSRM ordena por **tiempo**, no por distancia, y a veces la segunda tarda lo
+mismo y es más corta —medido en Quito: 9,29 km y 10,39 km, las dos en 22,6 min—.
+Por eso se piden alternativas y decide `elegirMejor`: de las que no tardan más
+de un 10 % sobre la más rápida, se queda con la más corta. Tiene pruebas.
+
+### La distancia y el tiempo NO fijan el precio
+
+La tarifa la calcula `cotizar_viaje` en Postgres y ahí se queda: el cliente se
+puede manipular, así que no puede decir cuánto cuesta un viaje.
+
+Pero conviene saber que **no coinciden**. Postgres usa la distancia en línea
+recta por un factor de `1.35`, no el camino real. Medido en Quito sobre el mismo
+par de puntos:
+
+| | km |
+|---|---|
+| Línea recta | 3,53 |
+| Lo que cobra (× 1.35) | 4,77 |
+| Ruta real (OSRM) | 5,92 |
+
+La tarifa se queda un ~19 % corta en ese trayecto. Subir el factor o pasar a
+cobrar por distancia real es una decisión de negocio, no técnica.
+
+### El servidor de OSRM
+
+Por defecto la app usa el **servidor público de demostración**
+(`router.project-osrm.org`), que no pide clave. Su política lo limita a
+desarrollo: puede ir lento y puede cortar. Lo mismo vale para el de FOSSGIS
+(`routing.openstreetmap.de`), que se probó y responde idéntico.
+
+**Para producción hay que levantar el propio.** Está todo preparado en
+`infra/osrm/`: Docker Compose con OSRM y Caddy —que saca el certificado HTTPS
+solo— más un script que descarga el mapa de Ecuador y construye el grafo.
+
+```bash
+cd infra/osrm
+cp .env.ejemplo .env && nano .env    # el dominio
+./preparar.sh
+docker compose up -d
+```
+
+Y se apunta la app ahí:
+
+```bash
+flutter build web --dart-define=OSRM_URL=https://rutas.tudominio.com
+```
+
+Tiene que ser **https**: una página servida por https no puede llamar a http, el
+navegador lo bloquea por contenido mixto.
+
+Detalles, requisitos de memoria y cómo refrescar el mapa, en
+[`infra/osrm/README.md`](../infra/osrm/README.md).
+
+## Por qué no un mapa «más bonito»
+
+El estilo de OSM está pensado para leerse solo, así que compite un poco con los
+marcadores. Se probaron las alternativas y **todas exigen clave, cuenta, o las
+dos**:
+
+| Vía | Qué pasó |
+|---|---|
+| **CARTO raster** sin clave | Responde `200 image/png`, pero con «API KEY REQUIRED» estampado *dentro* de la imagen. Con teselas hay que mirar el PNG, no el código HTTP. |
+| **CARTO raster** con clave | Funciona y se ve muy bien. La clave es gratis y no pide cuenta (<https://carto.com/basemaps/apikey>, llega por correo), con un tope de uso razonable de 5 M teselas/mes. Ojo: **no** es lo mismo que un *API Access Token* del workspace de CARTO, ni que la URL de su servidor MCP. |
+| **Mapbox** | `light-v11` / `dark-v11` se ven muy bien y un token malo falla limpio (`401`, no marca de agua). Pero exige crear cuenta y su capa gratuita son 50 000 cargas/mes. |
+| **Esri Gray Canvas** | Limpio y sin clave, pero su capa de etiquetas está vacía de z13 en adelante. Un mapa sin nombres de calle no sirve para elegir dónde te recogen. |
+| **CARTO vectorial** (`vector_map_tiles`) | Es lo que usa [mapcn](https://www.mapcn.dev/) por debajo, y los datos son correctos —`style.json` con 93 capas, teselas `.mvt` sin clave, CORS abierto— pero el mapa salía en negro y no se pudo depurar. |
+| **`maplibre_gl`** | El motor oficial de MapLibre. Obligaba a reescribir `RideMap` entero: marcadores, rutas y controlador cambian de API. |
+
+Si algún día se quiere un mapa **sin ningún límite y sin clave**, la opción real
+es [OpenFreeMap](https://openfreemap.org/): sin registro, sin tope y con uso
+comercial permitido. El pero es que solo sirve teselas **vectoriales**, que es
+el camino que no quedó funcionando.
+
+### mapcn
+
+[mapcn](https://www.mapcn.dev/) es **React** — `npx shadcn@latest add @mapcn/map`
+copia componentes JSX. Hay ports de Svelte, Vue, React Native y Angular; **de
+Flutter no hay**, así que en esta app no se puede usar.
+
+En **WEB-RIDE**, que sí es React, entra tal cual con ese comando.
+
+## Dónde se centra el mapa y dónde busca las direcciones
+
+Lo decide `lib/core/map_defaults.dart`, a partir de la última posición leída
+(`LocationService.ultimaConocida`). Si todavía no hay ninguna, se muestra una
+vista de país a zoom 6 — un encuadre general, que no afirma nada sobre dónde
+estás.
+
+**Nunca volver a poner una ciudad escrita a mano ahí.** Antes las cuatro
+pantallas con mapa tenían `LatLng(-2.1709, -79.9224)` —Guayaquil— como relleno,
+y eso rompía la búsqueda de direcciones para todo el que no estuviera en
+Guayaquil. Buscando «La Carolina» (un parque de Quito):
+
+| Sesgo | Resultados |
+|---|---|
+| Ninguno | Jaén (España), Coronel Pringles (Argentina), Quito |
+| Guayaquil | Pimocha, Pimocha, Quevedo |
+| La posición real (Quito) | Quito, Quito, Quito |
+
+El sesgo se le pasa a Photon como `lat`/`lon`, y no es opcional: sin él, los
+nombres de calle repetidos devuelven el de otro país.
+
+## Atribución
+
+La licencia ODbL obliga a acreditar OpenStreetMap allí donde se muestren sus
+datos, así que el crédito del mapa no se puede quitar. En las pantallas con hoja
+arrastrable sube con la hoja (`margenCredito`) para que nunca quede detrás.
+
+## Teselas vectoriales: OpenFreeMap (2026-08-31)
+
+Diego dijo que el mapa se veía desactualizado. Conviene separar dos cosas que
+suenan igual:
+
+- **Los datos NO estaban viejos.** `tile.openstreetmap.org` se refresca de forma
+  continua.
+- **El dibujo sí.** Son teselas *rasterizadas*: imágenes PNG de 256 px con el
+  estilo clásico de OSM, de hace más de una década. En un teléfono moderno hay
+  que ampliarlas, y se ven borrosas y anticuadas.
+
+Lo que arregla eso son las **teselas vectoriales**: no traen el dibujo, traen
+los datos, y los pinta el teléfono a la resolución de su pantalla.
+
+### Proveedor: OpenFreeMap
+
+**Sin clave, sin cuenta, sin tarjeta y sin cupo.** Es la única condición que
+importa aquí: CARTO, Mapbox y Esri murieron todos en el mismo sitio, pidiendo
+una clave (ver arriba).
+
+- Estilo claro: `https://tiles.openfreemap.org/styles/liberty`
+- Estilo oscuro: `https://tiles.openfreemap.org/styles/dark`
+
+El oscuro es un estilo de verdad, no el truco de invertir los colores de una
+imagen clara que hacía falta con OSM.
+
+### Plugin: `flutter_map_vector_tiles`
+
+`vector_map_tiles`, el más conocido, **no vale**: ni su versión estable ni sus
+betas pasan de `flutter_map ^7`, y aquí hay 8.3.1. Usarlo obligaría a bajar de
+versión flutter_map y a rehacer el mapa entero.
+
+`flutter_map_vector_tiles` sí soporta `flutter_map ^8.2`. **Es un paquete
+joven** (2 likes, publicador sin verificar), y por eso el mapa nunca depende de
+que funcione: ver el respaldo, abajo.
+
+### El respaldo importa más que el estilo
+
+`RideMap` pinta **siempre** las teselas rasterizadas de OpenStreetMap primero, y
+cambia a las vectoriales cuando el estilo termina de cargar. Si OpenFreeMap no
+responde, si el paquete falla o si no hay red, el mapa se queda con el estilo de
+siempre. **Nunca hay un hueco gris.** Un mapa feo es infinitamente mejor que un
+mapa que no está.
+
+### Lo que se verificó, y cómo
+
+La lección de CARTO fue que un `200 OK` no prueba nada: sus teselas devolvían
+`200 image/png` con «API KEY REQUIRED» dibujado dentro. Así que esta vez se
+comprobó el contenido:
+
+| Qué | Resultado |
+|---|---|
+| Los cinco estilos | JSON de MapLibre v8, sin `{key}` |
+| TileJSON | compilación `20260823`, datos de OSM de 8 días antes |
+| Una tesela real de Quito (z14) | 347 KB de MVT, con capas `water`, `building`, `transportation`, `place`, `landuse`, `boundary` |
+| Fuentes (`glyphs`) | 76 KB de protobuf — sin esto no habría etiquetas |
+| Iconos (`sprite`) | PNG de 512×263 **abierto y mirado**: iconos reales, ningún aviso de clave dentro |
+
+**Lo que NO está verificado: cómo se ve.** En este entorno no se puede renderizar
+Flutter, así que nadie ha visto todavía este mapa dibujado en una pantalla. Esa
+comprobación es de Diego, con el APK en el teléfono.
+
+### Atribución
+
+Cambia con la capa: sobre el respaldo rasterizado solo se acredita a
+OpenStreetMap; sobre el vectorial, `© OpenMapTiles © OpenStreetMap`, que es lo
+que exigen las condiciones de OpenFreeMap.
+
+### Estilos propios (2026-08-31, tras probar el APK)
+
+Probando en Quito salieron dos cosas que los estilos de OpenFreeMap no cubren:
+
+1. **El estilo oscuro no tiene ni un nombre de lugar.** `dark`, `positron` y
+   `fiord` son mapas base minimalistas: **cero** capas de POI. En modo oscuro no
+   se veia una farmacia, un restaurante ni una parada.
+2. **En claro los nombres salen tarde.** `liberty` los suelta por rango: los
+   importantes en z15, el resto en z16 y z17.
+
+| Estilo | Etiquetas POI | Nombres de calle | Fondo |
+|---|---|---|---|
+| liberty | 4 | 6 | claro |
+| bright | 4 | 6 | claro |
+| positron | **0** | 6 | claro |
+| dark | **0** | 2 | oscuro |
+| fiord | **0** | 2 | oscuro |
+
+`tool/generar_estilos_mapa.dart` parte de los de OpenFreeMap, lleva las capas de
+POI de `liberty` al oscuro —recoloreadas— y adelanta **un** nivel el zoom al que
+aparecen en los dos. Un nivel y no tres: las etiquetas se pisan entre ellas y un
+mapa ilegible es peor que uno con pocos nombres. El resultado vive en
+`assets/mapa/` y va dentro de la app.
+
+Efecto secundario bueno: el estilo ya no se descarga, asi que el mapa sale
+dibujado en el primer frame en vez de empezar rasterizado. Las teselas siguen
+viniendo de la red y actualizandose solas; lo unico congelado es el dibujo.
+
+### Cuantos nombres hay, de verdad
+
+Comparado contra Google Maps, el mapa parece tener menos sitios. Medido en un
+cuadro de ~900 m alrededor de la Av. 10 de Agosto (Quito):
+
+| | Nombres |
+|---|---|
+| Lo que tiene OpenStreetMap ahi | 394 |
+| Lo que viaja en la tesela de OpenFreeMap | 171 (43 %) |
+| Lo que viaja en la tesela de VersaTiles | 128 (32 %) |
+
+OpenFreeMap gana, y por eso se queda. El resto lo recorta el propio esquema de
+teselas por rango de importancia.
+
+**Lo que no se arregla cambiando de estilo ni de proveedor:** lo que no esta en
+OpenStreetMap. El Instituto Tecnologico Sudamericano de Quito, por ejemplo, no
+existe en OSM —si estan el de Cuenca y el de Loja—, asi que ningun mapa basado
+en OSM puede dibujarlo. Google tiene su propia base de negocios, que es de pago
+y pide tarjeta. Lo que si se puede hacer es **anadirlo a OpenStreetMap**: es
+gratis, lo edita cualquiera, y arregla a la vez el mapa y el buscador de
+direcciones, que tambien sale de OSM via Photon.
+
+## Direcciones equivocadas: falta la clave, no el codigo (2026-08-31)
+
+Diego reporto que las direcciones «son mentira». Dos causas distintas:
+
+**1. TOMTOM_KEY nunca llego a la compilacion.** `lib/core/busqueda_config.dart`
+integra TomTom precisamente porque OSM va flojo en Quito, pero
+`config/credenciales-administrativas.json` no tenia esa clave, asi que **todos**
+los APK entregados hasta hoy corrian solo con Photon. No es un fallo de codigo:
+la clave se saca gratis con un correo en <https://developer.tomtom.com>, sin
+tarjeta, y se pone en ese archivo. Ya aparece en la plantilla para que no vuelva
+a pasar desapercibida.
+
+**2. Photon devolvia codigos postales como si fueran sitios.** Medido con
+geocodificacion inversa en Quito:
+
+| Punto | Lo que contestaba |
+|---|---|
+| Av. 10 de Agosto | `Innova Dentist, Avenida 10 de Agosto` — a 2 m. Bien. |
+| La Carolina | **`170515, Iñaquito`** — un codigo postal como direccion |
+| Loma Puengasi | `Barricada, Conocoto` — parroquia equivocada |
+
+La distancia no era el problema (2–188 m); la **etiqueta** si. Photon devuelve
+features de tipo `postcode` cuyo `name` es el propio numero, y el codigo lo
+tomaba tal cual. `_nombreUtil` los descarta ahora, junto con cualquier nombre
+que sea solo cifras, y baja a barrio o ciudad antes que decir «Sin nombre».
+
+## El boton 3D y «el plugin del mapa actualizado»
+
+Son dos preguntas distintas y conviene no mezclarlas:
+
+- **Mas nombres de sitios NO se arregla con ningun plugin.** El plugin solo
+  dibuja; los nombres vienen de los datos. Cambiar de renderizador deja el mapa
+  exactamente con los mismos sitios. Eso se arregla con mejores datos: TomTom
+  para el buscador, o anadiendo los sitios que faltan a OpenStreetMap.
+- **El 3D si necesita otro plugin.** El boton de Google Maps que levanta los
+  edificios manteniendo el estilo es *camara inclinada + `fill-extrusion`*.
+  `flutter_map` es una libreria **2D**: no tiene inclinacion de camara, asi que
+  no puede hacerlo por diseno.
+
+Para 3D habria que pasar a **MapLibre GL** (`maplibre`, editor verificado, o
+`maplibre_gl`, de la propia organizacion MapLibre). Renderiza vectorial por GPU
+con inclinacion hasta 85 grados y capas `fill-extrusion`, sin clave. **Es un
+reemplazo del motor del mapa, no un anadido**: cambian los marcadores, las
+rutas, el controlador de camara y las cuatro pantallas que lo usan. Decision
+pendiente de Diego.

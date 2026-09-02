@@ -1,0 +1,10 @@
+{
+  "_comentario": "Plantilla. Copia este archivo como credenciales-administrativas.json (git lo ignora), pon los valores reales y compila con --dart-define-from-file=config/credenciales-administrativas.json. Sin ese archivo la app funciona igual, solo que sin cuentas administrativas y con el buscador de direcciones flojo en Quito.",
+  "RIDE_ADMIN_BETZABE": "",
+  "RIDE_ADMIN_DIEGO": "",
+  "RIDE_ADMIN_ALEX": "",
+  "RIDE_ADMIN_MAYURI": "",
+  "RIDE_ADMIN_JAVIER": "",
+  "TOMTOM_KEY": "",
+  "_comentario_tomtom": "Clave del buscador de direcciones. SIN ELLA las direcciones salen de Photon/OpenStreetMap, que en Quito va flojo y devuelve barrios equivocados o codigos postales como si fueran una direccion. Se saca gratis con un correo en https://developer.tomtom.com, sin tarjeta: 2500 busquedas al dia. Ver lib/core/busqueda_config.dart."
+}

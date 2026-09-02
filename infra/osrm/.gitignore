@@ -1,0 +1,5 @@
+# El .env lleva el dominio de cada despliegue.
+.env
+
+# El grafo pesa cientos de MB y se regenera con preparar.sh.
+datos/

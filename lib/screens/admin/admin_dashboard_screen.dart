@@ -1,0 +1,900 @@
+import 'package:flutter/material.dart';
+
+import '../../core/app_theme.dart';
+import '../../core/ride_colors.dart';
+import '../../models/app_user.dart';
+import '../../models/user_role.dart';
+import '../../services/auth_service.dart';
+import '../../widgets/panel_switcher.dart';
+import '../../widgets/user_avatar.dart';
+import '../settings/settings_screen.dart';
+import 'admin_fares_panel.dart';
+import 'admin_support_panel.dart';
+import 'admin_trips_panel.dart';
+import 'driver_review_screen.dart';
+
+/// Secciones del panel, las mismas de la barra lateral de WEB-RIDE.
+enum _Section {
+  resumen('Resumen', Icons.dashboard_outlined),
+  usuarios('Usuarios', Icons.people_outline),
+  conductores('Conductores', Icons.drive_eta_outlined),
+  viajes('Viajes', Icons.route_outlined),
+  tarifas('Tarifas', Icons.payments_outlined),
+  soporte('Soporte', Icons.help_outline);
+
+  const _Section(this.label, this.icon);
+  final String label;
+  final IconData icon;
+}
+
+/// Panel administrativo. Versión móvil del `AdminDashboard` de WEB-RIDE:
+/// mismas métricas, mismo listado de cuentas y las mismas reglas de
+/// visibilidad entre `admin` y `superadmin`.
+class AdminDashboardScreen extends StatefulWidget {
+  const AdminDashboardScreen({
+    super.key,
+    required this.user,
+    required this.viewAs,
+  });
+
+  final AppUser user;
+
+  /// Panel que se está mostrando: `admin` o `superadmin`.
+  ///
+  /// Un superadmin puede abrir el panel *visto como admin* para revisar qué
+  /// alcance tiene ese rol. Su cuenta sigue siendo superadmin — esto solo
+  /// cambia lo que se presenta.
+  final UserRole viewAs;
+
+  @override
+  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+}
+
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  _Section _section = _Section.resumen;
+  List<AppUser> _users = const [];
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+  }
+
+  bool _loadingUsers = true;
+
+  Future<void> _loadUsers() async {
+    setState(() => _loadingUsers = true);
+    try {
+      final users = await AuthService.instance.visibleUsers();
+      if (!mounted) return;
+      setState(() {
+        // Al mirar el panel *como admin*, RLS sigue enviando a los superadmin
+        // porque el rol real de la cuenta no cambió. Se ocultan aquí para que
+        // la previsualización sea fiel a lo que vería un admin de verdad.
+        //
+        // Es filtrado de presentación, no de seguridad: la barrera real son
+        // las políticas RLS, que sí aplican para una cuenta admin auténtica.
+        _users = widget.viewAs.isSuperadmin
+            ? users
+            : users.where((u) => !u.role.isSuperadmin).toList();
+        _error = null;
+      });
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _loadingUsers = false);
+    }
+  }
+
+  /// Manda la vista, no el rol: si un superadmin abrió el panel como admin,
+  /// la pantalla se comporta como la de un admin.
+  bool get _isSuperadmin => widget.viewAs.isSuperadmin;
+  String get _accessName =>
+      _isSuperadmin ? 'SUPERADMINISTRACIÓN' : 'ADMINISTRACIÓN';
+
+  int _countOf(UserRole role) =>
+      _users.where((user) => user.role == role).length;
+
+  Future<void> _signOut() async {
+    await AuthService.instance.signOut();
+  }
+
+  Future<void> _abrirConfiguracion() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+    // El nombre o la foto pueden haber cambiado mientras estaba dentro.
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Column(
+          children: [
+            Text(
+              _accessName,
+              style: TextStyle(
+                fontSize: 10,
+                letterSpacing: 1.1,
+                fontWeight: FontWeight.w800,
+                color: context.ride.info,
+              ),
+            ),
+            Text(_section.label),
+          ],
+        ),
+        actions: [
+          // El avatar abre Configuración, igual que en las pantallas de
+          // pasajero y de chofer. Antes era un adorno: desde el panel
+          // administrativo no había forma de llegar a la propia cuenta.
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              tooltip: 'Configuración',
+              onPressed: _abrirConfiguracion,
+              icon: UserAvatar(
+                iniciales: widget.user.initials,
+                fotoUrl: widget.user.fotoUrl,
+                radio: 17,
+                color: context.ride.info,
+                fondo: context.ride.infoSoft,
+              ),
+            ),
+          ),
+        ],
+      ),
+      drawer: _AdminDrawer(
+        user: widget.user,
+        accessName: _accessName,
+        showPanelSwitcher: true,
+        active: _section,
+        onSelect: (section) {
+          Navigator.of(context).pop();
+          setState(() => _section = section);
+        },
+        onSignOut: _signOut,
+        onSettings: () {
+          Navigator.of(context).pop();
+          _abrirConfiguracion();
+        },
+      ),
+      body: SafeArea(
+        child: switch (_section) {
+          _Section.resumen => _Overview(
+              user: widget.user,
+              users: _users,
+              error: _error,
+              loading: _loadingUsers,
+              passengers: _countOf(UserRole.passenger),
+              drivers: _countOf(UserRole.driver),
+              administrators: _countOf(UserRole.admin) +
+                  _countOf(UserRole.superadmin),
+              onSeeAll: () => setState(() => _section = _Section.usuarios),
+            ),
+          _Section.usuarios =>
+            _UserList(users: _users, error: _error, loading: _loadingUsers),
+          // La revisión de conductores dejó de ser una pantalla de espera: es
+          // donde se ven los papeles que suben —cédula, licencia, SOAT y
+          // matrícula— junto con su vehículo y su teléfono.
+          _Section.conductores => const DriverReviewPanel(),
+          _Section.viajes => const AdminTripsPanel(),
+          _Section.tarifas => const AdminFaresPanel(),
+          _Section.soporte => const AdminSupportPanel(),
+        },
+      ),
+    );
+  }
+}
+
+class _AdminDrawer extends StatelessWidget {
+  const _AdminDrawer({
+    required this.user,
+    required this.accessName,
+    required this.showPanelSwitcher,
+    required this.active,
+    required this.onSelect,
+    required this.onSignOut,
+    required this.onSettings,
+  });
+
+  final AppUser user;
+  final String accessName;
+  final bool showPanelSwitcher;
+  final _Section active;
+  final ValueChanged<_Section> onSelect;
+  final Future<void> Function() onSignOut;
+  final VoidCallback onSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      backgroundColor: context.ride.surface,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      width: 42,
+                      height: 42,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ride',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: context.ride.ink,
+                          ),
+                        ),
+                        Text(
+                          accessName,
+                          style: TextStyle(
+                            fontSize: 10,
+                            letterSpacing: 1,
+                            fontWeight: FontWeight.w700,
+                            color: context.ride.inkMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  for (final section in _Section.values)
+                    ListTile(
+                      leading: Icon(
+                        section.icon,
+                        size: 21,
+                        color: section == active
+                            ? context.ride.info
+                            : context.ride.inkMuted,
+                      ),
+                      title: Text(
+                        section.label,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: section == active
+                              ? context.ride.ink
+                              : context.ride.inkMuted,
+                        ),
+                      ),
+                      selected: section == active,
+                      selectedTileColor: context.ride.infoSoft,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                      onTap: () => onSelect(section),
+                    ),
+                ],
+              ),
+            ),
+            if (showPanelSwitcher) ...[
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: PanelSwitcher(
+                  onSwitched: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: context.ride.successSoft,
+                  borderRadius: BorderRadius.circular(AppTheme.radius),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline,
+                      size: 18,
+                      color: context.ride.success,
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Sistema operativo',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: context.ride.ink,
+                            ),
+                          ),
+                          Text(
+                            'Acceso protegido',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.ride.inkMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+              child: TextButton.icon(
+                onPressed: onSettings,
+                icon: const Icon(Icons.settings_outlined, size: 18),
+                label: const Text('Configuración'),
+                style: TextButton.styleFrom(
+                  foregroundColor: context.ride.ink,
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: TextButton.icon(
+                onPressed: onSignOut,
+                icon: const Icon(Icons.logout, size: 18),
+                label: const Text('Cerrar sesión'),
+                style: TextButton.styleFrom(
+                  foregroundColor: context.ride.danger,
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Overview extends StatelessWidget {
+  const _Overview({
+    required this.user,
+    required this.users,
+    required this.error,
+    required this.loading,
+    required this.passengers,
+    required this.drivers,
+    required this.administrators,
+    required this.onSeeAll,
+  });
+
+  final AppUser user;
+  final List<AppUser> users;
+  final String? error;
+  final bool loading;
+  final int passengers;
+  final int drivers;
+  final int administrators;
+  final VoidCallback onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: context.ride.infoSoft,
+            borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'PANEL DE CONTROL',
+                style: TextStyle(
+                  fontSize: 10,
+                  letterSpacing: 1.1,
+                  fontWeight: FontWeight.w800,
+                  color: context.ride.info,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Hola, ${user.firstName}',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: context.ride.ink,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Revisa el estado real de las cuentas registradas en Ride.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: context.ride.inkMuted,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Icon(
+                    Icons.verified_user_outlined,
+                    size: 16,
+                    color: context.ride.info,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Sesión ${user.role.displayName.toLowerCase()} segura',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: context.ride.info,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: _Metric(
+                label: 'Pasajeros',
+                value: passengers,
+                color: context.ride.accent,
+                background: context.ride.accentSoft,
+                icon: Icons.person_outline,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _Metric(
+                label: 'Conductores',
+                value: drivers,
+                color: context.ride.success,
+                background: context.ride.successSoft,
+                icon: Icons.drive_eta_outlined,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _Metric(
+                label: 'Equipo administrativo',
+                value: administrators,
+                color: context.ride.info,
+                background: context.ride.infoSoft,
+                icon: Icons.shield_outlined,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _Metric(
+                label: 'Viajes registrados',
+                value: 0,
+                color: context.ride.danger,
+                background: Color(0x14E5484D),
+                icon: Icons.route_outlined,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        _Card(
+          title: 'Usuarios registrados',
+          subtitle: 'Información obtenida desde Supabase.',
+          action: TextButton(onPressed: onSeeAll, child: const Text('Ver todos')),
+          child: Column(
+            children: [
+              if (error != null)
+                _Note(error!)
+              else if (loading)
+                const _Note('Cargando usuarios…')
+              else if (users.isEmpty)
+                const _Note('Todavía no hay cuentas registradas.')
+              else
+                for (final account in users.take(5)) _UserRow(user: account),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        const _ImplementationStatus(),
+      ],
+    );
+  }
+}
+
+class _UserList extends StatelessWidget {
+  const _UserList({
+    required this.users,
+    required this.error,
+    required this.loading,
+  });
+
+  final List<AppUser> users;
+  final String? error;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    if (error != null) {
+      return Padding(
+        padding: const EdgeInsets.all(20),
+        child: _Note(error!),
+      );
+    }
+    if (loading) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: _Note('Cargando usuarios…'),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+      children: [
+        Text(
+          '${users.length} cuentas visibles para tu rol',
+          style: TextStyle(fontSize: 13, color: context.ride.inkMuted),
+        ),
+        const SizedBox(height: 14),
+        _Card(
+          title: 'Todas las cuentas',
+          subtitle: 'Pasajeros, conductores y equipo administrativo.',
+          child: Column(
+            children: [
+              if (users.isEmpty)
+                const _Note('Todavía no hay cuentas registradas.')
+              else
+                for (final account in users) _UserRow(user: account),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.background,
+    required this.icon,
+  });
+
+  final String label;
+  final int value;
+  final Color color;
+  final Color background;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.ride.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radius),
+        border: Border.all(color: context.ride.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+            child: Icon(icon, size: 18, color: color),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '$value',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: context.ride.ink,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: context.ride.inkMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Card extends StatelessWidget {
+  const _Card({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+    this.action,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget child;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.ride.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+        border: Border.all(color: context.ride.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: context.ride.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.ride.inkMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ?action,
+            ],
+          ),
+          const SizedBox(height: 8),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _UserRow extends StatelessWidget {
+  const _UserRow({required this.user});
+
+  final AppUser user;
+
+  String get _date {
+    final createdAt = user.createdAt;
+    if (createdAt == null) return 'Sin fecha';
+    const months = [
+      'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+      'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+    ];
+    final day = createdAt.day.toString().padLeft(2, '0');
+    return '$day ${months[createdAt.month - 1]} ${createdAt.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 19,
+            backgroundColor: user.role.accentSoft,
+            child: Text(
+              user.initials,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: user.role.accent,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: context.ride.ink,
+                  ),
+                ),
+                Text(
+                  user.email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.ride.inkMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: user.role.accentSoft,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  user.role.displayName,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: user.role.accent,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _date,
+                style: TextStyle(fontSize: 11, color: context.ride.inkMuted),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImplementationStatus extends StatelessWidget {
+  const _ImplementationStatus();
+
+  @override
+  Widget build(BuildContext context) {
+    const steps = [
+      // Lo que de verdad está funcionando. Se quedó desfasado: seguía
+      // diciendo que Supabase estaba «preparada para el integrador» cuando
+      // llevaba semanas conectada, y que los viajes eran «el siguiente
+      // módulo» con el ciclo entero ya andando. Un tablero que miente sobre
+      // el avance es peor que no tenerlo.
+      (true, 'Acceso por roles', 'Admin y superadmin diferenciados'),
+      (true, 'Primer acceso seguro', 'Cambio de contraseña administrativa'),
+      (true, 'Conexión con Supabase', 'Base, autenticación, RLS y tiempo real'),
+      (true, 'Ciclo de viajes', 'Pedir, aceptar, seguir en el mapa y cobrar'),
+      (true, 'Tipos de vehículo', 'Moto, estándar, confort y XL con su tarifa'),
+      (true, 'Revisión de conductores', 'Documentos y aprobación desde el panel'),
+      (true, 'Chat y código de inicio', 'Mensajes del viaje y verificación de 6 dígitos'),
+      (false, 'Firma de producción', 'Pendiente: hoy se firma con la de depuración'),
+    ];
+
+    return _Card(
+      title: 'Estado de implementación',
+      subtitle: 'Avance funcional del proyecto.',
+      child: Column(
+        children: [
+          for (final (index, step) in steps.indexed)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: step.$1 ? context.ride.successSoft : context.ride.background,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: step.$1 ? context.ride.success : context.ride.border,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: step.$1
+                        ? Icon(Icons.check, size: 14, color: context.ride.success)
+                        : Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: context.ride.inkMuted,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          step.$2,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: context.ride.ink,
+                          ),
+                        ),
+                        Text(
+                          step.$3,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.ride.inkMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Note extends StatelessWidget {
+  const _Note(this.message);
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Text(
+        message,
+        style: TextStyle(
+          fontSize: 13,
+          height: 1.4,
+          color: context.ride.inkMuted,
+        ),
+      ),
+    );
+  }
+}
