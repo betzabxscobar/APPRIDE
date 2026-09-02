@@ -10,8 +10,9 @@ puede manipular, así que no puede ser quien diga cuánto cuesta un viaje.
 | | Arranque | Por km | Por minuto | Carrera mínima |
 |---|---|---|---|---|
 | **Estándar** (resto del día) | 0,45 | 0,32 | 0,09 | 1,30 |
-| **Hora pico** (06:00–09:00) | 0,49 | 0,35 | 0,10 | 1,40 |
-| **Nocturna** (22:00–05:00) | 0,52 | 0,37 | 0,10 | 1,50 |
+| **Hora pico mañana** (06:00–08:59) | 0,49 | 0,35 | 0,10 | 1,40 |
+| **Hora pico tarde** (16:00–19:59) | 0,49 | 0,35 | 0,10 | 1,40 |
+| **Nocturna** (22:00–04:59) | 0,52 | 0,37 | 0,10 | 1,50 |
 
 ### De dónde salen
 
@@ -47,6 +48,29 @@ propósito, porque no compiten contra lo mismo.
 > tarifas referenciales de taxi de Quito con un 10 % menos. Se abandonó ese
 > método porque dejaba el precio por encima de la competencia real; lo que
 > manda ahora es el rango DiDi–Uber.
+
+### Las franjas horarias
+
+Salen del **Pico y Placa** de Quito, que es la definición municipal de cuándo
+hay congestión: **06:00–09:30 y 16:00–20:00, de lunes a viernes**. Antes la
+hora pico era 06:00–09:00 inventada y no existía la de la tarde, que en Quito
+es la peor.
+
+La tabla guarda **horas enteras**, así que las medias horas hay que redondear:
+
+| Pico y Placa | En `tarifas` | Diferencia |
+|---|---|---|
+| 06:00–09:30 | 06:00–08:59 | se queda 31 min corta |
+| 16:00–20:00 | 16:00–19:59 | clava el horario |
+
+En la mañana se recorta en vez de estirar: cobrar hora pico a las 09:45 —que
+es lo que pasaba antes— es cobrar de más fuera de la congestión, y entre
+quedarse corto y pasarse, mejor corto.
+
+> **El Pico y Placa es de lunes a viernes; la tarifa no distingue el día.** La
+> tabla no tiene columna de día de la semana, así que un domingo a las 17:00
+> se cobra hora pico aunque no haya tráfico. Arreglarlo pide una columna nueva
+> y tocar `tarifa_vigente()`; hasta entonces, queda dicho.
 
 ## La formula
 
@@ -114,7 +138,13 @@ para que salgan choferes en la franja donde escasean.
 
 La elige el **servidor** con `public.tarifa_vigente()`, según la hora local de
 Ecuador (`America/Guayaquil`). La franja que cubre la hora gana; si ninguna la
-cubre, se usa la que no tiene franja.
+cubre, se usa la que no tiene franja. Si dos coincidieran, gana la más cara.
+
+> **Los dos extremos entran, y solo cuenta la hora entera.** La comparación es
+> un `between` sobre `extract(hour ...)`, así que `hora_hasta = 8` cubre hasta
+> las **08:59**, no hasta las 08:00. Por eso las franjas se escriben aquí
+> terminando en :59. Poner 9 alarga la franja una hora entera, que es
+> exactamente el error que tenía antes.
 
 > Antes la elegía el cliente: `_tarifaPorDefecto()` en Dart ordenaba por
 > `tarifa_base` y se quedaba con la primera, o sea **siempre la más barata**.
