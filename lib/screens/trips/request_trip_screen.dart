@@ -554,7 +554,7 @@ class _SelectorCategoria extends StatelessWidget {
             seleccionada: o.categoria.id == elegida,
             onTap: () => onElegir(o.categoria.id),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
         ],
       ],
     );
@@ -583,8 +583,9 @@ class _OpcionCategoria extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppTheme.radiusField),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppTheme.radiusField),
             border: Border.all(
@@ -592,66 +593,64 @@ class _OpcionCategoria extends StatelessWidget {
               width: seleccionada ? 1.8 : 1.2,
             ),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                cat.icon,
-                size: 28,
-                color: seleccionada ? ride.accent : ride.inkMuted,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          cat.nombre,
-                          style: TextStyle(
-                            fontSize: AppText.small,
-                            fontWeight: FontWeight.w800,
-                            color: ride.ink,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          Icons.person_outline,
-                          size: 13,
-                          color: ride.inkFaint,
-                        ),
-                        Text(
-                          '${cat.pasajeros}',
-                          style: TextStyle(
-                            fontSize: AppText.micro,
-                            fontWeight: FontWeight.w700,
-                            color: ride.inkFaint,
-                          ),
-                        ),
-                      ],
+              Row(
+                children: [
+                  Icon(
+                    cat.icon,
+                    size: 26,
+                    color: seleccionada ? ride.accent : ride.inkMuted,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    cat.nombre,
+                    style: TextStyle(
+                      fontSize: AppText.small,
+                      fontWeight: FontWeight.w800,
+                      color: ride.ink,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      cat.descripcion,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: AppText.micro,
-                        color: ride.inkMuted,
-                      ),
+                  ),
+                  const SizedBox(width: 7),
+                  Icon(Icons.person_outline, size: 13, color: ride.inkFaint),
+                  Text(
+                    '${cat.pasajeros}',
+                    style: TextStyle(
+                      fontSize: AppText.micro,
+                      fontWeight: FontWeight.w700,
+                      color: ride.inkFaint,
                     ),
-                  ],
-                ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '\$${opcion.total.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: AppText.h3,
+                      fontWeight: FontWeight.w900,
+                      color: seleccionada ? ride.accent : ride.ink,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 10),
-              Text(
-                '\$${opcion.total.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: AppText.h3,
-                  fontWeight: FontWeight.w900,
-                  color: seleccionada ? ride.accent : ride.ink,
+              // La descripción solo en la elegida.
+              //
+              // Antes iba en las cuatro, cortada a media frase —«Rapido y
+              // economico. Solo 1 pa…»— y hacía la lista tan alta que XL se
+              // salía de la pantalla. Un texto cortado no informa: ocupa. Así
+              // caben las cuatro y la explicación se lee entera justo cuando
+              // interesa, que es al elegir.
+              if (seleccionada) ...[
+                const SizedBox(height: 6),
+                Text(
+                  cat.descripcion,
+                  style: TextStyle(
+                    fontSize: AppText.micro,
+                    height: 1.35,
+                    color: ride.inkMuted,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

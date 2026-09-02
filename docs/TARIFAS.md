@@ -165,3 +165,52 @@ La base guarda un nombre logico (`moto`, `auto`, `confort`, `van`) y la app lo
 traduce a un icono de Material. No se guardan iconos en Postgres: un `IconData`
 es un numero de la fuente de iconos de Flutter, y guardarlo ataria la base a una
 version concreta del framework.
+
+## Bajada de precios frente a inDrive (2026-09-01)
+
+Medido en Quito, mismo trayecto de 8,4 km hasta la Universidad Central:
+inDrive recomendaba **3,10** y Ride cobraba **4,85**.
+
+Lo primero fue entender el 4,85: era la tarifa **nocturna** —eran las 23:00— y
+cuadra exacto con `0,65 + 0,50 x 8,4`. De dia el mismo viaje eran 3,78. Es
+decir, se estaba comparando nuestra tarifa mas cara contra la recomendada de
+ellos. Aun asi, por encima en los dos casos.
+
+Dos cambios:
+
+1. **Baja el precio base.** El km de 0,39 a 0,30 y el arranque de 0,50 a 0,40.
+2. **Se suaviza el recargo nocturno**, de +30 % a +18 %. Sigue habiendo recargo
+   —conducir de noche vale mas— pero deja de ser lo que duplica el numero que
+   ve el pasajero.
+
+| | Arranque | Por km | Por minuto | Minima |
+|---|---|---|---|---|
+| **Estandar** | 0,40 | 0,30 | 0,08 | 1,25 |
+| **Hora pico** (06–09) | 0,44 | 0,33 | 0,09 | 1,38 |
+| **Nocturna** (22–05) | 0,47 | 0,35 | 0,09 | 1,48 |
+
+Resultado en ese mismo viaje de 8,4 km:
+
+| | Antes | Ahora | inDrive |
+|---|---|---|---|
+| Estandar de dia | 3,78 | **2,92** | 3,10 |
+| Estandar de noche | 4,85 | **3,41** | 3,10 |
+| Moto de dia | 2,46 | **1,90** | — |
+
+### Lo que cuesta, y hay que vigilarlo
+
+El chofer se lleva el 85 % de una tarifa mas baja. Ese mismo viaje le pagaba
+**4,12** de noche y ahora le paga **2,90**.
+
+El cuello de botella de una app de viajes son los choferes, no los pasajeros.
+Si dejan de conectarse, el numero a mover es este —y la palanca es la tarifa,
+no la comision: bajar la comision no abarata el viaje, solo cambia quien se
+lleva el dinero.
+
+### Sobre comparar con inDrive
+
+Su «tarifa recomendada» **no es un precio fijo**: es la oferta inicial de una
+puja. El pasajero puede subirla, y cuando nadie acepta acaba subiendola. El
+precio final de un viaje en inDrive suele quedar por encima de lo que muestra
+esa pantalla. Conviene tenerlo presente antes de perseguir su numero hasta
+donde no salgan las cuentas.
