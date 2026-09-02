@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_colors.dart';
 import '../../core/app_theme.dart';
+import '../../core/ride_colors.dart';
 
 /// Pantalla de bienvenida que muestra el logo y los pilares de marca
 /// con una animación secuencial de fade-in sobre la imagen de fondo.
@@ -80,11 +81,15 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
+    final isDark = ride.isDark;
+
     return Scaffold(
+      backgroundColor: ride.background,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // ── Imagen de fondo con zoom ──
+          // ── Imagen de fondo con zoom + filtro para modo oscuro ──
           AnimatedBuilder(
             animation: _zoomCtrl,
             builder: (context, child) {
@@ -94,11 +99,23 @@ class _SplashScreenState extends State<SplashScreen>
                 child: child,
               );
             },
-            child: Image.asset(
-              'assets/images/fondo.png',
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  'assets/images/fondo.png',
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                ),
+                // Filtro para modo oscuro: velo ligero para que la ilustración
+                // siga viéndose pero el texto blanco contraste. Antes tapaba
+                // con 0xCC (80%), ahora 0x59 (35%) deja ver el fondo.
+                if (isDark)
+                  Container(
+                    color: const Color(0x59061420),
+                  ),
+              ],
             ),
           ),
 
@@ -127,7 +144,7 @@ class _SplashScreenState extends State<SplashScreen>
                         'Ride',
                         style: AppTheme.display(
                           58,
-                          color: AppColors.ink,
+                          color: isDark ? Colors.white : AppColors.ink,
                           letterSpacing: -1.5,
                           height: 1,
                         ),
@@ -142,7 +159,7 @@ class _SplashScreenState extends State<SplashScreen>
                         'Muévete a tu manera',
                         style: AppTheme.display(
                           22,
-                          color: AppColors.inkMuted,
+                          color: isDark ? const Color(0xFFB4C8D3) : AppColors.inkMuted,
                           letterSpacing: 0,
                           height: 1.4,
                         ),
@@ -166,6 +183,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Widget _buildPillars() {
+    final isDark = context.ride.isDark;
     final pillars = [
       _PillarData(
         icon: Icons.shield_outlined,
@@ -188,7 +206,7 @@ class _SplashScreenState extends State<SplashScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 0; i < pillars.length; i++)
-          _fade(_PillarTile(data: pillars[i]), 3 + i),
+          _fade(_PillarTile(data: pillars[i], isDark: isDark), 3 + i),
       ],
     );
   }
@@ -207,9 +225,10 @@ class _PillarData {
 }
 
 class _PillarTile extends StatelessWidget {
-  const _PillarTile({required this.data});
+  const _PillarTile({required this.data, this.isDark = false});
 
   final _PillarData data;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -221,10 +240,15 @@ class _PillarTile extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: AppColors.primarySoft,
+              color: isDark ? const Color(0xFF14314B) : AppColors.primarySoft,
               borderRadius: BorderRadius.circular(16),
+              border: isDark ? Border.all(color: const Color(0xFF1E3D52), width: 1) : null,
             ),
-            child: Icon(data.icon, size: 30, color: AppColors.primary),
+            child: Icon(
+              data.icon,
+              size: 30,
+              color: isDark ? const Color(0xFF56B6F8) : AppColors.primary,
+            ),
           ),
           const SizedBox(width: 18),
           Expanded(
@@ -235,7 +259,7 @@ class _PillarTile extends StatelessWidget {
                   data.title,
                   style: AppTheme.display(
                     19,
-                    color: AppColors.ink,
+                    color: isDark ? Colors.white : AppColors.ink,
                     height: 1.2,
                   ),
                 ),
@@ -244,7 +268,7 @@ class _PillarTile extends StatelessWidget {
                   data.subtitle,
                   style: AppTheme.display(
                     15,
-                    color: AppColors.inkMuted,
+                    color: isDark ? const Color(0xFF9CB2C4) : AppColors.inkMuted,
                     height: 1.3,
                   ),
                 ),

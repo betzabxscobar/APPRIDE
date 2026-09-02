@@ -67,28 +67,39 @@ class _MobileAuthLayout extends StatelessWidget {
       decoration: BoxDecoration(gradient: ride.hero),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // El alto que reporta el `body` ya descuenta el teclado, así que al
-          // escribir el héroe se encoge solo y el campo enfocado sigue a la
-          // vista.
-          final heroHeight =
-              padding.top + (constraints.maxHeight * 0.30).clamp(170.0, 280.0);
+          // Imagen al 45% del alto de la vista (modo estiramiento).
+          // El héroe sigue full-bleed detrás, pero la ilustración solo mide
+          // 45% del viewport y sangra levemente bajo la hoja.
+          final viewportHeight = constraints.maxHeight;
+          final overlapTop = viewportHeight.isFinite
+              ? (viewportHeight * 0.45).clamp(220.0, 380.0)
+              : 280.0;
 
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                SizedBox(
-                  height: heroHeight,
-                  child: _MobileHero(topInset: padding.top),
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: _MobileHero(topInset: padding.top),
+              ),
+              SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: viewportHeight.isFinite ? viewportHeight : 0,
+                  ),
+                  child: Column(
+                    children: [
+                      SizedBox(height: overlapTop),
+                      _MobileSheet(
+                        minHeight: viewportHeight.isFinite
+                            ? viewportHeight - overlapTop
+                            : 0,
+                        bottomInset: padding.bottom,
+                        child: child,
+                      ),
+                    ],
+                  ),
                 ),
-                _MobileSheet(
-                  // Sin este mínimo, un paso corto como la bienvenida dejaría
-                  // la hoja a media pantalla y el degradado asomando debajo.
-                  minHeight: constraints.maxHeight - heroHeight,
-                  bottomInset: padding.bottom,
-                  child: child,
-                ),
-              ],
-            ),
+              ),
+            ],
           );
         },
       ),
@@ -97,7 +108,10 @@ class _MobileAuthLayout extends StatelessWidget {
 }
 
 /// Cabecera de marca del teléfono: la misma aurora, ruta y ciudad del panel de
-/// escritorio, recortadas al alto de una cabecera.
+/// escritorio, ahora estirada para ocupar todo el espacio disponible.
+///
+/// En modo estiramiento la ilustración NO preserva ratio: se deforma para
+/// llenar el contenedor completo y el sobrante sangra por debajo de la hoja.
 class _MobileHero extends StatelessWidget {
   const _MobileHero({required this.topInset});
 
@@ -105,45 +119,56 @@ class _MobileHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
     return LayoutBuilder(
       builder: (context, constraints) {
         final height = constraints.maxHeight;
+        final isDark = ride.isDark;
 
-        return ClipRect(
-          child: Stack(
-            children: [
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
               Positioned(
                 left: -120,
                 top: -140,
                 child: Container(
                   width: 320,
                   height: 320,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
-                      colors: [Color(0x387DDBEE), Color(0x007DDBEE)],
-                      stops: [0, 0.68],
+                      colors: [
+                        isDark ? const Color(0x487DDBEE) : const Color(0x387DDBEE),
+                        const Color(0x007DDBEE),
+                      ],
+                      stops: const [0, 0.68],
                     ),
                   ),
                 ),
               ),
+              // 45% del alto: la ilustración llena el header visible (45% del
+              // viewport) y queda por encima de la hoja. El bottom se calcula
+              // para que la base de la ciudad coincida con el borde de la hoja
+              // (con 16px de sangrado) y las figuras no queden escondidas.
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: 0,
-                height: height * 0.6,
-                child: const _CityArt(),
+                bottom: height * 0.55 - 16,
+                height: height * 0.45,
+                child: _CityArt(isDark: isDark),
               ),
-              // Velo entre la ilustración y el texto. Sin él, el trazo de la
-              // ruta y los edificios cruzan por encima del titular y no hay
-              // manera de leerlo.
-              const Positioned.fill(
+              // Velo: más oscuro en modo nocturno para que el texto siga
+              // legible sobre edificios más claros.
+              Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      begin: Alignment.center,
+                      begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Color(0x0004121B), Color(0xE604121B)],
+                      colors: [
+                        const Color(0x0004121B),
+                        isDark ? const Color(0x9904121B) : const Color(0x6604121B),
+                      ],
                     ),
                   ),
                 ),
@@ -172,8 +197,7 @@ class _MobileHero extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        );
+          );
       },
     );
   }
@@ -249,15 +273,19 @@ class BrandPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
         final headline = (width * 0.1).clamp(45.0, 76.0);
+        final isDark = ride.isDark;
 
         return ClipRect(
           child: DecoratedBox(
-            decoration: const BoxDecoration(gradient: AppColors.brandPanel),
+            decoration: BoxDecoration(
+              gradient: isDark ? ride.hero : AppColors.brandPanel,
+            ),
             child: Stack(
               children: [
                 // Aurora superior izquierda (`.brand-panel:before`).
@@ -267,11 +295,14 @@ class BrandPanel extends StatelessWidget {
                   child: Container(
                     width: 430,
                     height: 430,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
-                        colors: [Color(0x2A7DDBEE), Color(0x007DDBEE)],
-                        stops: [0, 0.68],
+                        colors: [
+                          isDark ? const Color(0x3A7DDBEE) : const Color(0x2A7DDBEE),
+                          const Color(0x007DDBEE),
+                        ],
+                        stops: const [0, 0.68],
                       ),
                     ),
                   ),
@@ -297,7 +328,7 @@ class BrandPanel extends StatelessWidget {
                   right: 0,
                   bottom: 0,
                   height: height * 0.43,
-                  child: const _CityArt(),
+                  child: _CityArt(isDark: isDark),
                 ),
                 Padding(
                   padding: EdgeInsets.symmetric(
@@ -309,9 +340,9 @@ class BrandPanel extends StatelessWidget {
                     children: [
                       const RideWordmark(color: Colors.white),
                       SizedBox(height: height * 0.12),
-                      _Headline(size: headline),
+                      _Headline(size: headline, isDark: isDark),
                       const SizedBox(height: 25),
-                      const SizedBox(
+                      SizedBox(
                         width: 450,
                         child: Text(
                           'Una forma más segura, transparente y humana de '
@@ -319,12 +350,12 @@ class BrandPanel extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 16,
                             height: 1.65,
-                            color: AppColors.navySoft,
+                            color: isDark ? const Color(0xFFB4C8D3) : AppColors.navySoft,
                           ),
                         ),
                       ),
                       const Spacer(),
-                      const _TrustRow(),
+                      _TrustRow(isDark: isDark),
                     ],
                   ),
                 ),
@@ -339,9 +370,10 @@ class BrandPanel extends StatelessWidget {
 
 /// "Muévete con **libertad.**" (`.brand-copy h1`).
 class _Headline extends StatelessWidget {
-  const _Headline({required this.size});
+  const _Headline({required this.size, this.isDark = false});
 
   final double size;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -358,7 +390,9 @@ class _Headline extends StatelessWidget {
           const TextSpan(text: 'Muévete con\n'),
           TextSpan(
             text: 'libertad.',
-            style: style.copyWith(color: AppColors.sky),
+            style: style.copyWith(
+              color: isDark ? const Color(0xFF8ADFF0) : AppColors.sky,
+            ),
           ),
         ],
       ),
@@ -369,26 +403,29 @@ class _Headline extends StatelessWidget {
 
 /// Sellos inferiores (`.trust`): la primera letra va en verde menta.
 class _TrustRow extends StatelessWidget {
-  const _TrustRow();
+  const _TrustRow({this.isDark = false});
+
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    return const Wrap(
+    return Wrap(
       spacing: 25,
       runSpacing: 8,
       children: [
-        _TrustBadge(symbol: '◈', label: ' Viajes protegidos'),
-        _TrustBadge(symbol: '◉', label: ' Precio transparente'),
+        _TrustBadge(symbol: '◈', label: ' Viajes protegidos', isDark: isDark),
+        _TrustBadge(symbol: '◉', label: ' Precio transparente', isDark: isDark),
       ],
     );
   }
 }
 
 class _TrustBadge extends StatelessWidget {
-  const _TrustBadge({required this.symbol, required this.label});
+  const _TrustBadge({required this.symbol, required this.label, this.isDark = false});
 
   final String symbol;
   final String label;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -397,19 +434,23 @@ class _TrustBadge extends StatelessWidget {
         children: [
           TextSpan(
             text: symbol,
-            style: const TextStyle(color: AppColors.mint),
+            style: TextStyle(color: isDark ? const Color(0xFF6ED9C8) : AppColors.mint),
           ),
           TextSpan(text: label),
         ],
       ),
-      style: const TextStyle(fontSize: 11, color: AppColors.navyFaint),
+      style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF91AEBE) : AppColors.navyFaint),
     );
   }
 }
 
-/// Ilustración de la ciudad (`.city-art`): luna, ruta, auto y edificios.
+/// Ilustración de la ciudad (`.city-art`): luna, ruta y edificios.
+/// Colores adaptados al modo nocturno: en oscuro los edificios se aclaran
+/// levemente para contrastar con `ride.hero` (`_heroDark`).
 class _CityArt extends StatelessWidget {
-  const _CityArt();
+  const _CityArt({this.isDark = false});
+
+  final bool isDark;
 
   static const List<double> _buildingHeights = [
     0.42,
@@ -427,12 +468,20 @@ class _CityArt extends StatelessWidget {
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
 
+        // Paleta según tema: en modo oscuro la luna y los edificios deben
+        // ser más luminosos para no fundirse con el fondo navy oscuro.
+        final buildingTop = isDark ? const Color(0xFF234A5E) : const Color(0xFF123B50);
+        final buildingBottom = isDark ? const Color(0xFF0F2F40) : const Color(0xFF0C2D40);
+        final lunaInner = isDark ? const Color(0x44B5EDF7) : const Color(0x2EB5EDF7);
+        final lunaOuter = isDark ? const Color(0x1A69D2F0) : const Color(0x0969D2F0);
+        final overlayEnd = isDark ? const Color(0x243BA4CB) : const Color(0x143BA4CB);
+
         return DecoratedBox(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Colors.transparent, Color(0x143BA4CB)],
+              colors: [Colors.transparent, overlayEnd],
             ),
           ),
           child: Stack(
@@ -444,12 +493,12 @@ class _CityArt extends StatelessWidget {
                 child: Container(
                   width: 110,
                   height: 110,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
-                      center: Alignment(-0.24, -0.24),
-                      colors: [Color(0x2EB5EDF7), Color(0x0969D2F0)],
-                      stops: [0, 0.66],
+                      center: const Alignment(-0.24, -0.24),
+                      colors: [lunaInner, lunaOuter],
+                      stops: const [0, 0.66],
                     ),
                   ),
                 ),
@@ -466,13 +515,13 @@ class _CityArt extends StatelessWidget {
                       Expanded(
                         child: Container(
                           height: height * 0.7 * fraction,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
-                              colors: [Color(0xFF123B50), Color(0xFF0C2D40)],
+                              colors: [buildingTop, buildingBottom],
                             ),
-                            borderRadius: BorderRadius.vertical(
+                            borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(5),
                             ),
                           ),
@@ -489,18 +538,7 @@ class _CityArt extends StatelessWidget {
                 top: height * 0.24,
                 width: width * 0.58,
                 height: height * 0.42,
-                child: const _Route(),
-              ),
-              Positioned(
-                left: width * 0.58,
-                top: height * 0.48,
-                child: Transform.rotate(
-                  angle: -7 * math.pi / 180,
-                  child: const Text(
-                    '▰',
-                    style: TextStyle(fontSize: 42, color: Color(0xFFA5E8F4)),
-                  ),
-                ),
+                child: _Route(isDark: isDark),
               ),
             ],
           ),
@@ -512,7 +550,9 @@ class _CityArt extends StatelessWidget {
 
 /// Trazo de la ruta con sus tres paradas (`.route`).
 class _Route extends StatelessWidget {
-  const _Route();
+  const _Route({this.isDark = false});
+
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -526,10 +566,10 @@ class _Route extends StatelessWidget {
           return Stack(
             clipBehavior: Clip.none,
             children: [
-              Positioned.fill(child: CustomPaint(painter: _RoutePainter())),
-              Positioned(left: -5, bottom: -8, child: const _RouteStop()),
-              Positioned(left: width * 0.5, bottom: -8, child: const _RouteStop()),
-              Positioned(right: -8, top: -6, child: const _RouteStop()),
+              Positioned.fill(child: CustomPaint(painter: _RoutePainter(isDark: isDark))),
+              Positioned(left: -5, bottom: -8, child: _RouteStop(isDark: isDark)),
+              Positioned(left: width * 0.5, bottom: -8, child: _RouteStop(isDark: isDark)),
+              Positioned(right: -8, top: -6, child: _RouteStop(isDark: isDark)),
             ],
           );
         },
@@ -539,6 +579,9 @@ class _Route extends StatelessWidget {
 }
 
 class _RoutePainter extends CustomPainter {
+  _RoutePainter({this.isDark = false});
+
+  final bool isDark;
   static const double _radius = 70;
 
   @override
@@ -557,13 +600,13 @@ class _RoutePainter extends CustomPainter {
     final glow = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4
-      ..color = const Color(0xFF5ECFEE).withValues(alpha: 0.36)
+      ..color = isDark ? const Color(0xFF7DE2F5).withValues(alpha: 0.45) : const Color(0xFF5ECFEE).withValues(alpha: 0.36)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7);
 
     final stroke = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4
-      ..color = const Color(0xFF69CDE9);
+      ..color = isDark ? const Color(0xFF8ADFF0) : const Color(0xFF69CDE9);
 
     canvas
       ..drawPath(path, glow)
@@ -575,7 +618,9 @@ class _RoutePainter extends CustomPainter {
 }
 
 class _RouteStop extends StatelessWidget {
-  const _RouteStop();
+  const _RouteStop({this.isDark = false});
+
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -584,8 +629,8 @@ class _RouteStop extends StatelessWidget {
       height: 13,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFF0C2C43),
-        border: Border.all(color: const Color(0xFF8ADFF0), width: 3),
+        color: isDark ? const Color(0xFF14354A) : const Color(0xFF0C2C43),
+        border: Border.all(color: isDark ? const Color(0xFFA5E8F4) : const Color(0xFF8ADFF0), width: 3),
       ),
     );
   }

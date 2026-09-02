@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_colors.dart';
 import '../../core/app_theme.dart';
+import '../../core/ride_colors.dart';
 import '../../widgets/ride_logo.dart';
 
 /// Pantalla de bienvenida con hero visual: imagen de fondo, ilustraciones
@@ -17,73 +18,79 @@ class WelcomeHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+    final ride = context.ride;
+    final isDark = ride.isDark;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: ride.background,
       body: Column(
         children: [
           // ── Hero visual: 60% del alto ──
           SizedBox(
             width: size.width,
             height: size.height * 0.60,
-            child: const _HeroVisual(),
+            child: _HeroVisual(isDark: isDark),
           ),
 
           // ── Contenido inferior ──
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Column(
-                children: [
-                  const Spacer(flex: 2),
+            child: ColoredBox(
+              color: ride.surface,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Column(
+                  children: [
+                    const Spacer(flex: 2),
 
-                  // Título
-                  Text(
-                    'Bienvenido a Ride',
-                    style: AppTheme.display(
-                      26,
-                      color: AppColors.ink,
-                      letterSpacing: -0.5,
+                    // Título
+                    Text(
+                      'Bienvenido a Ride',
+                      style: AppTheme.display(
+                        26,
+                        color: ride.ink,
+                        letterSpacing: -0.5,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Elige cómo quieres usar Ride',
-                    style: AppTheme.display(
-                      15,
-                      color: AppColors.inkMuted,
+                    const SizedBox(height: 8),
+                    Text(
+                      'Elige cómo quieres usar Ride',
+                      style: AppTheme.display(
+                        15,
+                        color: ride.inkMuted,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
 
-                  const Spacer(flex: 2),
+                    const Spacer(flex: 2),
 
-                  // Botón continuar
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: FilledButton(
-                      onPressed: onContinue,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                    // Botón continuar
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: FilledButton(
+                        onPressed: onContinue,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: ride.accent,
+                          foregroundColor: isDark ? const Color(0xFF04121C) : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Text(
+                          'Continuar',
+                          style: AppTheme.display(
+                            17,
+                            color: isDark ? const Color(0xFF04121C) : Colors.white,
+                            weight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                      child: Text(
-                        'Continuar',
-                        style: AppTheme.display(
-                          17,
-                          color: Colors.white,
-                          weight: FontWeight.w700,
-                        ),
-                      ),
                     ),
-                  ),
 
-                  const Spacer(flex: 3),
-                ],
+                    const Spacer(flex: 3),
+                  ],
+                ),
               ),
             ),
           ),
@@ -96,7 +103,9 @@ class WelcomeHomeScreen extends StatelessWidget {
 /// Widget hero con imagen de fondo, logo arriba, y personajes superpuestos
 /// con animación de entrada.
 class _HeroVisual extends StatefulWidget {
-  const _HeroVisual();
+  const _HeroVisual({this.isDark = false});
+
+  final bool isDark;
 
   @override
   State<_HeroVisual> createState() => _HeroVisualState();
@@ -149,15 +158,25 @@ class _HeroVisualState extends State<_HeroVisual>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.isDark;
     return ClipRRect(
       child: Stack(
         fit: StackFit.expand,
         children: [
           // ── Imagen de fondo ──
-          Image.asset(
-            'assets/images/fondoInicio.jpeg',
-            fit: BoxFit.cover,
+          ColorFiltered(
+            colorFilter: isDark
+                ? const ColorFilter.mode(Color(0x59061420), BlendMode.darken)
+                : const ColorFilter.mode(Colors.transparent, BlendMode.srcOver),
+            child: Image.asset(
+              'assets/images/fondoInicio.jpeg',
+              fit: BoxFit.cover,
+            ),
           ),
+          // Filtro oscuro ligero para que la ilustración no quede tapada pero
+          // el logo/texto contrasten.
+          if (isDark)
+            Container(color: const Color(0x33061420)),
 
           // ── Degradado sutil en la parte inferior ──
           Positioned(
@@ -166,11 +185,14 @@ class _HeroVisualState extends State<_HeroVisual>
             bottom: 0,
             height: 80,
             child: Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, AppColors.background],
+                  colors: [
+                    Colors.transparent,
+                    isDark ? const Color(0xFF0E2432) : AppColors.background,
+                  ],
                 ),
               ),
             ),
@@ -196,7 +218,7 @@ class _HeroVisualState extends State<_HeroVisual>
                 'RIDE',
                 style: AppTheme.display(
                   42,
-                  color: AppColors.ink,
+                  color: isDark ? Colors.white : AppColors.ink,
                   letterSpacing: 2,
                   height: 1,
                 ),
@@ -214,7 +236,7 @@ class _HeroVisualState extends State<_HeroVisual>
                 'Muévete a tu manera',
                 style: AppTheme.display(
                   16,
-                  color: AppColors.inkMuted,
+                  color: isDark ? const Color(0xFFB4C8D3) : AppColors.inkMuted,
                   letterSpacing: 0,
                   height: 1.3,
                   weight: FontWeight.w500,
