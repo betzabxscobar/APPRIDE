@@ -9,45 +9,44 @@ puede manipular, así que no puede ser quien diga cuánto cuesta un viaje.
 
 | | Arranque | Por km | Por minuto | Carrera mínima |
 |---|---|---|---|---|
-| **Estándar** (resto del día) | 0,45 | 0,32 | 0,09 | 1,30 |
-| **Hora pico mañana** (06:00–08:59, L–V) | 0,49 | 0,35 | 0,10 | 1,40 |
-| **Hora pico tarde** (16:00–19:59, L–V) | 0,49 | 0,35 | 0,10 | 1,40 |
-| **Nocturna** (22:00–04:59) | 0,52 | 0,37 | 0,10 | 1,50 |
+| **Estándar** (resto del día) | 0,35 | 0,25 | 0,07 | 1,00 |
+| **Hora pico mañana** (06:00–08:59, L–V) | 0,38 | 0,27 | 0,08 | 1,08 |
+| **Hora pico tarde** (16:00–19:59, L–V) | 0,38 | 0,27 | 0,08 | 1,08 |
+| **Nocturna** (22:00–04:59) | 0,40 | 0,29 | 0,08 | 1,15 |
 
 ### De dónde salen
 
-De una medición real, no de una tabla de referencia. La regla es quedar
-**entre DiDi y Uber**: más caro que el primero, más barato que el segundo.
+De una medición real, no de una tabla de referencia. La regla es **quedar por
+debajo de DiDi**, que era el más barato de los dos que se compararon.
 
 Trayecto medido: parada **El Florón** (Av. 10 de Agosto) → **Universidad
 Central del Ecuador**. 4,4 km, 7 minutos.
 
 | | Precio |
 |---|---|
+| **Ride, estándar** | **1,45** |
 | DiDi | 1,50 |
-| **Ride, estándar** | **1,86** |
-| **Ride, hora pico** | **2,03** |
-| **Ride, nocturna** | **2,15** |
+| Ride, hora pico | 1,57 |
+| Ride, nocturna | 1,68 |
 | Uber | 2,25 |
 
-Las tres franjas caen dentro del rango, y esa es la regla: se aplica a todas,
-no solo a la estándar. La estándar queda casi en el punto medio exacto, que
-son 1,88.
+La estándar se calibra contra ese 1,45 y las otras dos salen de ahí con su
+recargo: **+8 % la hora pico y +15 % la nocturna**.
 
-> **El recargo por franja tuvo que bajar.** Era +30 % de noche y +15 % en hora
-> pico. A +30 %, la nocturna se pasaba de Uber y rompía la regla. Ahora son
-> **+15 % la nocturna y +8 % la hora pico**: sigue costando más de noche, pero
-> sin salirse del techo.
+> **En hora pico y de noche se pasa de DiDi.** 1,57 y 1,68 contra sus 1,50. No
+> hay manera de conservar un recargo por franja y quedar debajo de DiDi a todas
+> horas: o se aplana el recargo, o esas horas se pagan más. Se eligió conservar
+> el recargo, porque conducir de noche y en atasco vale más.
 
 **Qué se comparó y qué no.** DiDi y Uber se consultaron en ese momento, así que
 sus números llevan dentro la demanda que hubiera. Y los 1,50 y 2,25 son de su
-categoría de coche normal: Confort y XL de Ride quedan por encima de 2,25 a
-propósito, porque no compiten contra lo mismo.
+categoría de coche normal: en ese viaje, Confort sale en 1,89 y XL en 2,25, por
+encima de DiDi a propósito, porque no compiten contra lo mismo.
 
 > **Antes se calculaban de otra forma.** Hasta el 2026-09-02 salían de las
 > tarifas referenciales de taxi de Quito con un 10 % menos. Se abandonó ese
 > método porque dejaba el precio por encima de la competencia real; lo que
-> manda ahora es el rango DiDi–Uber.
+> manda ahora es quedar por debajo de DiDi.
 
 ### Las franjas horarias
 
@@ -247,8 +246,8 @@ version concreta del framework.
 
 > **Esto ya no esta vigente.** El 2026-09-02 los precios se revirtieron y ese
 > mismo dia se volvieron a ajustar, ahora contra DiDi y Uber (ver «Los
-> valores»). Con las tarifas de hoy este trayecto de 8,4 km sale en **3,14**
-> frente a los 3,10 que recomendaba inDrive: practicamente a la par. La
+> valores»). Con las tarifas de hoy este trayecto de 8,4 km sale en **2,45**
+> frente a los 3,10 que recomendaba inDrive: ahora por debajo. La
 > medicion se conserva porque sigue siendo el unico dato que hay de ese
 > trayecto concreto.
 
@@ -285,7 +284,8 @@ Resultado en ese mismo viaje de 8,4 km:
 
 El chofer se lleva el 85 % de la tarifa, asi que cada bajada le llega entera.
 Ese viaje de noche le pagaba **4,12** con 0,65/0,50, **2,90** con la bajada de
-inDrive y **3,09** con las tarifas de hoy.
+inDrive y **2,08** con las tarifas de hoy. Es el numero mas bajo por el que ha
+pasado el proyecto.
 
 Es el numero a vigilar. El cuello de botella de una app de viajes son los
 choferes, no los pasajeros; si dejan de conectarse, la palanca es la tarifa y
