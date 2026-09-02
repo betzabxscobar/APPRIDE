@@ -31,7 +31,6 @@ void main() async {
   // tope de tiempo.
   await Preferencias.instance.cargar();
   ThemeController.instance.cargar();
-  TripSessionStore.instance.cargar();
 
   // `runApp` va sin `await` de Supabase delante a propósito.
   //
@@ -78,6 +77,14 @@ class _ArranqueState extends State<_Arranque> {
       await AuthService.instance.bootstrap().timeout(
             const Duration(seconds: 15),
           );
+
+      // El viaje guardado se lee DESPUÉS del perfil, no antes.
+      //
+      // Comprueba que sea de la cuenta que está entrando, y para eso hace
+      // falta saber quién es. Leerlo en `main()` —donde estaba— significaba
+      // preguntarlo con la sesión todavía sin cargar: el dueño salía nulo y el
+      // viaje se descartaba siempre, justo lo contrario de lo que hace falta.
+      TripSessionStore.instance.cargar();
 
       if (mounted) setState(() => _listo = true);
     } on TimeoutException {

@@ -13,6 +13,7 @@ import '../../services/ride_service.dart';
 import '../../services/trip_session_store.dart';
 import '../../widgets/auth_feedback.dart';
 import '../../widgets/category_chip.dart';
+import '../../widgets/chat_button.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/trip_route_map.dart';
 import 'rate_trip_sheet.dart';
@@ -503,6 +504,8 @@ class _ViajeActivo extends StatelessWidget {
               ),
               const Divider(height: 22),
               _MiniRuta(viaje: viaje),
+              const SizedBox(height: 14),
+              ChatButton(viaje: viaje, conQuien: viaje.pasajeroNombre),
             ],
           ),
         ),

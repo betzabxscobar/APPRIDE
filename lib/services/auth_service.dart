@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../models/app_user.dart';
+import 'trip_session_store.dart';
 import '../models/user_role.dart';
 import '../models/vehicle.dart';
 
@@ -62,17 +63,29 @@ class AuthService extends ChangeNotifier {
       if (_client.auth.currentSession != null) {
         _currentUser = await _loadProfile();
       }
+    } on sb.AuthException {
+      // El token ya no vale: esta sesión está muerta de verdad.
+      await _signOutLocal();
+    } on sb.PostgrestException catch (error) {
+      // Postgres contestó y dijo que no. Si el perfil no existe, la sesión no
+      // sirve; cualquier otra cosa es un problema del servidor y no es motivo
+      // para echar a nadie.
+      if (error.code == 'PGRST116') {
+        await _signOutLocal();
+      }
     } catch (_) {
-      await _client.auth.signOut();
-      _currentUser = null;
+      // Sin red, DNS caído, tiempo agotado.
+      //
+      // Antes esto cerraba la sesión: abrir la app en el ascensor te dejaba
+      // fuera y con la contraseña por delante. La sesión sigue siendo válida;
+      // lo que falta es conexión. Se deja como está y se reintenta al volver.
     } finally {
       _setLoading(false);
     }
 
     _client.auth.onAuthStateChange.listen((state) {
       if (state.event == sb.AuthChangeEvent.signedOut) {
-        _currentUser = null;
-        _activeView = null;
+        _olvidarSesion();
         notifyListeners();
       }
     });
@@ -479,10 +492,29 @@ class AuthService extends ChangeNotifier {
     try {
       await _client.auth.signOut();
     } finally {
-      _currentUser = null;
-      _activeView = null;
+      await _olvidarSesion();
       _setLoading(false);
     }
+  }
+
+  /// Cierre local, sin llamar al servidor. Para cuando el token ya no vale.
+  Future<void> _signOutLocal() async {
+    try {
+      await _client.auth.signOut();
+    } catch (_) {
+      // Da igual que falle: lo que importa es no dejar datos en el teléfono.
+    }
+    await _olvidarSesion();
+  }
+
+  /// Borra todo rastro de la cuenta que se va.
+  ///
+  /// El viaje guardado en disco incluido: si se queda, la siguiente cuenta que
+  /// entre en este teléfono vería el viaje de la anterior mientras carga.
+  Future<void> _olvidarSesion() async {
+    _currentUser = null;
+    _activeView = null;
+    await TripSessionStore.instance.limpiar();
   }
 
   // ---------------------------------------------------------------------------

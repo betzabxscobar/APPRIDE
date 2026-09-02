@@ -11,6 +11,7 @@ import '../../services/ride_service.dart';
 import '../../services/trip_session_store.dart';
 import '../../widgets/auth_feedback.dart';
 import '../../widgets/category_chip.dart';
+import '../../widgets/chat_button.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/trip_route_map.dart';
 import 'rate_trip_sheet.dart';
@@ -198,6 +199,11 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                     if (viaje.status.tieneConductor) ...[
                       const SizedBox(height: 16),
                       _TarjetaConductor(viaje: viaje),
+                      const SizedBox(height: 12),
+                      ChatButton(
+                        viaje: viaje,
+                        conQuien: viaje.conductorNombre ?? 'Tu chofer',
+                      ),
                     ],
                     const SizedBox(height: 16),
                     _TarjetaPrecio(viaje: viaje),
