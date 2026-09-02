@@ -15,6 +15,7 @@ class Fare {
     required this.activo,
     this.horaDesde,
     this.horaHasta,
+    this.dias,
   });
 
   final String id;
@@ -37,12 +38,51 @@ class Fare {
   final int? horaDesde;
   final int? horaHasta;
 
-  /// «22:00 – 05:00» o «El resto del día».
+  /// Días ISO en que aplica la franja: 1 es lunes y 7 domingo. En null, todos.
+  ///
+  /// Las dos franjas pico van de lunes a viernes, porque el Pico y Placa de
+  /// Quito —de donde salen sus horas— no rige el fin de semana.
+  final List<int>? dias;
+
+  static const List<String> _nombresDia = [
+    'lunes',
+    'martes',
+    'miércoles',
+    'jueves',
+    'viernes',
+    'sábado',
+    'domingo',
+  ];
+
+  /// «06:00 – 08:59, de lunes a viernes» o «El resto del día».
+  ///
+  /// La hora final se escribe en **:59** porque es lo que de verdad hace el
+  /// servidor: `tarifa_vigente()` compara la hora entera con un `between`, así
+  /// que `hora_hasta = 8` cubre hasta las 08:59. Escribir «08:00» hacía creer
+  /// que la franja terminaba una hora antes de lo que termina.
   String get franja {
     if (horaDesde == null || horaHasta == null) return 'El resto del día';
     final d = horaDesde.toString().padLeft(2, '0');
     final h = horaHasta.toString().padLeft(2, '0');
-    return '$d:00 – $h:00';
+    final horario = '$d:00 – $h:59';
+    final cuando = _diasEnPalabras;
+    return cuando == null ? horario : '$horario, $cuando';
+  }
+
+  /// «de lunes a viernes», «lunes, miércoles» o null si aplica todos los días.
+  String? get _diasEnPalabras {
+    final d = dias;
+    if (d == null) return null;
+    if (d.isEmpty) return 'ningún día';
+
+    final orden = [...d]..sort();
+    // Un tramo corrido se lee mejor como rango que como lista.
+    final corrido =
+        orden.length > 2 && orden.last - orden.first == orden.length - 1;
+    if (corrido) {
+      return 'de ${_nombresDia[orden.first - 1]} a ${_nombresDia[orden.last - 1]}';
+    }
+    return orden.map((n) => _nombresDia[n - 1]).join(', ');
   }
 
   /// Lo que costaría un viaje de [km] en esta tarifa, sin multiplicador de
@@ -65,5 +105,11 @@ class Fare {
         activo: (row['activo'] as bool?) ?? true,
         horaDesde: (row['hora_desde'] as num?)?.toInt(),
         horaHasta: (row['hora_hasta'] as num?)?.toInt(),
+        // Un día fuera de 1..7 sería un dato corrupto; se descarta antes de
+        // llegar a `_nombresDia`, que si no reventaría por índice.
+        dias: (row['dias'] as List<dynamic>?)
+            ?.map((d) => (d as num).toInt())
+            .where((d) => d >= 1 && d <= 7)
+            .toList(),
       );
 }

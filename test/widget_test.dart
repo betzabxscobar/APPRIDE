@@ -1188,6 +1188,43 @@ void main() {
     test('Sin franja horaria, es la de por defecto', () {
       expect(tarifa().franja, 'El resto del día');
     });
+
+    Fare conFranja(int desde, int hasta, List<int>? dias) => Fare.fromMap({
+          'id': 'f-2',
+          'nombre': 'Tarifa',
+          'tarifa_base': 0.49,
+          'costo_por_km': 0.35,
+          'costo_por_minuto': 0.10,
+          'carrera_minima': 1.40,
+          'porcentaje_conductor': 0.85,
+          'activo': true,
+          'hora_desde': desde,
+          'hora_hasta': hasta,
+          'dias': dias,
+        });
+
+    test('La franja termina en :59, que es hasta donde llega el servidor', () {
+      // tarifa_vigente() compara la hora entera con un `between`, asi que
+      // hora_hasta = 8 cubre hasta las 08:59. Escribir «08:00» hacia creer
+      // que la franja terminaba una hora antes de lo que termina, y ese
+      // mismo error estuvo cobrando hora pico a las 09:45.
+      expect(conFranja(6, 8, [1, 2, 3, 4, 5]).franja,
+          '06:00 – 08:59, de lunes a viernes');
+    });
+
+    test('Sin dias, la franja no menciona ninguno', () {
+      // La nocturna aplica todos los dias: `dias` en null.
+      expect(conFranja(22, 4, null).franja, '22:00 – 04:59');
+    });
+
+    test('Unos dias sueltos se listan, no se leen como rango', () {
+      expect(conFranja(16, 19, [3, 1]).franja,
+          '16:00 – 19:59, lunes, miércoles');
+    });
+
+    test('Un dia fuera de 1..7 se descarta en vez de romper la pantalla', () {
+      expect(conFranja(16, 19, [1, 2, 9]).franja, '16:00 – 19:59, lunes, martes');
+    });
   });
 
   group('Tema elegido', () {

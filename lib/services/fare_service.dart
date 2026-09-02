@@ -21,7 +21,7 @@ class FareService {
           .from('tarifas')
           .select('id, nombre, tarifa_base, costo_por_km, costo_por_minuto, '
               'carrera_minima, porcentaje_conductor, activo, hora_desde, '
-              'hora_hasta')
+              'hora_hasta, dias')
           // La de por defecto primero —`hora_desde` en null— y luego por
           // franja. `order` es descendente por defecto, de ahí el explícito.
           .order('hora_desde', ascending: true, nullsFirst: true);

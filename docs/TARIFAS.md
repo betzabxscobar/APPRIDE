@@ -10,8 +10,8 @@ puede manipular, así que no puede ser quien diga cuánto cuesta un viaje.
 | | Arranque | Por km | Por minuto | Carrera mínima |
 |---|---|---|---|---|
 | **Estándar** (resto del día) | 0,45 | 0,32 | 0,09 | 1,30 |
-| **Hora pico mañana** (06:00–08:59) | 0,49 | 0,35 | 0,10 | 1,40 |
-| **Hora pico tarde** (16:00–19:59) | 0,49 | 0,35 | 0,10 | 1,40 |
+| **Hora pico mañana** (06:00–08:59, L–V) | 0,49 | 0,35 | 0,10 | 1,40 |
+| **Hora pico tarde** (16:00–19:59, L–V) | 0,49 | 0,35 | 0,10 | 1,40 |
 | **Nocturna** (22:00–04:59) | 0,52 | 0,37 | 0,10 | 1,50 |
 
 ### De dónde salen
@@ -67,10 +67,20 @@ En la mañana se recorta en vez de estirar: cobrar hora pico a las 09:45 —que
 es lo que pasaba antes— es cobrar de más fuera de la congestión, y entre
 quedarse corto y pasarse, mejor corto.
 
-> **El Pico y Placa es de lunes a viernes; la tarifa no distingue el día.** La
-> tabla no tiene columna de día de la semana, así que un domingo a las 17:00
-> se cobra hora pico aunque no haya tráfico. Arreglarlo pide una columna nueva
-> y tocar `tarifa_vigente()`; hasta entonces, queda dicho.
+**Solo de lunes a viernes.** El Pico y Placa no rige el fin de semana, así que
+las dos franjas pico tampoco: un domingo a las 17:00 se cobra tarifa estándar.
+Lo lleva la columna `dias` de `tarifas`, un arreglo de días ISO —1 es lunes y
+7 domingo—, y `tarifa_vigente()` la comprueba con `extract(isodow ...)`. En
+**null** significa «todos los días», que es como están la estándar y la
+nocturna.
+
+Repartido por semana: 15 horas de pico de mañana, 20 de pico de tarde, 49 de
+nocturna y 84 de estándar. Suman las 168 de la semana.
+
+> **No poner `dias` en una franja que cruza medianoche.** A la 01:00 del
+> sábado el día ya es sábado, así que una nocturna limitada a `{1,2,3,4,5}`
+> dejaría de aplicar a mitad de la madrugada del viernes y el precio cambiaría
+> solo. Por eso la nocturna se queda en null.
 
 ## La formula
 
