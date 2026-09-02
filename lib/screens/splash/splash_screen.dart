@@ -89,7 +89,7 @@ class _SplashScreenState extends State<SplashScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // ── Imagen de fondo con zoom + filtro para modo oscuro ──
+          // ── Imagen de fondo con zoom — sin filtro, imagen distinta por tema ──
           AnimatedBuilder(
             animation: _zoomCtrl,
             builder: (context, child) {
@@ -99,23 +99,11 @@ class _SplashScreenState extends State<SplashScreen>
                 child: child,
               );
             },
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.asset(
-                  'assets/images/fondo.png',
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: double.infinity,
-                ),
-                // Filtro para modo oscuro: velo ligero para que la ilustración
-                // siga viéndose pero el texto blanco contraste. Antes tapaba
-                // con 0xCC (80%), ahora 0x59 (35%) deja ver el fondo.
-                if (isDark)
-                  Container(
-                    color: const Color(0x59061420),
-                  ),
-              ],
+            child: Image.asset(
+              isDark ? 'assets/images/FondoNocturno.jpeg' : 'assets/images/fondo.png',
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
             ),
           ),
 

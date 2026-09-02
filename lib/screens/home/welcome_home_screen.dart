@@ -17,84 +17,277 @@ class WelcomeHomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
     final ride = context.ride;
     final isDark = ride.isDark;
+    final padding = MediaQuery.paddingOf(context);
 
     return Scaffold(
       backgroundColor: ride.background,
-      body: Column(
-        children: [
-          // ── Hero visual: 60% del alto ──
-          SizedBox(
-            width: size.width,
-            height: size.height * 0.60,
-            child: _HeroVisual(isDark: isDark),
-          ),
+      // Tarjeta anclada reciclada de 'Crear cuenta' (_MobileSheet / AuthCard):
+      // hero 60% + sheet 40% con mismo radius/sombra.
+      body: DecoratedBox(
+        decoration: BoxDecoration(gradient: ride.hero),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final viewportHeight = constraints.maxHeight;
+            final heroHeight = viewportHeight.isFinite
+                ? (viewportHeight * 0.60).clamp(340.0, 560.0)
+                : 420.0;
+            final overlapTop = heroHeight;
 
-          // ── Contenido inferior ──
-          Expanded(
-            child: ColoredBox(
-              color: ride.surface,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Column(
-                  children: [
-                    const Spacer(flex: 2),
+            final isTall = viewportHeight > 850;
+            final isVeryTall = viewportHeight > 1000;
 
-                    // Título
-                    Text(
-                      'Bienvenido a Ride',
-                      style: AppTheme.display(
-                        26,
-                        color: ride.ink,
-                        letterSpacing: -0.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Elige cómo quieres usar Ride',
-                      style: AppTheme.display(
-                        15,
-                        color: ride.inkMuted,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-
-                    const Spacer(flex: 2),
-
-                    // Botón continuar
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: FilledButton(
-                        onPressed: onContinue,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: ride.accent,
-                          foregroundColor: isDark ? const Color(0xFF04121C) : Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: Text(
-                          'Continuar',
-                          style: AppTheme.display(
-                            17,
-                            color: isDark ? const Color(0xFF04121C) : Colors.white,
-                            weight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const Spacer(flex: 3),
-                  ],
+            return Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  height: heroHeight,
+                  child: _HeroVisual(isDark: isDark),
                 ),
-              ),
-            ),
+                SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: viewportHeight.isFinite ? viewportHeight : 0,
+                    ),
+                    child: Column(
+                      children: [
+                        SizedBox(height: overlapTop),
+                        _WelcomeSheet(
+                          minHeight: viewportHeight.isFinite
+                              ? viewportHeight - overlapTop
+                              : 0,
+                          bottomInset: padding.bottom,
+                          onContinue: onContinue,
+                          isTall: isTall,
+                          isVeryTall: isVeryTall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Tarjeta anclada reutilizada de `auth_shell.dart:_MobileSheet`.
+///
+/// Mismo `ride.surface + radiusSheet 28 + shadow + padding 24/28` para que
+/// 'Bienvenido a Ride' se vea idéntica a 'Crear cuenta', pero responsiva:
+/// en pantallas grandes distribuye el alto y muestra beneficios/legal.
+class _WelcomeSheet extends StatelessWidget {
+  const _WelcomeSheet({
+    required this.minHeight,
+    required this.bottomInset,
+    required this.onContinue,
+    this.isTall = false,
+    this.isVeryTall = false,
+  });
+
+  final double minHeight;
+  final double bottomInset;
+  final VoidCallback onContinue;
+  final bool isTall;
+  final bool isVeryTall;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+    final isDark = ride.isDark;
+
+    // Tipografía y botón crecen levemente en pantallas grandes
+    final titleSize = isVeryTall ? 30.0 : (isTall ? 28.0 : 26.0);
+    final buttonHeight = isVeryTall ? 56.0 : 52.0;
+    final verticalPadding = isTall ? 32.0 : 28.0;
+
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(minHeight: minHeight > 0 ? minHeight : 0),
+      padding: EdgeInsets.fromLTRB(24, verticalPadding, 24, 32 + bottomInset + (isTall ? 12 : 0)),
+      decoration: BoxDecoration(
+        color: ride.surface,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusSheet),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: ride.shadow,
+            blurRadius: 32,
+            offset: const Offset(0, -10),
           ),
         ],
+      ),
+      child: Align(
+        alignment: Alignment.center,
+        child: SizedBox(
+          width: 450,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle sutil como en BottomSheet
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: ride.borderStrong,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              SizedBox(height: isTall ? 24 : 20),
+              Text(
+                'Bienvenido a Ride',
+                style: AppTheme.display(
+                  titleSize,
+                  color: ride.ink,
+                  letterSpacing: -0.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Elige cómo quieres usar Ride',
+                style: AppTheme.display(
+                  15,
+                  color: ride.inkMuted,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              // Espaciador proporcional que crece en pantallas grandes
+              SizedBox(height: isTall ? 24 : 16),
+              if (isTall) ...[
+                Row(
+                  children: [
+                    for (final b in const [
+                      _BenefitData(icon: Icons.shield_outlined, label: 'Seguro'),
+                      _BenefitData(icon: Icons.eco_outlined, label: 'Sostenible'),
+                      _BenefitData(icon: Icons.favorite_outline, label: 'Confiable'),
+                    ])
+                      Expanded(child: _BenefitTile(data: b)),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Divider(color: ride.border, height: 1, thickness: 1),
+                const SizedBox(height: 20),
+              ] else
+                const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: buttonHeight,
+                child: FilledButton(
+                  onPressed: onContinue,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: ride.accent,
+                    foregroundColor: isDark ? const Color(0xFF04121C) : Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Text(
+                    'Continuar',
+                    style: AppTheme.display(
+                      17,
+                      color: isDark ? const Color(0xFF04121C) : Colors.white,
+                      weight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              if (isTall) ...[
+                const SizedBox(height: 16),
+                _LegalNote(isDark: isDark),
+                SizedBox(height: isVeryTall ? 16 : 8),
+              ] else
+                const SizedBox(height: 4),
+              // Padding extra proporcional en pantallas muy grandes para
+              // no dejar hueco centrado sin usar Spacer (evita Flex error)
+              SizedBox(height: isVeryTall ? 24 : (isTall ? 12 : 0)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BenefitData {
+  const _BenefitData({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+}
+
+class _BenefitTile extends StatelessWidget {
+  const _BenefitTile({required this.data});
+  final _BenefitData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+    return Column(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: ride.surfaceAlt,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: ride.border, width: 1),
+          ),
+          child: Icon(data.icon, size: 22, color: ride.accent),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          data.label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: ride.inkMuted,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+class _LegalNote extends StatelessWidget {
+  const _LegalNote({this.isDark = false});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+    final link = TextStyle(
+      color: ride.accent,
+      fontWeight: FontWeight.w700,
+      decoration: TextDecoration.underline,
+      decorationColor: ride.accent,
+    );
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          const TextSpan(text: 'Al continuar aceptas nuestros '),
+          TextSpan(text: 'Términos', style: link),
+          const TextSpan(text: ' y la '),
+          TextSpan(text: 'Política de privacidad', style: link),
+          const TextSpan(text: '.'),
+        ],
+      ),
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontSize: AppText.micro,
+        height: 1.6,
+        color: ride.inkFaint,
       ),
     );
   }
@@ -163,20 +356,11 @@ class _HeroVisualState extends State<_HeroVisual>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // ── Imagen de fondo ──
-          ColorFiltered(
-            colorFilter: isDark
-                ? const ColorFilter.mode(Color(0x59061420), BlendMode.darken)
-                : const ColorFilter.mode(Colors.transparent, BlendMode.srcOver),
-            child: Image.asset(
-              'assets/images/fondoInicio.jpeg',
-              fit: BoxFit.cover,
-            ),
+          // ── Imagen de fondo — sin filtro, asset distinto por tema ──
+          Image.asset(
+            isDark ? 'assets/images/fondoInicioNocturno.jpeg' : 'assets/images/fondoInicio.jpeg',
+            fit: BoxFit.cover,
           ),
-          // Filtro oscuro ligero para que la ilustración no quede tapada pero
-          // el logo/texto contrasten.
-          if (isDark)
-            Container(color: const Color(0x33061420)),
 
           // ── Degradado sutil en la parte inferior ──
           Positioned(
