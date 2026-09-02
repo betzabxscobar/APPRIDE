@@ -18,10 +18,11 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# El .vscode que genera la extensión de CMake guarda rutas absolutas de la
+# máquina de cada uno («C:/Users/.../APPRIDE/windows/runner»), que en el equipo
+# de al lado no existen. Si algún día hay una configuración de lanzamiento que
+# valga la pena compartir, se añade a mano con `git add -f`.
+.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
