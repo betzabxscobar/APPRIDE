@@ -242,7 +242,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _Opcion(
               icono: Icons.badge_outlined,
               titulo: 'Vehículo y documentos',
-              detalle: 'Cédula, licencia, SOAT, matrícula y tus autos',
+              detalle: 'Tus datos, tus papeles y los de cada vehículo',
               onTap: () => _abrir(const DriverProfileScreen()),
             ),
           ],

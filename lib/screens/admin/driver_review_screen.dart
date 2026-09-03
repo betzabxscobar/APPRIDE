@@ -12,7 +12,7 @@ import '../../widgets/user_avatar.dart';
 /// Revisión de conductores: lo que manda un chofer para que lo aprueben.
 ///
 /// Hasta ahora esto no existía. Un chofer subía su cédula, su licencia, el
-/// SOAT y la matrícula, la base los guardaba en un bucket privado y ahí se
+/// seguro y la matrícula, la base los guardaba en un bucket privado y ahí se
 /// quedaban: **no había ninguna pantalla desde la que verlos**, así que la
 /// única forma de aprobar a alguien era entrar a la base a mano.
 ///
@@ -228,7 +228,9 @@ class _FilaConductor extends StatelessWidget {
                     _EstadoChip(estado: conductor.estadoAprobacion),
                     const SizedBox(width: 8),
                     Text(
-                      '${conductor.aprobados}/${DocumentType.values.length} documentos',
+                      conductor.papelesQueFaltan.isEmpty
+                          ? 'Todo en regla'
+                          : 'Le faltan ${conductor.papelesQueFaltan.length}',
                       style: TextStyle(
                         fontSize: AppText.micro,
                         fontWeight: FontWeight.w700,
@@ -342,45 +344,101 @@ class _DriverReviewDetailScreenState extends State<DriverReviewDetailScreen> {
     }
   }
 
-  Future<void> _revisarDocumento(DriverDocument doc, bool aprobado) {
+  Future<void> _revisarDocumento(DriverDocument doc, bool aprobado) async {
+    String? motivo;
+    if (!aprobado) {
+      motivo = await _pedirMotivo(
+        titulo: '¿Por qué se rechaza ${doc.tipo.label.toLowerCase()}?',
+        ayuda: 'El chofer solo va a leer esto. «Ilegible» o «vencida» le dice '
+            'qué arreglar; sin motivo vuelve a subir lo mismo.',
+      );
+      if (motivo == null) return;
+    }
+
     return _accion(
-      () => FleetService.instance.revisarDocumento(doc.id, aprobado),
+      () => FleetService.instance
+          .revisarDocumento(doc.id, aprobado, motivo: motivo),
       aprobado
           ? '${doc.tipo.label}: aprobado'
           : '${doc.tipo.label}: rechazado',
     );
   }
 
-  Future<void> _revisarCuenta(bool aprobado) async {
-    if (!aprobado) {
-      final confirmado = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('¿Rechazar al conductor?'),
-          content: const Text(
-            'No podrá ponerse en línea ni recibir viajes. Se le avisa del '
-            'rechazo y podrá volver a enviar sus documentos.',
+  /// Pide el motivo del rechazo. Devuelve null si se cancela.
+  ///
+  /// La base lo exige —`revisar_documento` rebota sin motivo—, así que esto no
+  /// es la validación: es no llegar hasta allí para que rebote.
+  Future<String?> _pedirMotivo({
+    required String titulo,
+    required String ayuda,
+  }) async {
+    final texto = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setLocal) => AlertDialog(
+          title: Text(titulo),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                ayuda,
+                style: TextStyle(fontSize: 12.5, color: context.ride.inkMuted),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: texto,
+                autofocus: true,
+                maxLines: 3,
+                maxLength: 200,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  hintText: 'La foto está borrosa y no se lee el número',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (_) => setLocal(() {}),
+              ),
+            ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('No'),
+              child: const Text('Cancelar'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style:
-                  FilledButton.styleFrom(backgroundColor: context.ride.danger),
-              child: const Text('Sí, rechazar'),
+              onPressed: texto.text.trim().isEmpty
+                  ? null
+                  : () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: context.ride.danger,
+              ),
+              child: const Text('Rechazar'),
             ),
           ],
         ),
+      ),
+    );
+
+    final motivo = texto.text.trim();
+    texto.dispose();
+    return ok == true && motivo.isNotEmpty ? motivo : null;
+  }
+
+  Future<void> _revisarCuenta(bool aprobado) async {
+    String? motivo;
+    if (!aprobado) {
+      motivo = await _pedirMotivo(
+        titulo: '¿Por qué se rechaza la cuenta?',
+        ayuda: 'No podrá ponerse en línea ni recibir viajes. Se le avisa del '
+            'rechazo con este motivo y podrá volver a enviar sus documentos.',
       );
-      if (confirmado != true) return;
+      if (motivo == null) return;
     }
 
     await _accion(
       () => FleetService.instance
-          .revisarConductor(widget.conductorId, aprobado)
+          .revisarConductor(widget.conductorId, aprobado, motivo: motivo)
           .then((_) {}),
       aprobado ? 'Conductor aprobado' : 'Conductor rechazado',
     );
@@ -421,12 +479,30 @@ class _DriverReviewDetailScreenState extends State<DriverReviewDetailScreen> {
                       else
                         for (final auto in conductor.vehiculos) ...[
                           _TarjetaAuto(auto: auto),
-                          const SizedBox(height: 10),
+                          // Los papeles de ese auto, debajo de ese auto. En una
+                          // lista suelta no se sabe de cuál es cada matrícula,
+                          // y con dos vehículos eso es justo lo que hay que
+                          // poder distinguir.
+                          for (final tipo in DocumentType.delVehiculo)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 16, top: 8),
+                              child: _TarjetaDocumento(
+                                tipo: tipo,
+                                documento: conductor
+                                    .documentosDe(auto.id)
+                                    .where((d) => d.tipo == tipo)
+                                    .firstOrNull,
+                                ocupado: _ocupado,
+                                onAprobar: (doc) => _revisarDocumento(doc, true),
+                                onRechazar: (doc) => _revisarDocumento(doc, false),
+                              ),
+                            ),
+                          const SizedBox(height: 18),
                         ],
                       const SizedBox(height: 18),
-                      const _Encabezado('Documentos'),
+                      const _Encabezado('Documentos de la persona'),
                       const SizedBox(height: 10),
-                      for (final tipo in DocumentType.values) ...[
+                      for (final tipo in DocumentType.delChofer) ...[
                         _TarjetaDocumento(
                           tipo: tipo,
                           documento: conductor.documento(tipo),
@@ -502,6 +578,35 @@ class _Identidad extends StatelessWidget {
             etiqueta: 'Número celular',
             valor: conductor.telefono ?? 'Sin registrar',
             alerta: conductor.telefono == null,
+          ),
+          const SizedBox(height: 12),
+          // Los tres datos que hay que cotejar con las fotos que subió. Antes
+          // no existían: de la identidad de un chofer solo había imágenes, y
+          // aprobar era mirar una foto y creerse lo que decía.
+          _Dato(
+            icono: Icons.badge_outlined,
+            etiqueta: 'Cédula',
+            valor: conductor.cedula ?? 'Sin registrar',
+            alerta: conductor.cedula == null,
+          ),
+          const SizedBox(height: 12),
+          _Dato(
+            icono: Icons.fingerprint,
+            etiqueta: 'Código dactilar',
+            valor: conductor.codigoDactilar ?? 'Sin registrar',
+            alerta: conductor.codigoDactilar == null,
+          ),
+          const SizedBox(height: 12),
+          _Dato(
+            icono: Icons.credit_card_outlined,
+            etiqueta: 'Licencia',
+            valor: conductor.licencia == null
+                ? 'Sin registrar'
+                : conductor.licenciaVencida
+                    ? '${conductor.licencia!.label} · VENCIDA'
+                    : '${conductor.licencia!.label} · vence el '
+                        '${_fecha(conductor.licenciaCaducaEl!)}',
+            alerta: conductor.licencia == null || conductor.licenciaVencida,
           ),
           const SizedBox(height: 12),
           _Dato(
@@ -994,14 +1099,12 @@ class _Decision extends StatelessWidget {
     );
   }
 
+  /// La lista la arma `papeles_que_faltan_chofer()`, la misma función que usa
+  /// `revisar_conductor` para decidir. Antes esta pantalla la calculaba por su
+  /// cuenta, que es como se acaba enseñando «listo» sobre un botón que rebota.
   static String _queFalta(DriverReview conductor) {
-    final partes = <String>[
-      if (conductor.faltantes.isNotEmpty)
-        'faltan por aprobar: '
-            '${conductor.faltantes.map((t) => t.label.toLowerCase()).join(', ')}',
-      if (conductor.vehiculos.isEmpty) 'no registró ningún vehículo',
-    ];
-    return 'Todavía no se puede aprobar — ${partes.join(' y ')}.';
+    final partes = conductor.faltantes.map((f) => f.toLowerCase()).join('; ');
+    return 'Todavía no se puede aprobar — falta $partes.';
   }
 }
 

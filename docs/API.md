@@ -94,10 +94,12 @@ viaje todavía no tiene chofer.
 |---|---|---|
 | `registrar_vehiculo` | `p_placa`, `p_marca`, `p_modelo`, `p_anio`, `p_color`, `p_vehiculo_id`, `p_categoria` | `uuid` |
 | `activar_vehiculo` | `p_vehiculo_id` | — |
-| `registrar_documento` | `p_tipo`, `p_url` | `uuid` |
+| `registrar_documento` | ver «Choferes: identidad y papeles» | `uuid` |
 
 `registrar_vehiculo` sirve para crear y para editar: con `p_vehiculo_id` en null
-crea, con un id actualiza el que ya existe.
+crea, con un id actualiza el que ya existe. **No basta con registrarlo**:
+`activar_vehiculo` exige que la licencia del chofer habilite esa categoría y que
+ese auto tenga sus cuatro papeles aprobados y sin caducar.
 
 ## Pagos
 
@@ -123,6 +125,32 @@ que es la única que ve el `fixedhash`.
 chofer su parte, igual que el efectivo le carga la comisión. Es idempotente
 porque un aviso de pasarela se reintenta. Todo el circuito, y las preguntas que
 quedan abiertas con Payválida, están en [`PAGOS.md`](PAGOS.md).
+
+## Choferes: identidad y papeles
+
+| Función | Parámetros | Devuelve | Quién |
+|---|---|---|---|
+| `registrar_identidad_chofer` | `p_cedula`, `p_codigo_dactilar`, `p_licencia_tipo`, `p_licencia_caduca_el` | — | el propio chofer |
+| `registrar_documento` | `p_tipo`, `p_url`, `p_vehiculo_id`, `p_numero`, `p_caduca_el` | `uuid` | el propio chofer |
+| `revisar_documento` | `p_documento_id`, `p_aprobado`, `p_motivo` | estado | administración |
+| `revisar_conductor` | `p_conductor_id`, `p_aprobado`, `p_motivo` | estado | administración |
+| `papeles_que_faltan_chofer` | `p_conductor_id` (null = uno mismo) | `text[]` | el chofer o administración |
+| `papeles_que_faltan_vehiculo` | `p_vehiculo_id` | `text[]` | el dueño o administración |
+| `cedula_ecuatoriana_valida` | `p_cedula` | `boolean` | cualquiera autenticado |
+| `licencia_habilita` | `p_licencia`, `p_categoria` | `boolean` | cualquiera autenticado |
+
+> **Los papeles del vehículo son de un vehículo.** `matricula`, `SPPAT`,
+> `revision_tecnica` y `foto_vehiculo` exigen `p_vehiculo_id`; `cedula`,
+> `licencia` y `foto_perfil` lo rechazan. Un chofer con dos autos necesita dos
+> matrículas, y hasta el 2026-09-03 la tabla no dejaba tenerlas.
+
+> **`papeles_que_faltan_chofer()` es la única definición de «está completo».**
+> La usan `revisar_conductor`, la pantalla del chofer y la de revisión. Si cada
+> una contara por su cuenta, acabarían discrepando.
+
+Rechazar exige motivo, y las caducidades se comprueban también al ponerse en
+línea: aprobar es de una vez, pero un SPPAT caduca solo. Todo el circuito está
+en [`CHOFERES.md`](CHOFERES.md).
 
 ## Ganancias
 
@@ -230,7 +258,7 @@ el `dispose`.
 | `avatares` | público | `getPublicUrl()` |
 | `documentos` | privado | `createSignedUrl(ruta, 3600)` |
 
-Los documentos de un chofer —cédula, licencia, SOAT y matrícula— no pueden ser
+Los documentos de un chofer —los suyos y los de cada vehículo— no pueden ser
 públicos: son documentos de identidad. Se abren con un enlace firmado que
 caduca en una hora.
 

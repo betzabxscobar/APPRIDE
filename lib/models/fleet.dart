@@ -41,21 +41,41 @@ class FleetVehicle {
       );
 }
 
-/// Los cuatro documentos que la administración exige para aprobar a un chofer.
+/// Los papeles que la administración exige para aprobar a un chofer.
 ///
-/// El orden es el de la revisión: primero quién es la persona, después qué le
-/// habilita a conducir y por último el vehículo.
+/// Se dividen en dos, y la división importa: los de la persona son uno por
+/// cuenta, y los del vehículo son **uno por cada auto**. Un chofer con dos
+/// autos necesita dos matrículas, dos SPPAT y dos revisiones técnicas.
+///
+/// `SPPAT` reemplazó al SOAT en Ecuador: es el Servicio Público para Pago de
+/// Accidentes de Tránsito.
 enum DocumentType {
-  cedula('cedula', 'Cédula de identidad',
-      'Foto del frente de tu cédula', Icons.badge_outlined),
+  cedula('cedula', 'Cédula de identidad', 'Foto del frente de tu cédula',
+      Icons.badge_outlined),
   licencia('licencia', 'Licencia de conducir',
       'Foto del frente de tu licencia vigente', Icons.credit_card_outlined),
-  soat('SOAT', 'SOAT', 'Póliza del seguro obligatorio',
-      Icons.shield_outlined),
-  matricula('matricula', 'Matrícula', 'Matrícula del vehículo',
-      Icons.description_outlined);
+  fotoPerfil('foto_perfil', 'Tu foto',
+      'De frente y con la cara descubierta: es la que ve el pasajero',
+      Icons.person_outline),
+  matricula('matricula', 'Matrícula', 'La del vehículo, vigente',
+      Icons.description_outlined, deVehiculo: true, caduca: true),
+  sppat('SPPAT', 'SPPAT', 'El seguro que reemplazó al SOAT',
+      Icons.shield_outlined, deVehiculo: true, caduca: true),
+  revisionTecnica('revision_tecnica', 'Revisión técnica',
+      'La del año en curso', Icons.build_outlined,
+      deVehiculo: true, caduca: true),
+  fotoVehiculo('foto_vehiculo', 'Foto del vehículo',
+      'De frente y con la placa legible', Icons.directions_car_outlined,
+      deVehiculo: true);
 
-  const DocumentType(this.id, this.label, this.hint, this.icon);
+  const DocumentType(
+    this.id,
+    this.label,
+    this.hint,
+    this.icon, {
+    this.deVehiculo = false,
+    this.caduca = false,
+  });
 
   /// Valor tal como lo espera la base.
   final String id;
@@ -63,9 +83,95 @@ enum DocumentType {
   final String hint;
   final IconData icon;
 
+  /// Si es de un auto concreto. Los demás son de la persona.
+  final bool deVehiculo;
+
+  /// Si lleva fecha de caducidad obligatoria. Una foto no caduca.
+  final bool caduca;
+
+  static List<DocumentType> get delChofer =>
+      DocumentType.values.where((d) => !d.deVehiculo).toList();
+
+  static List<DocumentType> get delVehiculo =>
+      DocumentType.values.where((d) => d.deVehiculo).toList();
+
   static DocumentType fromId(String id) => DocumentType.values.firstWhere(
         (d) => d.id == id,
         orElse: () => DocumentType.licencia,
+      );
+}
+
+/// Tipos de licencia de la ANT.
+///
+/// Cuál habilita para qué categoría **no se decide aquí**: está en la tabla
+/// `licencias_por_categoria`, porque eso lo cambia una resolución de la ANT y
+/// no puede exigir volver a compilar la app.
+enum LicenseType {
+  a('A', 'A · Motocicletas'),
+  a1('A1', 'A1 · Tricimotos y cuadrones'),
+  b('B', 'B · Particular, hasta 3.500 kg'),
+  c('C', 'C · Profesional, taxis y transporte liviano'),
+  c1('C1', 'C1 · Profesional, vehículos de instituciones'),
+  d('D', 'D · Profesional, transporte público de pasajeros'),
+  d1('D1', 'D1 · Profesional, turismo'),
+  e('E', 'E · Profesional, carga pesada'),
+  e1('E1', 'E1 · Profesional, carga pesada articulada'),
+  f('F', 'F · Adaptados para personas con discapacidad'),
+  g('G', 'G · Maquinaria agrícola y equipo pesado');
+
+  const LicenseType(this.id, this.label);
+  final String id;
+  final String label;
+
+  static LicenseType? fromId(String? id) {
+    if (id == null) return null;
+    for (final l in LicenseType.values) {
+      if (l.id == id) return l;
+    }
+    return null;
+  }
+}
+
+/// Quién es el chofer, según `public.conductores`.
+///
+/// Son los datos que la app no puede inventarse ni deducir de una foto: el
+/// número de cédula, el código dactilar del reverso y qué licencia tiene. Sin
+/// esto, de la identidad de un chofer solo había imágenes.
+class DriverIdentity {
+  const DriverIdentity({
+    this.cedula,
+    this.codigoDactilar,
+    this.licencia,
+    this.licenciaCaducaEl,
+  });
+
+  final String? cedula;
+  final String? codigoDactilar;
+  final LicenseType? licencia;
+  final DateTime? licenciaCaducaEl;
+
+  bool get completa =>
+      cedula != null && codigoDactilar != null && licencia != null;
+
+  bool get licenciaVencida {
+    final f = licenciaCaducaEl;
+    return f == null || f.isBefore(DateTime.now());
+  }
+
+  /// La cédula en pantalla se parte para leerla, no para ocultarla: es un dato
+  /// que la persona acaba de escribir y que ve en su propio perfil.
+  String get cedulaLegible {
+    final c = cedula;
+    if (c == null || c.length != 10) return c ?? '—';
+    return '${c.substring(0, 2)}-${c.substring(2, 9)}-${c.substring(9)}';
+  }
+
+  factory DriverIdentity.fromMap(Map<String, dynamic> row) => DriverIdentity(
+        cedula: row['cedula'] as String?,
+        codigoDactilar: row['codigo_dactilar'] as String?,
+        licencia: LicenseType.fromId(row['licencia_tipo'] as String?),
+        licenciaCaducaEl:
+            DateTime.tryParse((row['licencia_caduca_el'] as String?) ?? ''),
       );
 }
 
@@ -92,6 +198,10 @@ class DriverDocument {
     required this.estado,
     required this.url,
     required this.fechaSubida,
+    this.vehiculoId,
+    this.numero,
+    this.caducaEl,
+    this.motivoRechazo,
   });
 
   final String id;
@@ -99,6 +209,34 @@ class DriverDocument {
   final DocumentStatus estado;
   final String url;
   final DateTime fechaSubida;
+
+  /// De qué auto es. Null en los de la persona.
+  final String? vehiculoId;
+
+  /// Número de la póliza o de la matrícula, para poder cotejarlo.
+  final String? numero;
+  final DateTime? caducaEl;
+
+  /// Por qué se rechazó. Es lo único que el chofer va a leer, así que sin esto
+  /// vuelve a subir exactamente lo mismo.
+  final String? motivoRechazo;
+
+  /// Aprobado **y** sin caducar. Un SPPAT vencido no sirve por mucho que
+  /// alguien lo haya aprobado en su día.
+  bool get vigente {
+    if (estado != DocumentStatus.aprobado) return false;
+    if (!tipo.caduca) return true;
+    final f = caducaEl;
+    return f != null && !f.isBefore(DateTime.now());
+  }
+
+  /// Caduca dentro de un mes: se avisa antes de que deje de servir.
+  bool get porCaducar {
+    final f = caducaEl;
+    if (!tipo.caduca || f == null) return false;
+    final quedan = f.difference(DateTime.now()).inDays;
+    return quedan >= 0 && quedan <= 30;
+  }
 
   factory DriverDocument.fromMap(Map<String, dynamic> row) => DriverDocument(
         id: row['id'] as String,
@@ -108,8 +246,25 @@ class DriverDocument {
         fechaSubida:
             DateTime.tryParse(row['fecha_subida'] as String)?.toLocal() ??
                 DateTime.now(),
+        vehiculoId: row['vehiculo_id'] as String?,
+        numero: row['numero'] as String?,
+        caducaEl: DateTime.tryParse((row['caduca_el'] as String?) ?? ''),
+        motivoRechazo: row['motivo_rechazo'] as String?,
       );
 }
+
+/// Lo que le falta a un chofer, tal como lo devuelve
+/// `papeles_que_faltan_chofer()`.
+///
+/// Los identificadores llegan del servidor y se traducen aquí. Que la lista la
+/// arme Postgres y no la app es lo que evita que la pantalla diga «ya está»
+/// mientras la función que aprueba piensa lo contrario.
+String etiquetaDePapel(String id) => switch (id) {
+      'identidad' => 'Cédula, código dactilar y tipo de licencia',
+      'licencia_vigente' => 'Una licencia sin caducar',
+      'vehiculo_completo' => 'Un vehículo con todos sus papeles al día',
+      _ => DocumentType.fromId(id).label,
+    };
 
 /// Aviso de `public.notificaciones`.
 class AppNotification {
@@ -220,6 +375,11 @@ class DriverReview {
     required this.fechaRegistro,
     required this.vehiculos,
     required this.documentos,
+    required this.papelesQueFaltan,
+    this.cedula,
+    this.codigoDactilar,
+    this.licencia,
+    this.licenciaCaducaEl,
   });
 
   final String id;
@@ -239,6 +399,19 @@ class DriverReview {
 
   final List<FleetVehicle> vehiculos;
   final List<DriverDocument> documentos;
+
+  /// Lo que le falta, calculado por `papeles_que_faltan_chofer()`. Llega del
+  /// servidor y no se recalcula aquí a propósito: si la pantalla tuviera su
+  /// propia idea de «completo», acabaría discrepando de la función que aprueba.
+  final List<String> papelesQueFaltan;
+
+  final String? cedula;
+  final String? codigoDactilar;
+  final LicenseType? licencia;
+  final DateTime? licenciaCaducaEl;
+
+  bool get licenciaVencida =>
+      licenciaCaducaEl == null || licenciaCaducaEl!.isBefore(DateTime.now());
 
   bool get aprobado => estadoAprobacion == 'aprobado';
   bool get rechazado => estadoAprobacion == 'rechazado';
@@ -263,17 +436,19 @@ class DriverReview {
   int get pendientes =>
       documentos.where((d) => d.estado == DocumentStatus.pendiente).length;
 
-  /// Los tipos que todavía no están aprobados. Es exactamente lo que
-  /// `revisar_conductor` exige antes de dejar aprobar la cuenta.
-  List<DocumentType> get faltantes => [
-        for (final tipo in DocumentType.values)
-          if (documento(tipo)?.estado != DocumentStatus.aprobado) tipo,
-      ];
+  /// Los papeles de ese vehículo, para revisarlos junto al auto al que
+  /// pertenecen y no en una lista suelta donde no se sabe de cuál son.
+  List<DriverDocument> documentosDe(String vehiculoId) =>
+      documentos.where((d) => d.vehiculoId == vehiculoId).toList();
 
-  /// Se puede aprobar cuando no falta ningún documento y hay al menos un auto.
-  /// La comprobación de verdad la hace Postgres; esto solo evita ofrecer un
-  /// botón que se sabe que va a rebotar.
-  bool get listoParaAprobar => faltantes.isEmpty && vehiculos.isNotEmpty;
+  /// Lo que falta, ya en castellano.
+  List<String> get faltantes =>
+      papelesQueFaltan.map(etiquetaDePapel).toList();
+
+  /// Se puede aprobar cuando el servidor dice que no falta nada. La
+  /// comprobación de verdad la hace `revisar_conductor`; esto solo evita
+  /// ofrecer un botón que se sabe que va a rebotar.
+  bool get listoParaAprobar => papelesQueFaltan.isEmpty;
 
   String get iniciales {
     final partes = nombre.trim().split(RegExp(r'\s+'));
@@ -299,6 +474,15 @@ class DriverReview {
       estadoAprobacion: (row['estado_aprobacion'] as String?) ?? 'pendiente',
       disponible: (row['disponible'] as bool?) ?? false,
       calificacion: (row['calificacion_promedio'] as num?)?.toDouble(),
+      papelesQueFaltan: [
+        for (final f in (row['papeles_que_faltan'] as List?) ?? const [])
+          f as String,
+      ],
+      cedula: row['cedula'] as String?,
+      codigoDactilar: row['codigo_dactilar'] as String?,
+      licencia: LicenseType.fromId(row['licencia_tipo'] as String?),
+      licenciaCaducaEl:
+          DateTime.tryParse((row['licencia_caduca_el'] as String?) ?? ''),
       fechaRegistro: row['fecha_registro'] == null
           ? null
           : DateTime.tryParse(row['fecha_registro'] as String)?.toLocal(),

@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
+import 'package:flutter/painting.dart' show decodeImageFromList;
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../models/fleet.dart';
@@ -73,7 +75,8 @@ class FleetService {
   Future<List<DriverDocument>> misDocumentos() async {
     final rows = await _client
         .from('documentos_conductor')
-        .select('id, tipo_documento, estado, url_archivo, fecha_subida')
+        .select('id, tipo_documento, estado, url_archivo, fecha_subida, '
+            'vehiculo_id, numero, caduca_el, motivo_rechazo')
         .eq('conductor_id', _uid);
     return rows.map(DriverDocument.fromMap).toList();
   }
@@ -86,9 +89,29 @@ class FleetService {
   ///
   /// `upsert` reemplaza el archivo anterior en vez de acumular versiones, y la
   /// función de base vuelve a poner el documento en «pendiente».
-  Future<void> subirDocumento(DocumentType tipo, File archivo) async {
+  Future<void> subirDocumento(
+    DocumentType tipo,
+    File archivo, {
+    String? vehiculoId,
+    String? numero,
+    DateTime? caducaEl,
+  }) async {
+    if (tipo.deVehiculo && vehiculoId == null) {
+      throw const RideException('Dinos de qué vehículo es ese papel');
+    }
+    if (tipo.caduca && caducaEl == null) {
+      throw const RideException('Ese documento necesita su fecha de caducidad');
+    }
+
+    await _comprobarImagen(archivo);
+
     final ext = _extension(archivo.path);
-    final ruta = '$_uid/${tipo.id}.$ext';
+    // El vehículo va en la ruta: sin eso, la matrícula del segundo auto
+    // sobrescribiría el archivo de la del primero, que es exactamente el
+    // problema que se acaba de arreglar en la base.
+    final ruta = vehiculoId == null
+        ? '$_uid/${tipo.id}.$ext'
+        : '$_uid/$vehiculoId/${tipo.id}.$ext';
 
     try {
       await _client.storage.from('documentos').upload(
@@ -103,7 +126,116 @@ class FleetService {
     await _rpc<String>('registrar_documento', {
       'p_tipo': tipo.id,
       'p_url': ruta,
+      'p_vehiculo_id': vehiculoId,
+      'p_numero': numero,
+      'p_caduca_el': caducaEl?.toIso8601String().split('T').first,
     });
+
+    // La foto que revisa la administración y la que ve el pasajero son la
+    // misma. Tener dos sería pedirle al chofer que suba su cara dos veces, y
+    // dejaría la puerta abierta a que le aprueben una y enseñe otra.
+    //
+    // Que se vea antes de estar aprobada no es un problema: un chofer sin
+    // aprobar no puede ponerse en línea, así que ningún pasajero llega a verla.
+    if (tipo == DocumentType.fotoPerfil) {
+      try {
+        await AuthService.instance.cambiarFoto(archivo);
+      } catch (_) {
+        // El documento ya quedó registrado, que es lo que importa para la
+        // revisión. Si el avatar público falla, se reintenta desde Ajustes.
+      }
+    }
+  }
+
+  /// Rechaza antes de subir lo que no se va a poder revisar.
+  ///
+  /// El bucket ya limita tamaño y tipo, pero eso no distingue una foto legible
+  /// de uno de 40x30 píxeles: el tope de arriba no tiene suelo. Una matrícula
+  /// que no se puede leer se rechaza igual, solo que tres días después.
+  ///
+  /// Se mide con [decodeImageFromList] en vez de traer una librería: solo hace
+  /// falta el tamaño, y eso ya lo sabe Flutter.
+  Future<void> _comprobarImagen(File archivo) async {
+    if (_extension(archivo.path) == 'pdf') return;
+
+    final bytes = await archivo.readAsBytes();
+    if (bytes.lengthInBytes > _topeArchivo) {
+      throw const RideException(
+        'La foto pesa más de 5 MB. Vuelve a tomarla con menos resolución.',
+      );
+    }
+
+    final ui.Image imagen;
+    try {
+      imagen = await decodeImageFromList(bytes);
+    } catch (_) {
+      throw const RideException('Ese archivo no es una foto que podamos leer.');
+    }
+    final ancho = imagen.width;
+    final alto = imagen.height;
+    imagen.dispose();
+
+    if (ancho < _ladoMinimo || alto < _ladoMinimo) {
+      throw RideException(
+        'Esa foto es demasiado pequeña ($ancho×$alto). Tiene que medir al '
+        'menos $_ladoMinimo píxeles de lado para que se lea.',
+      );
+    }
+  }
+
+  /// Lo mismo que acepta el bucket `documentos`. Repetirlo aquí es para dar el
+  /// mensaje antes de gastar la subida, no para sustituirlo.
+  static const int _topeArchivo = 5 * 1024 * 1024;
+
+  /// Por debajo de esto no se lee un número de placa ni el de una póliza.
+  static const int _ladoMinimo = 600;
+
+  /// Lo que hay registrado hoy de su identidad.
+  ///
+  /// Se lee directo de `conductores`: RLS ya limita la fila a la suya, y no
+  /// hace falta una función para leer cuatro columnas propias.
+  Future<DriverIdentity> miIdentidad() async {
+    final row = await _client
+        .from('conductores')
+        .select('cedula, codigo_dactilar, licencia_tipo, licencia_caduca_el')
+        .eq('id', _uid)
+        .maybeSingle();
+    return row == null ? const DriverIdentity() : DriverIdentity.fromMap(row);
+  }
+
+  /// Cédula, código dactilar y licencia.
+  ///
+  /// Los tres los valida Postgres: la cédula con su dígito verificador, el
+  /// dactilar con su formato y la licencia contra la lista de la ANT. Aquí no
+  /// se comprueba nada por adelantado para no tener dos reglas que se
+  /// contradigan.
+  Future<void> registrarIdentidad({
+    required String cedula,
+    required String codigoDactilar,
+    required LicenseType licencia,
+    required DateTime licenciaCaducaEl,
+  }) =>
+      _rpc<void>('registrar_identidad_chofer', {
+        'p_cedula': cedula,
+        'p_codigo_dactilar': codigoDactilar,
+        'p_licencia_tipo': licencia.id,
+        'p_licencia_caduca_el':
+            licenciaCaducaEl.toIso8601String().split('T').first,
+      });
+
+  /// Qué le falta al chofer para que le puedan aprobar la cuenta.
+  Future<List<String>> papelesQueFaltan() async {
+    final r = await _rpc<List<dynamic>>('papeles_que_faltan_chofer', {});
+    return [for (final x in r) x as String];
+  }
+
+  /// Qué le falta a un vehículo para poder ponerlo en servicio.
+  Future<List<String>> papelesQueFaltanDelVehiculo(String vehiculoId) async {
+    final r = await _rpc<List<dynamic>>(
+      'papeles_que_faltan_vehiculo',
+      {'p_vehiculo_id': vehiculoId},
+    );
+    return [for (final x in r) x as String];
   }
 
   /// URL temporal para ver un documento del bucket privado.
@@ -257,21 +389,34 @@ class FleetService {
   ///
   /// El trigger `documentos_notificar` avisa al chofer del resultado, así que
   /// desde aquí no hay que mandar nada.
-  Future<void> revisarDocumento(String documentoId, bool aprobado) =>
+  /// Rechazar exige un motivo, y la base lo impone: es lo único que el chofer
+  /// va a leer, y sin ello vuelve a subir exactamente el mismo papel.
+  Future<void> revisarDocumento(
+    String documentoId,
+    bool aprobado, {
+    String? motivo,
+  }) =>
       _rpc<void>('revisar_documento', {
         'p_documento_id': documentoId,
         'p_aprobado': aprobado,
+        'p_motivo': motivo,
       });
 
   /// Aprueba o rechaza la cuenta de chofer.
   ///
-  /// Aprobar exige que los cuatro documentos estén aprobados y que haya al
-  /// menos un vehículo; si falta algo, Postgres lo rechaza diciendo qué falta.
-  /// Rechazar no exige nada.
-  Future<String> revisarConductor(String conductorId, bool aprobado) =>
+  /// Aprobar exige identidad registrada, licencia vigente y del tipo que
+  /// corresponde, sus papeles personales aprobados y al menos un vehículo con
+  /// todos los suyos al día. Si falta algo, Postgres lo rechaza diciendo qué.
+  /// Rechazar exige un motivo.
+  Future<String> revisarConductor(
+    String conductorId,
+    bool aprobado, {
+    String? motivo,
+  }) =>
       _rpc<String>('revisar_conductor', {
         'p_conductor_id': conductorId,
         'p_aprobado': aprobado,
+        'p_motivo': motivo,
       });
 
   // ---------------------------------------------------------------------------
