@@ -12,6 +12,7 @@ import 'package:ride/services/geocoding_service.dart';
 import 'package:ride/services/h3_service.dart';
 import 'package:ride/services/ride_service.dart';
 import 'package:ride/services/map_style_service.dart';
+import 'package:ride/services/payments_service.dart';
 import 'package:ride/services/places_service.dart';
 import 'package:ride/services/routing_service.dart';
 import 'package:ride/widgets/ride_map.dart';
@@ -698,15 +699,18 @@ void main() {
   });
 
   group('Flota y documentos', () {
-    test('Los cuatro tipos coinciden con el CHECK de la base', () {
+    test('Los tipos coinciden con el CHECK de la base', () {
       // El orden importa: es el que ve el chofer al subirlos y el que sigue la
-      // administración al revisarlos. La cédula va primero porque identifica a
-      // la persona; el resto habilita a conducir y al vehículo.
+      // administración al revisarlos. Primero quién es la persona, después de
+      // qué auto es cada papel.
       expect(DocumentType.values.map((d) => d.id).toList(), [
         'cedula',
         'licencia',
-        'SOAT',
+        'foto_perfil',
         'matricula',
+        'SPPAT',
+        'revision_tecnica',
+        'foto_vehiculo',
       ]);
     });
 
@@ -1051,6 +1055,7 @@ void main() {
       List<String> pendientes = const [],
       bool conAuto = true,
       String? nombre = 'Javier Conforme',
+      List<String> faltan = const [],
     }) {
       return {
         'id': 'c-1',
@@ -1062,6 +1067,7 @@ void main() {
         'disponible': false,
         'calificacion_promedio': null,
         'fecha_registro': '2026-08-20T10:00:00Z',
+        'papeles_que_faltan': faltan,
         'vehiculos': conAuto
             ? [
                 {
@@ -1096,9 +1102,16 @@ void main() {
       };
     }
 
-    test('Sin documentos, faltan los cuatro', () {
-      final conductor = DriverReview.fromMap(fila());
-      expect(conductor.faltantes.length, DocumentType.values.length);
+    test('Lo que falta lo dice el servidor, no la pantalla', () {
+      // Antes esta ficha contaba documentos por su cuenta y decidia sola si
+      // estaba completa. Con los papeles por vehiculo esa cuenta ya no cuadra:
+      // un chofer con dos autos necesita mas documentos que uno con uno. La
+      // lista la arma `papeles_que_faltan_chofer()`, que es la misma que usa
+      // `revisar_conductor` para decidir.
+      final conductor = DriverReview.fromMap(fila(
+        faltan: const ['identidad', 'licencia_vigente', 'vehiculo_completo'],
+      ));
+      expect(conductor.faltantes.length, 3);
       expect(conductor.listoParaAprobar, isFalse);
     });
 
@@ -1106,32 +1119,36 @@ void main() {
       // Es la trampa de contar «documentos entregados» en vez de «aprobados»:
       // subirlos no es lo mismo que validarlos.
       final conductor = DriverReview.fromMap(
-        fila(pendientes: ['cedula', 'licencia', 'SOAT', 'matricula']),
+        fila(
+          pendientes: ['cedula', 'licencia', 'foto_perfil'],
+          faltan: const ['cedula', 'licencia', 'foto_perfil'],
+        ),
       );
-      expect(conductor.pendientes, 4);
+      expect(conductor.pendientes, 3);
       expect(conductor.aprobados, 0);
       expect(conductor.listoParaAprobar, isFalse);
     });
 
-    test('Con los cuatro aprobados y un auto, se puede aprobar', () {
+    test('Con todo en regla, se puede aprobar', () {
       final conductor = DriverReview.fromMap(
-        fila(aprobados: ['cedula', 'licencia', 'SOAT', 'matricula']),
+        fila(aprobados: ['cedula', 'licencia', 'foto_perfil']),
       );
       expect(conductor.faltantes, isEmpty);
       expect(conductor.listoParaAprobar, isTrue);
     });
 
     test('Con los papeles en regla pero sin vehículo, todavía no', () {
-      // Es la misma condición que exige `revisar_conductor`: aprobar aquí
-      // solo daría un error del servidor.
+      // Es la misma condición que exige `revisar_conductor`, y ahora llega
+      // dicha por el propio servidor en vez de deducida aquí.
       final conductor = DriverReview.fromMap(
         fila(
-          aprobados: ['cedula', 'licencia', 'SOAT', 'matricula'],
+          aprobados: ['cedula', 'licencia', 'foto_perfil'],
           conAuto: false,
+          faltan: const ['vehiculo_completo'],
         ),
       );
-      expect(conductor.faltantes, isEmpty);
       expect(conductor.listoParaAprobar, isFalse);
+      expect(conductor.faltantes.first, contains('vehículo'));
     });
 
     test('Sin nombre se usa el correo, para que la fila no salga vacía', () {
@@ -1363,6 +1380,271 @@ void main() {
       // almacenamiento local falle.
       ThemeController.instance.cargar();
       expect(ThemeController.instance.mode, ThemeMode.system);
+    });
+  });
+
+  group('Papeles del chofer', () {
+    DriverDocument doc(
+      DocumentType tipo, {
+      DocumentStatus estado = DocumentStatus.aprobado,
+      DateTime? caduca,
+      String? vehiculo,
+      String? motivo,
+    }) =>
+        DriverDocument.fromMap({
+          'id': 'd-1',
+          'tipo_documento': tipo.id,
+          'estado': estado.id,
+          'url_archivo': 'x/y.jpg',
+          'fecha_subida': DateTime.now().toIso8601String(),
+          'vehiculo_id': vehiculo,
+          'caduca_el': caduca?.toIso8601String().split('T').first,
+          'motivo_rechazo': motivo,
+        });
+
+    test('Los papeles del auto son de un auto y los de la persona no', () {
+      // Es la división que hace posible el segundo vehículo: si la matrícula
+      // fuera de la persona, un chofer con dos autos solo podría tener una.
+      expect(DocumentType.matricula.deVehiculo, isTrue);
+      expect(DocumentType.sppat.deVehiculo, isTrue);
+      expect(DocumentType.revisionTecnica.deVehiculo, isTrue);
+      expect(DocumentType.fotoVehiculo.deVehiculo, isTrue);
+
+      expect(DocumentType.cedula.deVehiculo, isFalse);
+      expect(DocumentType.licencia.deVehiculo, isFalse);
+      expect(DocumentType.fotoPerfil.deVehiculo, isFalse);
+
+      expect(DocumentType.delChofer.length, 3);
+      expect(DocumentType.delVehiculo.length, 4);
+    });
+
+    test('El SOAT pasó a llamarse SPPAT', () {
+      // En Ecuador lo reemplazó el SPPAT. El id tiene que ser el que espera la
+      // base, o `registrar_documento` lo rechaza.
+      expect(DocumentType.sppat.id, 'SPPAT');
+      expect(DocumentType.fromId('SPPAT'), DocumentType.sppat);
+    });
+
+    test('Un aprobado que ya caducó no está vigente', () {
+      // El agujero de antes: un seguro vencido valía igual que uno al día,
+      // para siempre, porque nadie guardaba la fecha.
+      final vencido = doc(DocumentType.sppat,
+          caduca: DateTime.now().subtract(const Duration(days: 1)));
+      expect(vencido.estado, DocumentStatus.aprobado);
+      expect(vencido.vigente, isFalse);
+    });
+
+    test('Un aprobado sin fecha tampoco cuenta como vigente', () {
+      expect(doc(DocumentType.sppat).vigente, isFalse);
+    });
+
+    test('Una foto no caduca, así que vale sin fecha', () {
+      expect(doc(DocumentType.fotoVehiculo).vigente, isTrue);
+      expect(doc(DocumentType.cedula).vigente, isTrue);
+    });
+
+    test('Se avisa un mes antes de que venza', () {
+      final pronto = doc(DocumentType.matricula,
+          caduca: DateTime.now().add(const Duration(days: 10)));
+      final lejos = doc(DocumentType.matricula,
+          caduca: DateTime.now().add(const Duration(days: 200)));
+      expect(pronto.porCaducar, isTrue);
+      expect(pronto.vigente, isTrue);
+      expect(lejos.porCaducar, isFalse);
+    });
+
+    test('Un pendiente no está vigente por mucho que tenga fecha', () {
+      final pendiente = doc(DocumentType.matricula,
+          estado: DocumentStatus.pendiente,
+          caduca: DateTime.now().add(const Duration(days: 300)));
+      expect(pendiente.vigente, isFalse);
+    });
+
+    test('El motivo del rechazo llega hasta el modelo', () {
+      final rechazado = doc(DocumentType.licencia,
+          estado: DocumentStatus.rechazado, motivo: 'La foto está borrosa');
+      expect(rechazado.motivoRechazo, 'La foto está borrosa');
+    });
+
+    test('Lo que falta se dice en castellano', () {
+      // Los identificadores los arma Postgres; si esto no los traduce, al
+      // chofer le aparece «vehiculo_completo» en pantalla.
+      expect(etiquetaDePapel('identidad'), contains('dactilar'));
+      expect(etiquetaDePapel('licencia_vigente'), contains('licencia'));
+      expect(etiquetaDePapel('vehiculo_completo'), contains('vehículo'));
+      expect(etiquetaDePapel('SPPAT'), 'SPPAT');
+    });
+
+    test('La cédula se parte para poder leerla', () {
+      const i = DriverIdentity(cedula: '1710034065');
+      expect(i.cedulaLegible, '17-1003406-5');
+    });
+
+    test('Sin licencia registrada, la identidad no está completa', () {
+      final sinLicencia = DriverIdentity.fromMap({
+        'cedula': '1710034065',
+        'codigo_dactilar': 'V1234I5678',
+        'licencia_tipo': null,
+        'licencia_caduca_el': null,
+      });
+      expect(sinLicencia.completa, isFalse);
+      expect(sinLicencia.licenciaVencida, isTrue);
+    });
+
+    test('Una licencia con fecha pasada cuenta como vencida', () {
+      final vencida = DriverIdentity.fromMap({
+        'cedula': '1710034065',
+        'codigo_dactilar': 'V1234I5678',
+        'licencia_tipo': 'C',
+        'licencia_caduca_el': '2020-01-01',
+      });
+      expect(vencida.completa, isTrue);
+      expect(vencida.licenciaVencida, isTrue);
+      expect(vencida.licencia, LicenseType.c);
+    });
+
+    test('Un tipo de licencia que no existe no revienta la ficha', () {
+      expect(LicenseType.fromId('Z9'), isNull);
+      expect(LicenseType.fromId(null), isNull);
+    });
+
+    test('Se puede aprobar cuando el servidor dice que no falta nada', () {
+      DriverReview ficha(List<String> faltan) => DriverReview.fromMap({
+            'id': 'c-1',
+            'nombre': 'Ana',
+            'email': 'ana@ride.app',
+            'estado_aprobacion': 'pendiente',
+            'disponible': false,
+            'vehiculos': const [],
+            'documentos': const [],
+            'papeles_que_faltan': faltan,
+          });
+
+      expect(ficha(const []).listoParaAprobar, isTrue);
+      expect(ficha(const ['foto_perfil']).listoParaAprobar, isFalse);
+      expect(ficha(const ['identidad']).faltantes.first, contains('dactilar'));
+    });
+
+    test('Los papeles se agrupan por el auto al que pertenecen', () {
+      final ficha = DriverReview.fromMap({
+        'id': 'c-1',
+        'nombre': 'Ana',
+        'email': 'ana@ride.app',
+        'estado_aprobacion': 'pendiente',
+        'disponible': false,
+        'vehiculos': const [],
+        'papeles_que_faltan': const [],
+        'documentos': [
+          {
+            'id': 'd-1',
+            'tipo_documento': 'matricula',
+            'estado': 'aprobado',
+            'url_archivo': 'a.jpg',
+            'fecha_subida': DateTime.now().toIso8601String(),
+            'vehiculo_id': 'auto-1',
+          },
+          {
+            'id': 'd-2',
+            'tipo_documento': 'matricula',
+            'estado': 'aprobado',
+            'url_archivo': 'b.jpg',
+            'fecha_subida': DateTime.now().toIso8601String(),
+            'vehiculo_id': 'auto-2',
+          },
+          {
+            'id': 'd-3',
+            'tipo_documento': 'cedula',
+            'estado': 'aprobado',
+            'url_archivo': 'c.jpg',
+            'fecha_subida': DateTime.now().toIso8601String(),
+          },
+        ],
+      });
+
+      // Dos matrículas, una por auto: lo que el índice único de antes hacía
+      // imposible.
+      expect(ficha.documentosDe('auto-1').length, 1);
+      expect(ficha.documentosDe('auto-2').length, 1);
+      // Y la cédula no es de ningún auto.
+      expect(ficha.documento(DocumentType.cedula)?.vehiculoId, isNull);
+    });
+  });
+
+  group('Cobro con DeUna', () {
+    PaymentMethod metodo(String tipo, {String? token}) => PaymentMethod.fromMap({
+          'id': 'm-1',
+          'tipo': tipo,
+          'predeterminado': true,
+          'detalle_tokenizado': token,
+        });
+
+    test('DeUna es un método sin token, como el efectivo', () {
+      final m = metodo('deuna');
+      expect(m.esDeuna, isTrue);
+      expect(m.esEfectivo, isFalse);
+      expect(m.label, 'DeUna');
+      expect(m.descripcion, 'Escaneas el QR al terminar');
+    });
+
+    test('Cada método tiene su propio icono', () {
+      // Si dos comparten icono, la lista de métodos deja de distinguirse de un
+      // vistazo, que es justo para lo que sirve.
+      final iconos = {
+        metodo('efectivo').icon,
+        metodo('deuna').icon,
+        metodo('tarjeta', token: 'tok_1234').icon,
+      };
+      expect(iconos.length, 3);
+    });
+
+    // Un PNG de 1x1 en base64, que es lo mínimo que decodifica.
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4'
+        'zwAAAgEBAF8Q5UcAAAAASUVORK5CYII=';
+
+    test('El QR llega como data URI y hay que quedarse con el base64', () {
+      // Payválida lo manda pensado para un <img> de una web. `Image.memory`
+      // quiere bytes: con el prefijo delante, no pinta nada.
+      final bytes = DeunaCharge.decodificarQr('data:image/png;base64,$png');
+      expect(bytes, isNotNull);
+      expect(bytes!.length, greaterThan(0));
+    });
+
+    test('Un base64 pelado también vale', () {
+      expect(DeunaCharge.decodificarQr(png), isNotNull);
+    });
+
+    test('Un QR roto deja la pantalla sin imagen, no reventada', () {
+      // Todavía queda el deeplink para pagar, así que perder el QR no puede
+      // tumbar la pantalla entera.
+      expect(DeunaCharge.decodificarQr('data:image/png;base64,%%%'), isNull);
+      expect(DeunaCharge.decodificarQr(''), isNull);
+      expect(DeunaCharge.decodificarQr(null), isNull);
+    });
+
+    test('La respuesta de la función trae orden, monto y deeplink', () {
+      final cobro = DeunaCharge.fromMap({
+        'orden': 'ride7f3a',
+        'monto': 1.75,
+        'qr': 'data:image/png;base64,$png',
+        'deep_link': 'https://pagar.deuna.app/H91/merchant?id=MD1Y7HWEV',
+      });
+
+      expect(cobro.orden, 'ride7f3a');
+      expect(cobro.monto, 1.75);
+      expect(cobro.deepLink, contains('pagar.deuna.app'));
+      expect(cobro.yaPagado, isFalse);
+    });
+
+    test('Un monto entero llega como int y no puede romper el cobro', () {
+      // PostgREST serializa un numeric sin decimales como número pelado: un
+      // viaje de 2,00 llega como 2, no como 2.0.
+      expect(DeunaCharge.fromMap({'orden': 'o', 'monto': 2}).monto, 2.0);
+    });
+
+    test('Un viaje ya pagado no trae QR y se dice', () {
+      final cobro = DeunaCharge.fromMap({'ya_pagado': true, 'estado': 'completado'});
+      expect(cobro.yaPagado, isTrue);
+      expect(cobro.qr, isNull);
     });
   });
 }

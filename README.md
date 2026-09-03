@@ -12,7 +12,9 @@ La superficie que consume la app —funciones, tablas, Realtime y Storage— est
 documentada en [`docs/API.md`](docs/API.md). El mapa, en
 [`docs/MAPA.md`](docs/MAPA.md); el buscador de direcciones, en
 [`docs/BUSCADOR.md`](docs/BUSCADOR.md); los precios, en
-[`docs/TARIFAS.md`](docs/TARIFAS.md).
+[`docs/TARIFAS.md`](docs/TARIFAS.md); el cobro con DeUna, en
+[`docs/PAGOS.md`](docs/PAGOS.md); lo que se le exige a un chofer, en
+[`docs/CHOFERES.md`](docs/CHOFERES.md).
 
 ## Credenciales del equipo administrativo
 
@@ -180,7 +182,9 @@ chofer para revisarla y la pantalla se lo dice con esas palabras.
 **Actor:** conductor autenticado.
 
 1. El conductor abre su perfil, registra o edita un vehículo y elige cuál queda en servicio.
-2. Sube licencia, SOAT y matrícula desde la cámara o la galería.
+2. Registra su cédula, su código dactilar y el tipo de licencia que tiene.
+3. Sube su cédula, su licencia y su foto; y de **cada** vehículo, la matrícula,
+   el SPPAT, la revisión técnica y una foto, con su fecha de caducidad.
 3. Consulta si cada documento está pendiente, aprobado o rechazado.
 4. Puede abrir el archivo privado mediante un enlace temporal y reemplazarlo si es necesario.
 
@@ -241,7 +245,7 @@ con el anterior. El rol no se puede cambiar desde aquí: lo impide el trigger
 
 1. El usuario entra en **Conductores** y filtra por estado.
 2. Abre la ficha de un chofer: sus datos de contacto, sus vehículos con placa y
-   sus cuatro documentos —cédula, licencia, SOAT y matrícula—.
+   sus papeles: los suyos y los de cada vehículo.
 3. Abre cada documento a pantalla completa y lo aprueba o lo rechaza.
 4. Con los cuatro aprobados y al menos un vehículo, aprueba la cuenta.
 

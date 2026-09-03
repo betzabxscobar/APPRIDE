@@ -7,11 +7,13 @@ import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../../core/app_theme.dart';
 import '../../core/ride_colors.dart';
 import '../../models/trip.dart';
+import '../../services/fleet_service.dart';
 import '../../services/ride_service.dart';
 import '../../services/trip_session_store.dart';
 import '../../widgets/auth_feedback.dart';
 import '../../widgets/category_chip.dart';
 import '../../widgets/chat_button.dart';
+import '../payments/deuna_qr_screen.dart';
 import '../support/support_screen.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/trip_route_map.dart';
@@ -39,6 +41,12 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   bool _ocupado = false;
   String? _error;
   bool _calificacionOfrecida = false;
+
+  /// Si el pasajero eligió DeUna, el viaje cerrado no queda cobrado solo: hay
+  /// que enseñarle el QR. Se mira una vez, al terminar, y no en cada aviso de
+  /// Realtime.
+  bool _pagaConDeuna = false;
+  bool _metodoConsultado = false;
 
   /// Dónde va el chofer y cuándo se supo.
   DriverPosition? _posicionChofer;
@@ -105,6 +113,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
       }
 
       if (viaje != null && viaje.status == TripStatus.finalizado) {
+        await _mirarSiPagaConDeuna();
         _ofrecerCalificacion(viaje);
       }
     } catch (_) {
@@ -113,6 +122,24 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
         _error = 'No pudimos cargar el viaje.';
         _cargando = false;
       });
+    }
+  }
+
+  /// El método predeterminado del pasajero decide qué se le ofrece al cerrar:
+  /// con efectivo no hay nada que hacer —ya pagó en la mano— y con DeUna queda
+  /// un cobro pendiente que solo se salda escaneando.
+  ///
+  /// Si esto falla no se enseña el botón. Es mejor que ofrecer un pago que
+  /// después no se puede completar.
+  Future<void> _mirarSiPagaConDeuna() async {
+    if (_metodoConsultado) return;
+    _metodoConsultado = true;
+    try {
+      final metodos = await FleetService.instance.misMetodosPago();
+      final deuna = metodos.any((m) => m.esDeuna && m.predeterminado);
+      if (mounted && deuna) setState(() => _pagaConDeuna = true);
+    } catch (_) {
+      // Sin red o sin permiso: se queda sin botón, no con uno roto.
     }
   }
 
@@ -238,6 +265,21 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                     ],
                     const SizedBox(height: 16),
                     _TarjetaPrecio(viaje: viaje),
+                    if (viaje.status == TripStatus.finalizado &&
+                        _pagaConDeuna) ...[
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: () => DeunaQrScreen.abrir(
+                          context,
+                          viajeId: viaje.id,
+                        ),
+                        icon: const Icon(Icons.qr_code_2, size: 20),
+                        label: const Text('Pagar con DeUna'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                        ),
+                      ),
+                    ],
                     if (_error != null) ...[
                       const SizedBox(height: 14),
                       ErrorBanner(message: _error!),

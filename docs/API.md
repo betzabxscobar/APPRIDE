@@ -94,22 +94,63 @@ viaje todavía no tiene chofer.
 |---|---|---|
 | `registrar_vehiculo` | `p_placa`, `p_marca`, `p_modelo`, `p_anio`, `p_color`, `p_vehiculo_id`, `p_categoria` | `uuid` |
 | `activar_vehiculo` | `p_vehiculo_id` | — |
-| `registrar_documento` | `p_tipo`, `p_url` | `uuid` |
+| `registrar_documento` | ver «Choferes: identidad y papeles» | `uuid` |
 
 `registrar_vehiculo` sirve para crear y para editar: con `p_vehiculo_id` en null
-crea, con un id actualiza el que ya existe.
+crea, con un id actualiza el que ya existe. **No basta con registrarlo**:
+`activar_vehiculo` exige que la licencia del chofer habilite esa categoría y que
+ese auto tenga sus cuatro papeles aprobados y sin caducar.
 
 ## Pagos
 
-| Función | Parámetros | Devuelve |
-|---|---|---|
-| `registrar_metodo_pago` | `p_tipo`, `p_token`, `p_predeterminado` | `uuid` |
-| `elegir_metodo_predeterminado` | `p_metodo_id` | — |
+| Función | Parámetros | Devuelve | Quién |
+|---|---|---|---|
+| `registrar_metodo_pago` | `p_tipo`, `p_token`, `p_predeterminado` | `uuid` | pasajero |
+| `elegir_metodo_predeterminado` | `p_metodo_id` | — | pasajero |
+| `cobro_deuna` | `p_viaje_id` | `orden`, `monto`, `estado` | el pasajero del viaje |
+| `confirmar_cobro_deuna` | `p_orden`, `p_pagado`, `p_datos` | `uuid` del pago | `service_role` o administración |
 
 > **`p_token` no es un número de tarjeta y la base lo comprueba.**
-> `registrar_metodo_pago` rechaza cualquier valor con forma de PAN. Hoy el único
-> tipo que la app registra es `efectivo`; la tarjeta espera una pasarela que
-> tokenice, y hasta entonces no hay formulario donde escribirla.
+> `registrar_metodo_pago` rechaza cualquier valor con forma de PAN. Los tipos
+> que la app registra son `efectivo` y `deuna`, y ninguno guarda nada del
+> pasajero; la tarjeta espera una pasarela que tokenice, y hasta entonces no hay
+> formulario donde escribirla.
+
+`cobro_deuna` devuelve el importe que hay que cobrar y fija el número de orden,
+que es el mismo cada vez que se pide el QR de ese viaje. **La app no manda el
+importe nunca**, y quien llama a Payválida es la Edge Function `cobro-deuna`,
+que es la única que ve el `fixedhash`.
+
+`confirmar_cobro_deuna` es lo que mueve dinero: marca el cobro y le abona al
+chofer su parte, igual que el efectivo le carga la comisión. Es idempotente
+porque un aviso de pasarela se reintenta. Todo el circuito, y las preguntas que
+quedan abiertas con Payválida, están en [`PAGOS.md`](PAGOS.md).
+
+## Choferes: identidad y papeles
+
+| Función | Parámetros | Devuelve | Quién |
+|---|---|---|---|
+| `registrar_identidad_chofer` | `p_cedula`, `p_codigo_dactilar`, `p_licencia_tipo`, `p_licencia_caduca_el` | — | el propio chofer |
+| `registrar_documento` | `p_tipo`, `p_url`, `p_vehiculo_id`, `p_numero`, `p_caduca_el` | `uuid` | el propio chofer |
+| `revisar_documento` | `p_documento_id`, `p_aprobado`, `p_motivo` | estado | administración |
+| `revisar_conductor` | `p_conductor_id`, `p_aprobado`, `p_motivo` | estado | administración |
+| `papeles_que_faltan_chofer` | `p_conductor_id` (null = uno mismo) | `text[]` | el chofer o administración |
+| `papeles_que_faltan_vehiculo` | `p_vehiculo_id` | `text[]` | el dueño o administración |
+| `cedula_ecuatoriana_valida` | `p_cedula` | `boolean` | cualquiera autenticado |
+| `licencia_habilita` | `p_licencia`, `p_categoria` | `boolean` | cualquiera autenticado |
+
+> **Los papeles del vehículo son de un vehículo.** `matricula`, `SPPAT`,
+> `revision_tecnica` y `foto_vehiculo` exigen `p_vehiculo_id`; `cedula`,
+> `licencia` y `foto_perfil` lo rechazan. Un chofer con dos autos necesita dos
+> matrículas, y hasta el 2026-09-03 la tabla no dejaba tenerlas.
+
+> **`papeles_que_faltan_chofer()` es la única definición de «está completo».**
+> La usan `revisar_conductor`, la pantalla del chofer y la de revisión. Si cada
+> una contara por su cuenta, acabarían discrepando.
+
+Rechazar exige motivo, y las caducidades se comprueban también al ponerse en
+línea: aprobar es de una vez, pero un SPPAT caduca solo. Todo el circuito está
+en [`CHOFERES.md`](CHOFERES.md).
 
 ## Ganancias
 
@@ -217,7 +258,7 @@ el `dispose`.
 | `avatares` | público | `getPublicUrl()` |
 | `documentos` | privado | `createSignedUrl(ruta, 3600)` |
 
-Los documentos de un chofer —cédula, licencia, SOAT y matrícula— no pueden ser
+Los documentos de un chofer —los suyos y los de cada vehículo— no pueden ser
 públicos: son documentos de identidad. Se abren con un enlace firmado que
 caduca en una hora.
 
@@ -280,5 +321,9 @@ El estado de partida y los dos arreglos están en
   puede contrastar cada contraseña nueva con HaveIBeenPwned y rechazar las que
   ya se filtraron. Es un interruptor del panel, no código. Para una app donde
   la cuenta guarda viajes, dirección de casa y método de pago, vale la pena.
-- **No hay pasarela de pagos.** `registrar_metodo_pago` acepta un token, pero no
-  hay quién lo emita, así que el único método real es el efectivo.
+- **El cobro con DeUna está escrito pero no cobra todavía.** Falta desplegar la
+  Edge Function con las credenciales de Payválida, y falta saber quién avisa de
+  que el pasajero pagó: no hay webhook ni consulta de estado documentados. Las
+  preguntas abiertas están en [`PAGOS.md`](PAGOS.md).
+- **La tarjeta sigue sin pasarela.** `registrar_metodo_pago` acepta un token,
+  pero no hay quién lo emita.

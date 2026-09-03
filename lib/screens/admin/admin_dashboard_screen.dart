@@ -178,7 +178,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           _Section.usuarios =>
             _UserList(users: _users, error: _error, loading: _loadingUsers),
           // La revisión de conductores dejó de ser una pantalla de espera: es
-          // donde se ven los papeles que suben —cédula, licencia, SOAT y
+          // donde se ven los papeles que suben —cédula, licencia, SPPAT y
           // matrícula— junto con su vehículo y su teléfono.
           _Section.conductores => const DriverReviewPanel(),
           _Section.viajes => const AdminTripsPanel(),
