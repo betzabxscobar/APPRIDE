@@ -153,30 +153,40 @@ void main() {
   });
 
   group('Bienvenida adaptable', () {
-    testWidgets('La presentación no desborda en móvil ni escritorio', (
-      tester,
-    ) async {
-      for (final size in const [
-        Size(320, 568),
-        Size(500, 500),
-        Size(1440, 900),
-      ]) {
-        tester.view.physicalSize = size;
-        tester.view.devicePixelRatio = 1;
+    for (final size in const [
+      Size(280, 653),
+      Size(320, 568),
+      Size(375, 667),
+      Size(400, 653),
+      Size(500, 500),
+      Size(768, 1024),
+      Size(1024, 600),
+      Size(1440, 900),
+    ]) {
+      testWidgets('No desborda en ${size.width}x${size.height}', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(size);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
 
         await tester.pumpWidget(
           MaterialApp(
-            theme: AppTheme.light,
+            theme: AppTheme.dark,
             home: WelcomeHomeScreen(onContinue: () {}),
           ),
         );
         await tester.pump(const Duration(milliseconds: 1400));
 
-        expect(find.text('Empezar'), findsOneWidget);
+        final start = find.text('Empezar');
+        expect(start, findsOneWidget);
+        // Con fuentes de accesibilidad más anchas el contenido puede requerir
+        // desplazamiento; el botón debe seguir siendo alcanzable y visible.
+        await tester.ensureVisible(start);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(start).bottom, lessThan(size.height));
         expect(tester.takeException(), isNull);
-      }
-      addTearDown(tester.view.reset);
-    });
+      });
+    }
 
     testWidgets('El acceso oscuro cabe en un teléfono pequeño', (tester) async {
       tester.view.physicalSize = const Size(320, 568);

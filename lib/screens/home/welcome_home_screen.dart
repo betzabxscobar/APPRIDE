@@ -19,10 +19,12 @@ class WelcomeHomeScreen extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 920;
-            final compactHeight = constraints.maxHeight < 680;
+            final compactLayout =
+                constraints.maxHeight < 620 || constraints.maxWidth < 320;
             final content = _WelcomeContent(
               wide: wide,
-              compact: compactHeight,
+              compact: compactLayout,
+              centerVertically: constraints.maxHeight >= 900,
               onContinue: onContinue,
             );
             if (wide) {
@@ -61,8 +63,10 @@ class WelcomeHomeScreen extends StatelessWidget {
                 ),
               );
             }
-            final heroHeight = compactHeight
+            final heroHeight = compactLayout
                 ? (constraints.maxHeight * 0.34).clamp(150.0, 215.0)
+                : constraints.maxHeight < 720
+                ? (constraints.maxHeight * 0.40).clamp(240.0, 285.0)
                 : (constraints.maxHeight * 0.46).clamp(250.0, 430.0);
             return SingleChildScrollView(
               child: ConstrainedBox(
@@ -72,11 +76,16 @@ class WelcomeHomeScreen extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       height: heroHeight,
-                      child: _HeroVisual(compact: compactHeight),
+                      child: _HeroVisual(compact: compactLayout),
                     ),
                     Transform.translate(
                       offset: const Offset(0, -24),
-                      child: content,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight - heroHeight + 24,
+                        ),
+                        child: content,
+                      ),
                     ),
                   ],
                 ),
@@ -93,11 +102,13 @@ class _WelcomeContent extends StatelessWidget {
   const _WelcomeContent({
     required this.wide,
     required this.compact,
+    required this.centerVertically,
     required this.onContinue,
   });
 
   final bool wide;
   final bool compact;
+  final bool centerVertically;
   final VoidCallback onContinue;
 
   @override
@@ -122,7 +133,10 @@ class _WelcomeContent extends StatelessWidget {
         horizontal,
         compact ? 24 : (wide ? 48 : 40),
       ),
-      child: Center(
+      child: Align(
+        alignment: wide || centerVertically
+            ? Alignment.center
+            : Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 470),
           child: Column(
@@ -142,7 +156,9 @@ class _WelcomeContent extends StatelessWidget {
               ),
               SizedBox(height: compact ? 7 : 12),
               Text(
-                'Tu camino, más simple desde el inicio.',
+                compact
+                    ? 'Tu viaje empieza aquí.'
+                    : 'Tu camino, más simple desde el inicio.',
                 textAlign: wide ? TextAlign.left : TextAlign.center,
                 style: AppTheme.display(
                   compact ? 24 : (wide ? 38 : 29),
@@ -153,7 +169,9 @@ class _WelcomeContent extends StatelessWidget {
               ),
               SizedBox(height: compact ? 8 : 14),
               Text(
-                'Solicita un viaje, sigue el recorrido y mantén todo bajo control desde un solo lugar.',
+                compact
+                    ? 'Solicita y sigue tu viaje desde un solo lugar.'
+                    : 'Solicita un viaje, sigue el recorrido y mantén todo bajo control desde un solo lugar.',
                 textAlign: wide ? TextAlign.left : TextAlign.center,
                 style: TextStyle(
                   color: ride.inkMuted,
@@ -162,24 +180,26 @@ class _WelcomeContent extends StatelessWidget {
                 ),
               ),
               SizedBox(height: compact ? 14 : 26),
-              if (!compact)
-                Wrap(
-                  alignment: wide ? WrapAlignment.start : WrapAlignment.center,
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: const [
-                    _Benefit(icon: Icons.route_outlined, label: 'Rutas claras'),
-                    _Benefit(
-                      icon: Icons.shield_outlined,
-                      label: 'Viajes seguros',
-                    ),
-                    _Benefit(
-                      icon: Icons.payments_outlined,
-                      label: 'Precio visible',
-                    ),
-                  ],
-                ),
-              SizedBox(height: compact ? 0 : 30),
+              Wrap(
+                alignment: wide ? WrapAlignment.start : WrapAlignment.center,
+                spacing: compact ? 7 : 10,
+                runSpacing: compact ? 7 : 10,
+                children: [
+                  _Benefit(
+                    icon: Icons.route_outlined,
+                    label: compact ? 'Rutas' : 'Rutas claras',
+                  ),
+                  _Benefit(
+                    icon: Icons.shield_outlined,
+                    label: compact ? 'Seguro' : 'Viajes seguros',
+                  ),
+                  _Benefit(
+                    icon: Icons.payments_outlined,
+                    label: compact ? 'Precio' : 'Precio visible',
+                  ),
+                ],
+              ),
+              SizedBox(height: compact ? 18 : 30),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -219,12 +239,16 @@ class _Benefit extends StatelessWidget {
         children: [
           Icon(icon, size: 17, color: ride.accent),
           const SizedBox(width: 7),
-          Text(
-            label,
-            style: TextStyle(
-              color: ride.inkMuted,
-              fontSize: AppText.label,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: ride.inkMuted,
+                fontSize: AppText.label,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -282,14 +306,6 @@ class _HeroVisualState extends State<_HeroVisual>
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
         final unit = (width < height ? width : height).clamp(260.0, 720.0);
-        final personWidth = (unit * (widget.wide ? 0.20 : 0.24)).clamp(
-          70.0,
-          145.0,
-        );
-        final carWidth = (unit * (widget.wide ? 0.36 : 0.40)).clamp(
-          130.0,
-          260.0,
-        );
         return ClipRect(
           child: DecoratedBox(
             decoration: BoxDecoration(gradient: ride.hero),
@@ -360,39 +376,18 @@ class _HeroVisualState extends State<_HeroVisual>
                   ),
                 ),
                 Positioned(
-                  left: width * 0.035,
-                  bottom: height * 0.04,
-                  child: _Entrance(
-                    animation: _curve(0.05, 0.72),
-                    from: const Offset(-0.9, 0),
-                    child: Image.asset(
-                      'assets/images/ChicaDibujo.png',
-                      width: personWidth,
-                    ),
+                  left: 0,
+                  right: 0,
+                  bottom: widget.wide ? height * 0.035 : 24,
+                  height: (height * (widget.wide ? 0.46 : 0.52)).clamp(
+                    92.0,
+                    widget.wide ? 310.0 : 205.0,
                   ),
-                ),
-                Positioned(
-                  right: width * 0.04,
-                  bottom: height * 0.04,
-                  child: _Entrance(
-                    animation: _curve(0.18, 0.82),
-                    from: const Offset(0.9, 0),
-                    child: Image.asset(
-                      'assets/images/ChicoDibujo.png',
-                      width: personWidth,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: widget.wide ? width * 0.17 : width * 0.16,
-                  bottom: widget.wide ? height * 0.02 : -height * 0.02,
-                  child: _Entrance(
-                    animation: _curve(0.32, 1),
-                    from: const Offset(1.1, 0.12),
-                    child: Image.asset(
-                      'assets/images/carroDibujo.png',
-                      width: carWidth,
-                    ),
+                  child: _RideScene(
+                    wide: widget.wide,
+                    girlAnimation: _curve(0.05, 0.72),
+                    boyAnimation: _curve(0.18, 0.82),
+                    carAnimation: _curve(0.32, 1),
                   ),
                 ),
               ],
@@ -400,6 +395,165 @@ class _HeroVisualState extends State<_HeroVisual>
           ),
         );
       },
+    );
+  }
+}
+
+/// Escena con una sola línea de suelo para que personas y vehículo compartan
+/// perspectiva en cualquier tamaño de pantalla.
+class _RideScene extends StatelessWidget {
+  const _RideScene({
+    required this.wide,
+    required this.girlAnimation,
+    required this.boyAnimation,
+    required this.carAnimation,
+  });
+
+  final bool wide;
+  final Animation<double> girlAnimation;
+  final Animation<double> boyAnimation;
+  final Animation<double> carAnimation;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final height = constraints.maxHeight;
+        final personHeight = (height * 0.96).clamp(82.0, wide ? 285.0 : 178.0);
+        final girlWidth = personHeight * 619 / 1958;
+        final boyWidth = personHeight * 607 / 1900;
+        final carWidth = (width * (wide ? 0.40 : 0.43)).clamp(
+          116.0,
+          wide ? 345.0 : 220.0,
+        );
+        final carHeight = carWidth * 562 / 1186;
+        final sideInset = (width * (wide ? 0.075 : 0.07)).clamp(12.0, 58.0);
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: (width - carWidth * 0.72) / 2,
+              bottom: 0,
+              width: carWidth * 0.72,
+              height: (carHeight * 0.10).clamp(5.0, 13.0),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF020B12).withValues(alpha: 0.42),
+                  borderRadius: BorderRadius.circular(99),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x55000000),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              left: sideInset,
+              bottom: 0,
+              child: _Entrance(
+                animation: girlAnimation,
+                from: const Offset(-0.55, 0),
+                child: _TrimmedAsset(
+                  asset: 'assets/images/ChicaDibujo.png',
+                  sourceLeft: 405,
+                  sourceTop: 226,
+                  sourceWidth: 619,
+                  sourceHeight: 1958,
+                  width: girlWidth,
+                  height: personHeight,
+                ),
+              ),
+            ),
+            Positioned(
+              right: sideInset,
+              bottom: 0,
+              child: _Entrance(
+                animation: boyAnimation,
+                from: const Offset(0.55, 0),
+                child: _TrimmedAsset(
+                  asset: 'assets/images/ChicoDibujo.png',
+                  sourceLeft: 417,
+                  sourceTop: 233,
+                  sourceWidth: 607,
+                  sourceHeight: 1900,
+                  width: boyWidth,
+                  height: personHeight,
+                ),
+              ),
+            ),
+            Positioned(
+              left: (width - carWidth) / 2,
+              bottom: 1,
+              child: _Entrance(
+                animation: carAnimation,
+                from: const Offset(0.75, 0),
+                child: _TrimmedAsset(
+                  asset: 'assets/images/carroDibujo.png',
+                  sourceLeft: 89,
+                  sourceTop: 940,
+                  sourceWidth: 1186,
+                  sourceHeight: 562,
+                  width: carWidth,
+                  height: carHeight,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Recorta en tiempo de composición el espacio transparente de una imagen.
+/// Así las medidas describen el dibujo visible, no el lienzo original.
+class _TrimmedAsset extends StatelessWidget {
+  const _TrimmedAsset({
+    required this.asset,
+    required this.sourceLeft,
+    required this.sourceTop,
+    required this.sourceWidth,
+    required this.sourceHeight,
+    required this.width,
+    required this.height,
+  });
+
+  static const double _sourceCanvasWidth = 1340;
+  static const double _sourceCanvasHeight = 2400;
+
+  final String asset;
+  final double sourceLeft;
+  final double sourceTop;
+  final double sourceWidth;
+  final double sourceHeight;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = width / sourceWidth;
+    return SizedBox(
+      width: width,
+      height: height,
+      child: ClipRect(
+        child: Stack(
+          clipBehavior: Clip.hardEdge,
+          children: [
+            Positioned(
+              left: -sourceLeft * scale,
+              top: -sourceTop * scale,
+              width: _sourceCanvasWidth * scale,
+              height: _sourceCanvasHeight * scale,
+              child: Image.asset(asset, fit: BoxFit.fill),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
