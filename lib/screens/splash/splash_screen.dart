@@ -116,7 +116,7 @@ class _SplashScreenState extends State<SplashScreen>
             },
             child: ColorFiltered(
               colorFilter: ColorFilter.mode(
-                dark ? const Color(0xFF143143) : Colors.white,
+                dark ? const Color(0xFF4B9CB5) : Colors.white,
                 dark ? BlendMode.multiply : BlendMode.dst,
               ),
               child: Image.asset(
@@ -135,7 +135,7 @@ class _SplashScreenState extends State<SplashScreen>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: dark
-                      ? const [Color(0x44061420), Color(0xDD061420)]
+                      ? const [Color(0x330A3047), Color(0x88104E66)]
                       : const [Color(0x18FFFFFF), Color(0x77F1F5FA)],
                 ),
               ),

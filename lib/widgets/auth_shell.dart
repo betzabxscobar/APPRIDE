@@ -457,22 +457,6 @@ class _CityArt extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               Positioned(
-                right: width * 0.15,
-                top: height * 0.06,
-                child: Container(
-                  width: 110,
-                  height: 110,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      center: Alignment(-0.24, -0.24),
-                      colors: [Color(0x2EB5EDF7), Color(0x0969D2F0)],
-                      stops: [0, 0.66],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
                 left: width * 0.05,
                 right: width * 0.05,
                 bottom: 0,

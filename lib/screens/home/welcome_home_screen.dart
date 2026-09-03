@@ -102,8 +102,9 @@ class _WelcomeContent extends StatelessWidget {
     final ride = context.ride;
     final width = MediaQuery.sizeOf(context).width;
     final horizontal = wide ? 54.0 : (width < 360 ? 20.0 : 28.0);
+    final panel = ride.isDark ? const Color(0xFF0D3D53) : ride.surface;
     return Container(
-      color: ride.surface,
+      color: panel,
       padding: EdgeInsets.fromLTRB(
         horizontal,
         compact ? 22 : (wide ? 48 : 34),
@@ -193,12 +194,14 @@ class _Benefit extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ride = context.ride;
+    final chipColor = ride.isDark ? const Color(0xFF14536B) : ride.surfaceAlt;
+    final chipBorder = ride.isDark ? const Color(0xFF2A7890) : ride.border;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: ride.surfaceAlt,
+        color: chipColor,
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: ride.border),
+        border: Border.all(color: chipBorder),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -276,22 +279,32 @@ class _HeroVisualState extends State<_HeroVisual>
           130.0,
           260.0,
         );
+        const accessibleDarkHero = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF0B3854), Color(0xFF105F79), Color(0xFF187B8E)],
+        );
         return ClipRect(
           child: DecoratedBox(
-            decoration: BoxDecoration(gradient: ride.hero),
+            decoration: BoxDecoration(
+              gradient: dark ? accessibleDarkHero : ride.hero,
+            ),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                ColorFiltered(
-                  colorFilter: ColorFilter.mode(
-                    dark
-                        ? const Color(0xFF0B2838)
-                        : Colors.white.withValues(alpha: 0.18),
-                    dark ? BlendMode.multiply : BlendMode.screen,
-                  ),
-                  child: Image.asset(
-                    'assets/images/fondoInicio.jpeg',
-                    fit: BoxFit.cover,
+                Opacity(
+                  opacity: dark ? 0.36 : 1,
+                  child: ColorFiltered(
+                    colorFilter: ColorFilter.mode(
+                      dark
+                          ? const Color(0xFF3E93AD)
+                          : Colors.white.withValues(alpha: 0.18),
+                      dark ? BlendMode.color : BlendMode.screen,
+                    ),
+                    child: Image.asset(
+                      'assets/images/fondoInicio.jpeg',
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
                 DecoratedBox(
@@ -301,9 +314,9 @@ class _HeroVisualState extends State<_HeroVisual>
                       end: Alignment.bottomCenter,
                       colors: dark
                           ? const [
-                              Color(0x22030C14),
-                              Color(0x55030C14),
-                              Color(0xF2061420),
+                              Color(0xB20A3550),
+                              Color(0x99104B63),
+                              Color(0xCC103F55),
                             ]
                           : const [
                               Color(0x08FFFFFF),
@@ -331,7 +344,7 @@ class _HeroVisualState extends State<_HeroVisual>
                           style: AppTheme.display(
                             (unit * 0.045).clamp(16.0, 25.0),
                             color: dark
-                                ? const Color(0xFFB8CFDB)
+                                ? const Color(0xFFE2F0F5)
                                 : ride.inkMuted,
                             letterSpacing: -0.5,
                           ),
