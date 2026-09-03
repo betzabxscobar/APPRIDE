@@ -57,3 +57,5 @@ app.*.map.json
 # Cache incremental del compilador de Kotlin. La crea el build de Android y
 # solo vale para esta maquina.
 /android/.kotlin/
+# Widget Preview related
+.widget_preview/

@@ -102,7 +102,7 @@ class RideColors extends ThemeExtension<RideColors> {
     brightness: Brightness.light,
     // Un punto más profundo que el #F7FAFF de la web: sobre un fondo casi
     // blanco las tarjetas blancas no llegaban a despegarse.
-    background: Color(0xFFF1F5FA),
+    background: Color(0xFFEAF7FF),
     surface: Colors.white,
     surfaceAlt: Color(0xFFF4F8FC),
     surfaceSunken: Color(0xFFE7EEF6),
