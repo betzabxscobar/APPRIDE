@@ -22,6 +22,7 @@ import 'package:ride/models/user_role.dart';
 import 'package:ride/models/vehicle_category.dart';
 import 'package:ride/models/vehicle.dart';
 import 'package:ride/screens/auth/auth_screen.dart';
+import 'package:ride/screens/home/welcome_home_screen.dart';
 import 'package:ride/screens/home/account_sheet.dart';
 import 'package:ride/services/auth_service.dart';
 import 'package:ride/widgets/auth_shell.dart';
@@ -51,10 +52,8 @@ void main() {
     /// No se usa [RideApp] porque su primera pantalla conecta con Supabase, y
     /// estas pruebas corren sin red. Lo que se verifica aquí es el árbol de
     /// widgets, que no depende de la sesión.
-    Widget appDePrueba() => MaterialApp(
-          theme: AppTheme.light,
-          home: const AuthScreen(),
-        );
+    Widget appDePrueba() =>
+        MaterialApp(theme: AppTheme.light, home: const AuthScreen());
 
     /// Lleva la pantalla desde la bienvenida hasta [step].
     Future<void> abrir(WidgetTester tester, AuthStep step) async {
@@ -69,8 +68,9 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('La bienvenida ofrece registro e inicio de sesión',
-        (tester) async {
+    testWidgets('La bienvenida ofrece registro e inicio de sesión', (
+      tester,
+    ) async {
       await tester.pumpWidget(appDePrueba());
       await tester.pumpAndSettle();
 
@@ -79,8 +79,9 @@ void main() {
       expect(find.text('Ya tengo una cuenta'), findsOneWidget);
     });
 
-    testWidgets('El panel de marca solo aparece en pantallas anchas',
-        (tester) async {
+    testWidgets('El panel de marca solo aparece en pantallas anchas', (
+      tester,
+    ) async {
       // En móvil (800 px de ancho por defecto) la columna oscura se oculta,
       // igual que el `@media(max-width:850px)` de WEB-RIDE.
       await tester.pumpWidget(appDePrueba());
@@ -122,8 +123,9 @@ void main() {
       expect(find.text('Contraseña'), findsOneWidget);
     });
 
-    testWidgets('Desde el login se llega a recuperar la contraseña',
-        (tester) async {
+    testWidgets('Desde el login se llega a recuperar la contraseña', (
+      tester,
+    ) async {
       await abrir(tester, AuthStep.login);
 
       final enlace = find.text('¿Olvidaste tu contraseña?');
@@ -150,12 +152,65 @@ void main() {
     });
   });
 
+  group('Bienvenida adaptable', () {
+    for (final size in const [
+      Size(280, 653),
+      Size(320, 568),
+      Size(375, 667),
+      Size(400, 653),
+      Size(500, 500),
+      Size(768, 1024),
+      Size(1024, 600),
+      Size(1440, 900),
+    ]) {
+      testWidgets('No desborda en ${size.width}x${size.height}', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(size);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.dark,
+            home: WelcomeHomeScreen(onContinue: () {}),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 1400));
+
+        final start = find.text('Empezar');
+        expect(start, findsOneWidget);
+        // Con fuentes de accesibilidad más anchas el contenido puede requerir
+        // desplazamiento; el botón debe seguir siendo alcanzable y visible.
+        await tester.ensureVisible(start);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(start).bottom, lessThan(size.height));
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('El acceso oscuro cabe en un teléfono pequeño', (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(theme: AppTheme.dark, home: const AuthScreen()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Cómo quieres continuar?'), findsOneWidget);
+      expect(find.text('Crear cuenta'), findsOneWidget);
+      expect(find.text('Ya tengo una cuenta'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   group('Rutas', () {
     Ruta ruta({double metros = 5070, int segundos = 462}) => Ruta(
-          puntos: const [],
-          metros: metros,
-          duracion: Duration(seconds: segundos),
-        );
+      puntos: const [],
+      metros: metros,
+      duracion: Duration(seconds: segundos),
+    );
 
     test('La distancia larga se muestra en kilometros', () {
       expect(ruta().distanciaTexto, '5,1 km');
@@ -173,8 +228,9 @@ void main() {
   });
 
   group('Zoom del mapa', () {
-    testWidgets('Al acercarse mas alla de z19 se siguen viendo teselas',
-        (tester) async {
+    testWidgets('Al acercarse mas alla de z19 se siguen viendo teselas', (
+      tester,
+    ) async {
       // El mapa usa teselas vectoriales de OpenFreeMap, con las de
       // OpenStreetMap como respaldo. Aqui se comprueba el respaldo, que es lo
       // unico que se puede montar sin red; ademas, dejar que intente cargar el
@@ -242,10 +298,10 @@ void main() {
 
   group('Eleccion de ruta', () {
     Ruta ruta({required double km, required int min}) => Ruta(
-          puntos: const [],
-          metros: km * 1000,
-          duracion: Duration(minutes: min),
-        );
+      puntos: const [],
+      metros: km * 1000,
+      duracion: Duration(minutes: min),
+    );
 
     test('Sin rutas no hay nada que elegir', () {
       expect(RoutingService.elegirMejor(const []), isNull);
@@ -290,8 +346,9 @@ void main() {
       role: UserRole.superadmin,
     );
 
-    testWidgets('En una pantalla corta el contenido se desplaza, no desborda',
-        (tester) async {
+    testWidgets('En una pantalla corta el contenido se desplaza, no desborda', (
+      tester,
+    ) async {
       // 200 px de alto: el avatar, el correo, la insignia y el boton ya no
       // caben. Es la misma situacion que provocaba una cuenta de superadmin,
       // que ve tres paneles en el selector y desbordaba por abajo cortando
@@ -335,16 +392,16 @@ void main() {
 
   group('Cotizacion', () {
     Quote cotizar(Map<String, dynamic> extra) => Quote.fromMap({
-          'tarifa_id': 't1',
-          'tarifa_nombre': 'Tarifa Estandar',
-          'distancia_km': 5.92,
-          'minutos_estimados': 15,
-          'total': 4.31,
-          'gana_conductor': 3.66,
-          'comision_app': 0.65,
-          'aplico_minima': false,
-          ...extra,
-        });
+      'tarifa_id': 't1',
+      'tarifa_nombre': 'Tarifa Estandar',
+      'distancia_km': 5.92,
+      'minutos_estimados': 15,
+      'total': 4.31,
+      'gana_conductor': 3.66,
+      'comision_app': 0.65,
+      'aplico_minima': false,
+      ...extra,
+    });
 
     test('Lee el reparto entre chofer y app', () {
       final q = cotizar(const {});
@@ -404,7 +461,9 @@ void main() {
         isTrue,
       );
       expect(
-        RoutingService.esServidorPublico('https://routing.openstreetmap.de/routed-car'),
+        RoutingService.esServidorPublico(
+          'https://routing.openstreetmap.de/routed-car',
+        ),
         isTrue,
       );
       expect(
@@ -416,14 +475,14 @@ void main() {
 
   group('Direcciones guardadas', () {
     SavedPlace leer(Map<String, dynamic> extra) => SavedPlace.fromMap({
-          'id': 'd1',
-          'direccion': 'Avenida Amazonas 123, Quito',
-          'latitud': -0.18,
-          'longitud': -78.48,
-          'favorita': false,
-          'etiqueta': null,
-          ...extra,
-        });
+      'id': 'd1',
+      'direccion': 'Avenida Amazonas 123, Quito',
+      'latitud': -0.18,
+      'longitud': -78.48,
+      'favorita': false,
+      'etiqueta': null,
+      ...extra,
+    });
 
     test('Una direccion del historial no es favorita ni tiene etiqueta', () {
       final d = leer(const {});
@@ -449,7 +508,10 @@ void main() {
     });
 
     test('Una clave de TomTom se acepta', () {
-      expect(BusquedaConfig.claveValida('rAnDoM4lFaNuM3r1cK3y0fT0mT0m'), isTrue);
+      expect(
+        BusquedaConfig.claveValida('rAnDoM4lFaNuM3r1cK3y0fT0mT0m'),
+        isTrue,
+      );
     });
 
     test('Una URL pegada por error cae a Photon', () {
@@ -490,12 +552,12 @@ void main() {
 
   group('AppUser', () {
     AppUser usuario({String name = 'Andrea Salazar'}) => AppUser(
-          id: 'u-1',
-          name: name,
-          email: 'andrea@ride.app',
-          phone: '0991234567',
-          role: UserRole.passenger,
-        );
+      id: 'u-1',
+      name: name,
+      email: 'andrea@ride.app',
+      phone: '0991234567',
+      role: UserRole.passenger,
+    );
 
     test('firstName toma solo el primer nombre', () {
       expect(usuario().firstName, 'Andrea');
@@ -537,8 +599,10 @@ void main() {
     });
 
     test('Solo finalizado, cancelado y sin chofer cierran el viaje', () {
-      final finales =
-          TripStatus.values.where((e) => e.esFinal).map((e) => e.id).toSet();
+      final finales = TripStatus.values
+          .where((e) => e.esFinal)
+          .map((e) => e.id)
+          .toSet();
       expect(finales, {'FINALIZADO', 'CANCELADO', 'SIN_CONDUCTOR'});
     });
 
@@ -563,10 +627,14 @@ void main() {
     });
 
     test('El progreso avanza con el recorrido', () {
-      expect(TripStatus.solicitado.progreso,
-          lessThan(TripStatus.aceptado.progreso));
-      expect(TripStatus.aceptado.progreso,
-          lessThan(TripStatus.enCurso.progreso));
+      expect(
+        TripStatus.solicitado.progreso,
+        lessThan(TripStatus.aceptado.progreso),
+      );
+      expect(
+        TripStatus.aceptado.progreso,
+        lessThan(TripStatus.enCurso.progreso),
+      );
       expect(TripStatus.finalizado.progreso, 1);
     });
   });
@@ -605,14 +673,18 @@ void main() {
       const p = GeoPlace(
         nombre: 'Calle de Serrano 21',
         direccion: 'Madrid, España',
-        lat: 40.42, lng: -3.68,
+        lat: 40.42,
+        lng: -3.68,
       );
       expect(p.completo, 'Calle de Serrano 21, Madrid, España');
     });
 
     test('Sin contexto no queda una coma suelta', () {
       const p = GeoPlace(
-        nombre: 'Tu ubicación actual', direccion: '', lat: 0, lng: 0,
+        nombre: 'Tu ubicación actual',
+        direccion: '',
+        lat: 0,
+        lng: 0,
       );
       expect(p.completo, 'Tu ubicación actual');
     });
@@ -630,13 +702,20 @@ void main() {
       // El orden importa: es el que ve el chofer al subirlos y el que sigue la
       // administración al revisarlos. La cédula va primero porque identifica a
       // la persona; el resto habilita a conducir y al vehículo.
-      expect(DocumentType.values.map((d) => d.id).toList(),
-          ['cedula', 'licencia', 'SOAT', 'matricula']);
+      expect(DocumentType.values.map((d) => d.id).toList(), [
+        'cedula',
+        'licencia',
+        'SOAT',
+        'matricula',
+      ]);
     });
 
     test('Los estados coinciden con el CHECK de la base', () {
-      expect(DocumentStatus.values.map((d) => d.id).toList(),
-          ['pendiente', 'aprobado', 'rechazado']);
+      expect(DocumentStatus.values.map((d) => d.id).toList(), [
+        'pendiente',
+        'aprobado',
+        'rechazado',
+      ]);
     });
 
     test('Un tipo o estado desconocido no rompe la app', () {
@@ -646,8 +725,13 @@ void main() {
 
     test('El resumen del vehículo se arma para mostrarlo al pasajero', () {
       const v = FleetVehicle(
-        id: 'v-1', placa: 'ABC-1234', marca: 'Kia', modelo: 'Rio',
-        anio: 2022, activo: true, color: 'Blanco',
+        id: 'v-1',
+        placa: 'ABC-1234',
+        marca: 'Kia',
+        modelo: 'Rio',
+        anio: 2022,
+        activo: true,
+        color: 'Blanco',
       );
       expect(v.resumen, 'Kia Rio · 2022');
     });
@@ -655,7 +739,11 @@ void main() {
 
   group('Métodos de pago', () {
     test('El efectivo se describe sin exponer nada', () {
-      const m = PaymentMethod(id: 'm-1', tipo: 'efectivo', predeterminado: true);
+      const m = PaymentMethod(
+        id: 'm-1',
+        tipo: 'efectivo',
+        predeterminado: true,
+      );
       expect(m.esEfectivo, isTrue);
       expect(m.label, 'Efectivo');
       expect(m.descripcion, 'Pagas al llegar');
@@ -665,7 +753,9 @@ void main() {
       // Nunca es un número de tarjeta: la base rechaza cualquier cosa con
       // forma de PAN. Aun así, del token tampoco se enseña todo.
       const m = PaymentMethod(
-        id: 'm-2', tipo: 'tarjeta', predeterminado: false,
+        id: 'm-2',
+        tipo: 'tarjeta',
+        predeterminado: false,
         detalle: 'tok_abc123XYZ9',
       );
       expect(m.descripcion, '···· XYZ9');
@@ -674,7 +764,10 @@ void main() {
 
     test('Un token muy corto no se recorta a la fuerza', () {
       const m = PaymentMethod(
-        id: 'm-3', tipo: 'tarjeta', predeterminado: false, detalle: 'ab',
+        id: 'm-3',
+        tipo: 'tarjeta',
+        predeterminado: false,
+        detalle: 'ab',
       );
       expect(m.descripcion, 'Tarjeta guardada');
     });
@@ -682,9 +775,12 @@ void main() {
 
   group('Notificaciones', () {
     AppNotification aviso(Duration antiguedad) => AppNotification(
-          id: 'n-1', titulo: 'Chofer asignado', mensaje: 'Va en camino',
-          leida: false, fecha: DateTime.now().subtract(antiguedad),
-        );
+      id: 'n-1',
+      titulo: 'Chofer asignado',
+      mensaje: 'Va en camino',
+      leida: false,
+      fecha: DateTime.now().subtract(antiguedad),
+    );
 
     test('El texto relativo se adapta a la antigüedad', () {
       expect(aviso(const Duration(seconds: 20)).cuando, 'ahora');
@@ -746,15 +842,19 @@ void main() {
 
     test('Todos pueden volver a su propio panel', () {
       for (final rol in UserRole.values) {
-        expect(rol.viewsAllowed(hasVehicle: true), contains(rol),
-            reason: rol.id);
+        expect(
+          rol.viewsAllowed(hasVehicle: true),
+          contains(rol),
+          reason: rol.id,
+        );
       }
     });
 
     test('Un pasajero sin vehículo no puede abrir la vista de chofer', () {
       expect(UserRole.passenger.viewsAllowed(), [UserRole.passenger]);
-      expect(UserRole.passenger.viewsAllowed(hasVehicle: true),
-          [UserRole.passenger]);
+      expect(UserRole.passenger.viewsAllowed(hasVehicle: true), [
+        UserRole.passenger,
+      ]);
     });
   });
 
@@ -780,21 +880,23 @@ void main() {
       expect(AuthService.instance.isViewingOtherPanel, isFalse);
     });
 
-    test('El registro rechaza roles administrativos antes de salir a la red',
-        () async {
-      // La validación es local, así que no necesita sesión ni conexión: el
-      // trigger handle_new_user() es la segunda barrera, no la única.
-      await expectLater(
-        AuthService.instance.register(
-          name: 'Intruso',
-          email: 'intruso@ride.app',
-          phone: '0990000000',
-          password: 'ClaveLarga123',
-          role: UserRole.superadmin,
-        ),
-        throwsA(isA<AuthException>()),
-      );
-    });
+    test(
+      'El registro rechaza roles administrativos antes de salir a la red',
+      () async {
+        // La validación es local, así que no necesita sesión ni conexión: el
+        // trigger handle_new_user() es la segunda barrera, no la única.
+        await expectLater(
+          AuthService.instance.register(
+            name: 'Intruso',
+            email: 'intruso@ride.app',
+            phone: '0990000000',
+            password: 'ClaveLarga123',
+            role: UserRole.superadmin,
+          ),
+          throwsA(isA<AuthException>()),
+        );
+      },
+    );
 
     test('Sin sesión no se puede consultar la lista de usuarios', () async {
       await expectLater(
@@ -853,8 +955,10 @@ void main() {
       });
       final copia = Trip.fromMap(conReferencia.toMap());
 
-      expect(copia.origenReferencia,
-          'Edificio Blanco con porton azul, 3 pisos');
+      expect(
+        copia.origenReferencia,
+        'Edificio Blanco con porton azul, 3 pisos',
+      );
       expect(copia.destinoReferencia, 'Entrada por la calle de atras');
     });
 
@@ -909,10 +1013,14 @@ void main() {
       // Se guarda con cinco decimales —un metro— así que se compara con esa
       // tolerancia, no por igualdad exacta.
       for (var i = 0; i < ruta.puntos.length; i++) {
-        expect(copia.puntos[i].latitude,
-            closeTo(ruta.puntos[i].latitude, 0.00001));
-        expect(copia.puntos[i].longitude,
-            closeTo(ruta.puntos[i].longitude, 0.00001));
+        expect(
+          copia.puntos[i].latitude,
+          closeTo(ruta.puntos[i].latitude, 0.00001),
+        );
+        expect(
+          copia.puntos[i].longitude,
+          closeTo(ruta.puntos[i].longitude, 0.00001),
+        );
       }
     });
 
@@ -1035,9 +1143,10 @@ void main() {
 
   group('Posicion del chofer', () {
     DriverPosition pos(Duration hace) => DriverPosition(
-          lat: -0.18, lng: -78.49,
-          cuando: DateTime.now().subtract(hace),
-        );
+      lat: -0.18,
+      lng: -78.49,
+      cuando: DateTime.now().subtract(hace),
+    );
 
     test('Una posicion recien reportada es de fiar', () {
       expect(pos(const Duration(seconds: 20)).esVieja, isFalse);
@@ -1117,7 +1226,8 @@ void main() {
   });
 
   group('Soporte', () {
-    Map<String, dynamic> fila({String estado = 'abierto', String? respuesta}) => {
+    Map<String, dynamic> fila({String estado = 'abierto', String? respuesta}) =>
+        {
           'id': 't-1',
           'usuario_id': 'u-1',
           'viaje_id': null,
@@ -1142,8 +1252,10 @@ void main() {
       // colandose dejaria el bloque verde de «Respuesta de Ride» sin nada
       // dentro.
       expect(SupportTicket.fromMap(fila(respuesta: '   ')).respondido, isFalse);
-      expect(SupportTicket.fromMap(fila(respuesta: 'Ya te devolvimos')).respondido,
-          isTrue);
+      expect(
+        SupportTicket.fromMap(fila(respuesta: 'Ya te devolvimos')).respondido,
+        isTrue,
+      );
     });
 
     test('Resuelto y cerrado son estados finales; abierto no', () {
@@ -1190,26 +1302,28 @@ void main() {
     });
 
     Fare conFranja(int desde, int hasta, List<int>? dias) => Fare.fromMap({
-          'id': 'f-2',
-          'nombre': 'Tarifa',
-          'tarifa_base': 0.49,
-          'costo_por_km': 0.35,
-          'costo_por_minuto': 0.10,
-          'carrera_minima': 1.40,
-          'porcentaje_conductor': 0.85,
-          'activo': true,
-          'hora_desde': desde,
-          'hora_hasta': hasta,
-          'dias': dias,
-        });
+      'id': 'f-2',
+      'nombre': 'Tarifa',
+      'tarifa_base': 0.49,
+      'costo_por_km': 0.35,
+      'costo_por_minuto': 0.10,
+      'carrera_minima': 1.40,
+      'porcentaje_conductor': 0.85,
+      'activo': true,
+      'hora_desde': desde,
+      'hora_hasta': hasta,
+      'dias': dias,
+    });
 
     test('La franja termina en :59, que es hasta donde llega el servidor', () {
       // tarifa_vigente() compara la hora entera con un `between`, asi que
       // hora_hasta = 8 cubre hasta las 08:59. Escribir «08:00» hacia creer
       // que la franja terminaba una hora antes de lo que termina, y ese
       // mismo error estuvo cobrando hora pico a las 09:45.
-      expect(conFranja(6, 8, [1, 2, 3, 4, 5]).franja,
-          '06:00 – 08:59, de lunes a viernes');
+      expect(
+        conFranja(6, 8, [1, 2, 3, 4, 5]).franja,
+        '06:00 – 08:59, de lunes a viernes',
+      );
     });
 
     test('Sin dias, la franja no menciona ninguno', () {
@@ -1218,19 +1332,23 @@ void main() {
     });
 
     test('Unos dias sueltos se listan, no se leen como rango', () {
-      expect(conFranja(16, 19, [3, 1]).franja,
-          '16:00 – 19:59, lunes, miércoles');
+      expect(
+        conFranja(16, 19, [3, 1]).franja,
+        '16:00 – 19:59, lunes, miércoles',
+      );
     });
 
     test('Un dia fuera de 1..7 se descarta en vez de romper la pantalla', () {
-      expect(conFranja(16, 19, [1, 2, 9]).franja, '16:00 – 19:59, lunes, martes');
+      expect(
+        conFranja(16, 19, [1, 2, 9]).franja,
+        '16:00 – 19:59, lunes, martes',
+      );
     });
   });
 
   group('Tema elegido', () {
     test('Las tres opciones tienen nombre, explicación e icono propios', () {
-      final etiquetas =
-          ThemeMode.values.map(ThemeController.etiqueta).toSet();
+      final etiquetas = ThemeMode.values.map(ThemeController.etiqueta).toSet();
       final detalles = ThemeMode.values.map(ThemeController.detalle).toSet();
       final iconos = ThemeMode.values.map(ThemeController.icono).toSet();
 

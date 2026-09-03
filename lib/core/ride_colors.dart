@@ -84,16 +84,18 @@ class RideColors extends ThemeExtension<RideColors> {
 
   bool get isDark => brightness == Brightness.dark;
 
-  /// Degradado del héroe de las pantallas de acceso. Es el mismo navy de la
-  /// marca en los dos temas: en claro contrasta con la hoja blanca y en oscuro
-  /// se funde con el fondo.
+  /// Degradado del héroe de las pantallas de acceso.
+  ///
+  /// El tema oscuro usa azules medios de alto contraste. No representa la
+  /// noche: solo reduce el brillo de la superficie sin perder la identidad ni
+  /// convertir las ilustraciones en siluetas casi negras.
   LinearGradient get hero => isDark ? _heroDark : AppColors.brandPanel;
 
   static const LinearGradient _heroDark = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     stops: [0, 0.52, 1],
-    colors: [Color(0xFF04101A), Color(0xFF071F2D), Color(0xFF0B2E3F)],
+    colors: [Color(0xFF0A3047), Color(0xFF0D4962), Color(0xFF12657B)],
   );
 
   static const RideColors light = RideColors(

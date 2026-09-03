@@ -77,6 +77,7 @@ class _MobileAuthLayout extends StatelessWidget {
             child: Column(
               children: [
                 SizedBox(
+                  width: double.infinity,
                   height: heroHeight,
                   child: _MobileHero(topInset: padding.top),
                 ),
@@ -105,6 +106,7 @@ class _MobileHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
     return LayoutBuilder(
       builder: (context, constraints) {
         final height = constraints.maxHeight;
@@ -112,28 +114,38 @@ class _MobileHero extends StatelessWidget {
         return ClipRect(
           child: Stack(
             children: [
-              Positioned(
-                left: -120,
-                top: -140,
-                child: Container(
-                  width: 320,
-                  height: 320,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [Color(0x387DDBEE), Color(0x007DDBEE)],
-                      stops: [0, 0.68],
+              if (ride.isDark)
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/images/fondoInicioOscuro-v2.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  ),
+                )
+              else ...[
+                Positioned(
+                  left: -120,
+                  top: -140,
+                  child: Container(
+                    width: 320,
+                    height: 320,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [Color(0x387DDBEE), Color(0x007DDBEE)],
+                        stops: [0, 0.68],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: height * 0.6,
-                child: const _CityArt(),
-              ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: height * 0.6,
+                  child: const _CityArt(),
+                ),
+              ],
               // Velo entre la ilustración y el texto. Sin él, el trazo de la
               // ruta y los edificios cruzan por encima del titular y no hay
               // manera de leerlo.
@@ -194,27 +206,35 @@ class _MobileSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ride = context.ride;
-
-    return Container(
-      width: double.infinity,
-      constraints: BoxConstraints(minHeight: minHeight > 0 ? minHeight : 0),
-      padding: EdgeInsets.fromLTRB(24, 28, 24, 32 + bottomInset),
-      decoration: BoxDecoration(
-        color: ride.surface,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(AppTheme.radiusSheet),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: ride.shadow,
-            blurRadius: 32,
-            offset: const Offset(0, -10),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final horizontal = constraints.maxWidth < 360 ? 18.0 : 24.0;
+        return Container(
+          width: double.infinity,
+          constraints: BoxConstraints(minHeight: minHeight > 0 ? minHeight : 0),
+          padding: EdgeInsets.fromLTRB(
+            horizontal,
+            constraints.maxHeight < 460 ? 22 : 28,
+            horizontal,
+            30 + bottomInset,
           ),
-        ],
-      ),
-      // Centrado, no pegado arriba: en pasos cortos como la bienvenida el
-      // formulario ocupa poco y dejaba media hoja en blanco debajo.
-      child: Align(alignment: Alignment.center, child: child),
+          decoration: BoxDecoration(
+            color: ride.surface,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppTheme.radiusSheet),
+            ),
+            border: Border(top: BorderSide(color: ride.border)),
+            boxShadow: [
+              BoxShadow(
+                color: ride.shadow,
+                blurRadius: 32,
+                offset: const Offset(0, -10),
+              ),
+            ],
+          ),
+          child: Align(alignment: Alignment.center, child: child),
+        );
+      },
     );
   }
 }
@@ -232,10 +252,15 @@ class _FormPanel extends StatelessWidget {
     return ColoredBox(
       color: ride.surface,
       child: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
-            child: Center(child: child),
+        child: LayoutBuilder(
+          builder: (context, constraints) => Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: constraints.maxWidth < 540 ? 28 : 48,
+                vertical: constraints.maxHeight < 650 ? 24 : 40,
+              ),
+              child: Center(child: child),
+            ),
           ),
         ),
       ),
@@ -249,71 +274,101 @@ class BrandPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
-        final headline = (width * 0.1).clamp(45.0, 76.0);
+        final compactHeight = height < 650;
+        final headline = math.min(
+          (width * 0.1).clamp(40.0, 76.0),
+          (height * 0.085).clamp(40.0, 68.0),
+        );
 
         return ClipRect(
           child: DecoratedBox(
-            decoration: const BoxDecoration(gradient: AppColors.brandPanel),
+            decoration: BoxDecoration(gradient: ride.hero),
             child: Stack(
               children: [
+                if (ride.isDark)
+                  Positioned.fill(
+                    child: Image.asset(
+                      'assets/images/fondoInicioOscuro-v2.png',
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                    ),
+                  ),
                 // Aurora superior izquierda (`.brand-panel:before`).
-                Positioned(
-                  left: -170,
-                  top: -160,
-                  child: Container(
-                    width: 430,
-                    height: 430,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [Color(0x2A7DDBEE), Color(0x007DDBEE)],
-                        stops: [0, 0.68],
+                if (!ride.isDark)
+                  Positioned(
+                    left: -170,
+                    top: -160,
+                    child: Container(
+                      width: 430,
+                      height: 430,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [Color(0x2A7DDBEE), Color(0x007DDBEE)],
+                          stops: [0, 0.68],
+                        ),
                       ),
                     ),
                   ),
-                ),
                 // Anillo superior derecho (`.brand-panel:after`).
-                Positioned(
-                  right: -220,
-                  top: -200,
-                  child: Container(
-                    width: 520,
-                    height: 520,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFF97E2F1).withValues(alpha: 0.05),
-                        width: 90,
+                if (!ride.isDark)
+                  Positioned(
+                    right: -220,
+                    top: -200,
+                    child: Container(
+                      width: 520,
+                      height: 520,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(
+                            0xFF97E2F1,
+                          ).withValues(alpha: 0.05),
+                          width: 90,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: height * 0.43,
-                  child: const _CityArt(),
-                ),
+                if (!ride.isDark)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: height * 0.43,
+                    child: const _CityArt(),
+                  )
+                else
+                  const Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0x22061F31), Color(0xA6030F19)],
+                        ),
+                      ),
+                    ),
+                  ),
                 Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal: math.max(32, width * 0.09),
-                    vertical: 48,
+                    vertical: compactHeight ? 28 : 48,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const RideWordmark(color: Colors.white),
-                      SizedBox(height: height * 0.12),
+                      SizedBox(height: (height * 0.1).clamp(32.0, 94.0)),
                       _Headline(size: headline),
-                      const SizedBox(height: 25),
-                      const SizedBox(
-                        width: 450,
-                        child: Text(
+                      SizedBox(height: compactHeight ? 14 : 25),
+                      SizedBox(
+                        width: math.min(450, width * 0.82),
+                        child: const Text(
                           'Una forma más segura, transparente y humana de '
                           'llegar a donde quieres.',
                           style: TextStyle(
@@ -407,7 +462,7 @@ class _TrustBadge extends StatelessWidget {
   }
 }
 
-/// Ilustración de la ciudad (`.city-art`): luna, ruta, auto y edificios.
+/// Ilustración de la ciudad (`.city-art`): ruta, auto y edificios.
 class _CityArt extends StatelessWidget {
   const _CityArt();
 
@@ -439,22 +494,6 @@ class _CityArt extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               Positioned(
-                right: width * 0.15,
-                top: height * 0.06,
-                child: Container(
-                  width: 110,
-                  height: 110,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      center: Alignment(-0.24, -0.24),
-                      colors: [Color(0x2EB5EDF7), Color(0x0969D2F0)],
-                      stops: [0, 0.66],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
                 left: width * 0.05,
                 right: width * 0.05,
                 bottom: 0,
@@ -462,7 +501,8 @@ class _CityArt extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    for (final (index, fraction) in _buildingHeights.indexed) ...[
+                    for (final (index, fraction)
+                        in _buildingHeights.indexed) ...[
                       Expanded(
                         child: Container(
                           height: height * 0.7 * fraction,
@@ -528,7 +568,11 @@ class _Route extends StatelessWidget {
             children: [
               Positioned.fill(child: CustomPaint(painter: _RoutePainter())),
               Positioned(left: -5, bottom: -8, child: const _RouteStop()),
-              Positioned(left: width * 0.5, bottom: -8, child: const _RouteStop()),
+              Positioned(
+                left: width * 0.5,
+                bottom: -8,
+                child: const _RouteStop(),
+              ),
               Positioned(right: -8, top: -6, child: const _RouteStop()),
             ],
           );
