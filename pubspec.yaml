@@ -47,6 +47,10 @@ dependencies:
   # que se cierre la app.
   shared_preferences: ^2.5.3
   flutter_map_vector_tiles: ^2.8.1
+  # Otra que ya venia por debajo de supabase_flutter. Se declara porque el
+  # cobro con DeUna necesita abrir el deeplink `pagar.deuna.app`: pagando desde
+  # el mismo telefono no hay forma de escanear el QR de la propia pantalla.
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

@@ -46,5 +46,12 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Sin esto, en Android 11 o mas nuevo `canLaunchUrl` responde que no
+             a cualquier enlace y el boton «Pagar con DeUna» no abriria nada.
+             La visibilidad de otras apps dejo de ser gratis en Android 11. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
     </queries>
 </manifest>

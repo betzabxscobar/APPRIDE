@@ -101,15 +101,28 @@ crea, con un id actualiza el que ya existe.
 
 ## Pagos
 
-| Función | Parámetros | Devuelve |
-|---|---|---|
-| `registrar_metodo_pago` | `p_tipo`, `p_token`, `p_predeterminado` | `uuid` |
-| `elegir_metodo_predeterminado` | `p_metodo_id` | — |
+| Función | Parámetros | Devuelve | Quién |
+|---|---|---|---|
+| `registrar_metodo_pago` | `p_tipo`, `p_token`, `p_predeterminado` | `uuid` | pasajero |
+| `elegir_metodo_predeterminado` | `p_metodo_id` | — | pasajero |
+| `cobro_deuna` | `p_viaje_id` | `orden`, `monto`, `estado` | el pasajero del viaje |
+| `confirmar_cobro_deuna` | `p_orden`, `p_pagado`, `p_datos` | `uuid` del pago | `service_role` o administración |
 
 > **`p_token` no es un número de tarjeta y la base lo comprueba.**
-> `registrar_metodo_pago` rechaza cualquier valor con forma de PAN. Hoy el único
-> tipo que la app registra es `efectivo`; la tarjeta espera una pasarela que
-> tokenice, y hasta entonces no hay formulario donde escribirla.
+> `registrar_metodo_pago` rechaza cualquier valor con forma de PAN. Los tipos
+> que la app registra son `efectivo` y `deuna`, y ninguno guarda nada del
+> pasajero; la tarjeta espera una pasarela que tokenice, y hasta entonces no hay
+> formulario donde escribirla.
+
+`cobro_deuna` devuelve el importe que hay que cobrar y fija el número de orden,
+que es el mismo cada vez que se pide el QR de ese viaje. **La app no manda el
+importe nunca**, y quien llama a Payválida es la Edge Function `cobro-deuna`,
+que es la única que ve el `fixedhash`.
+
+`confirmar_cobro_deuna` es lo que mueve dinero: marca el cobro y le abona al
+chofer su parte, igual que el efectivo le carga la comisión. Es idempotente
+porque un aviso de pasarela se reintenta. Todo el circuito, y las preguntas que
+quedan abiertas con Payválida, están en [`PAGOS.md`](PAGOS.md).
 
 ## Ganancias
 
@@ -280,5 +293,9 @@ El estado de partida y los dos arreglos están en
   puede contrastar cada contraseña nueva con HaveIBeenPwned y rechazar las que
   ya se filtraron. Es un interruptor del panel, no código. Para una app donde
   la cuenta guarda viajes, dirección de casa y método de pago, vale la pena.
-- **No hay pasarela de pagos.** `registrar_metodo_pago` acepta un token, pero no
-  hay quién lo emita, así que el único método real es el efectivo.
+- **El cobro con DeUna está escrito pero no cobra todavía.** Falta desplegar la
+  Edge Function con las credenciales de Payválida, y falta saber quién avisa de
+  que el pasajero pagó: no hay webhook ni consulta de estado documentados. Las
+  preguntas abiertas están en [`PAGOS.md`](PAGOS.md).
+- **La tarjeta sigue sin pasarela.** `registrar_metodo_pago` acepta un token,
+  pero no hay quién lo emita.

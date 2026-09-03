@@ -12,7 +12,8 @@ La superficie que consume la app —funciones, tablas, Realtime y Storage— est
 documentada en [`docs/API.md`](docs/API.md). El mapa, en
 [`docs/MAPA.md`](docs/MAPA.md); el buscador de direcciones, en
 [`docs/BUSCADOR.md`](docs/BUSCADOR.md); los precios, en
-[`docs/TARIFAS.md`](docs/TARIFAS.md).
+[`docs/TARIFAS.md`](docs/TARIFAS.md); el cobro con DeUna, en
+[`docs/PAGOS.md`](docs/PAGOS.md).
 
 ## Credenciales del equipo administrativo
 

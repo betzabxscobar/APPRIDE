@@ -10,11 +10,15 @@ import '../../widgets/ride_card.dart';
 
 /// Métodos de pago del pasajero.
 ///
-/// Solo se ofrece efectivo. La tarjeta existe en el modelo de datos, pero
-/// guardarla exige un token de una pasarela de pagos: **esta app nunca pide ni
-/// almacena un número de tarjeta**. La función `registrar_metodo_pago` de la
-/// base rechaza cualquier valor con forma de PAN, y aquí directamente no hay
-/// formulario donde escribirlo.
+/// Se ofrecen efectivo y DeUna. Ninguno de los dos guarda nada del pasajero:
+/// el efectivo se paga en la mano y DeUna se paga escaneando un QR distinto en
+/// cada viaje.
+///
+/// La tarjeta existe en el modelo de datos, pero guardarla exige un token de
+/// una pasarela de pagos: **esta app nunca pide ni almacena un número de
+/// tarjeta**. La función `registrar_metodo_pago` de la base rechaza cualquier
+/// valor con forma de PAN, y aquí directamente no hay formulario donde
+/// escribirlo.
 class PaymentMethodsScreen extends StatefulWidget {
   const PaymentMethodsScreen({super.key});
 
@@ -68,6 +72,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   }
 
   bool get _tieneEfectivo => _metodos.any((m) => m.esEfectivo);
+  bool get _tieneDeuna => _metodos.any((m) => m.esDeuna);
 
   @override
   Widget build(BuildContext context) {
@@ -111,6 +116,24 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                       minimumSize: const Size.fromHeight(50),
                     ),
                   ),
+                if (!_tieneDeuna) ...[
+                  const SizedBox(height: 10),
+                  // DeUna no pide guardar nada: es elegir que este viaje se
+                  // pagará escaneando. Por eso el botón es igual que el de
+                  // efectivo y no abre ningún formulario.
+                  OutlinedButton.icon(
+                    onPressed: _ocupado
+                        ? null
+                        : () => _accion(() => FleetService.instance
+                            .agregarMetodoPago(tipo: 'deuna')
+                            .then((_) {})),
+                    icon: const Icon(Icons.qr_code_2, size: 20),
+                    label: const Text('Agregar DeUna'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 22),
                 Container(
                   padding: const EdgeInsets.all(15),
@@ -197,7 +220,7 @@ class _Tarjeta extends StatelessWidget {
               borderRadius: BorderRadius.circular(11),
             ),
             child: Icon(
-              metodo.esEfectivo ? Icons.payments_outlined : Icons.credit_card,
+              metodo.icon,
               size: 20,
               color: metodo.predeterminado
                   ? context.ride.accent

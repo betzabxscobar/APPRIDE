@@ -12,6 +12,7 @@ import 'package:ride/services/geocoding_service.dart';
 import 'package:ride/services/h3_service.dart';
 import 'package:ride/services/ride_service.dart';
 import 'package:ride/services/map_style_service.dart';
+import 'package:ride/services/payments_service.dart';
 import 'package:ride/services/places_service.dart';
 import 'package:ride/services/routing_service.dart';
 import 'package:ride/widgets/ride_map.dart';
@@ -1363,6 +1364,84 @@ void main() {
       // almacenamiento local falle.
       ThemeController.instance.cargar();
       expect(ThemeController.instance.mode, ThemeMode.system);
+    });
+  });
+
+  group('Cobro con DeUna', () {
+    PaymentMethod metodo(String tipo, {String? token}) => PaymentMethod.fromMap({
+          'id': 'm-1',
+          'tipo': tipo,
+          'predeterminado': true,
+          'detalle_tokenizado': token,
+        });
+
+    test('DeUna es un método sin token, como el efectivo', () {
+      final m = metodo('deuna');
+      expect(m.esDeuna, isTrue);
+      expect(m.esEfectivo, isFalse);
+      expect(m.label, 'DeUna');
+      expect(m.descripcion, 'Escaneas el QR al terminar');
+    });
+
+    test('Cada método tiene su propio icono', () {
+      // Si dos comparten icono, la lista de métodos deja de distinguirse de un
+      // vistazo, que es justo para lo que sirve.
+      final iconos = {
+        metodo('efectivo').icon,
+        metodo('deuna').icon,
+        metodo('tarjeta', token: 'tok_1234').icon,
+      };
+      expect(iconos.length, 3);
+    });
+
+    // Un PNG de 1x1 en base64, que es lo mínimo que decodifica.
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4'
+        'zwAAAgEBAF8Q5UcAAAAASUVORK5CYII=';
+
+    test('El QR llega como data URI y hay que quedarse con el base64', () {
+      // Payválida lo manda pensado para un <img> de una web. `Image.memory`
+      // quiere bytes: con el prefijo delante, no pinta nada.
+      final bytes = DeunaCharge.decodificarQr('data:image/png;base64,$png');
+      expect(bytes, isNotNull);
+      expect(bytes!.length, greaterThan(0));
+    });
+
+    test('Un base64 pelado también vale', () {
+      expect(DeunaCharge.decodificarQr(png), isNotNull);
+    });
+
+    test('Un QR roto deja la pantalla sin imagen, no reventada', () {
+      // Todavía queda el deeplink para pagar, así que perder el QR no puede
+      // tumbar la pantalla entera.
+      expect(DeunaCharge.decodificarQr('data:image/png;base64,%%%'), isNull);
+      expect(DeunaCharge.decodificarQr(''), isNull);
+      expect(DeunaCharge.decodificarQr(null), isNull);
+    });
+
+    test('La respuesta de la función trae orden, monto y deeplink', () {
+      final cobro = DeunaCharge.fromMap({
+        'orden': 'ride7f3a',
+        'monto': 1.75,
+        'qr': 'data:image/png;base64,$png',
+        'deep_link': 'https://pagar.deuna.app/H91/merchant?id=MD1Y7HWEV',
+      });
+
+      expect(cobro.orden, 'ride7f3a');
+      expect(cobro.monto, 1.75);
+      expect(cobro.deepLink, contains('pagar.deuna.app'));
+      expect(cobro.yaPagado, isFalse);
+    });
+
+    test('Un monto entero llega como int y no puede romper el cobro', () {
+      // PostgREST serializa un numeric sin decimales como número pelado: un
+      // viaje de 2,00 llega como 2, no como 2.0.
+      expect(DeunaCharge.fromMap({'orden': 'o', 'monto': 2}).monto, 2.0);
+    });
+
+    test('Un viaje ya pagado no trae QR y se dice', () {
+      final cobro = DeunaCharge.fromMap({'ya_pagado': true, 'estado': 'completado'});
+      expect(cobro.yaPagado, isTrue);
+      expect(cobro.qr, isNull);
     });
   });
 }
