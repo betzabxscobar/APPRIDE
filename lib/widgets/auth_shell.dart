@@ -77,6 +77,7 @@ class _MobileAuthLayout extends StatelessWidget {
             child: Column(
               children: [
                 SizedBox(
+                  width: double.infinity,
                   height: heroHeight,
                   child: _MobileHero(topInset: padding.top),
                 ),
@@ -105,6 +106,7 @@ class _MobileHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ride = context.ride;
     return LayoutBuilder(
       builder: (context, constraints) {
         final height = constraints.maxHeight;
@@ -112,28 +114,38 @@ class _MobileHero extends StatelessWidget {
         return ClipRect(
           child: Stack(
             children: [
-              Positioned(
-                left: -120,
-                top: -140,
-                child: Container(
-                  width: 320,
-                  height: 320,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [Color(0x387DDBEE), Color(0x007DDBEE)],
-                      stops: [0, 0.68],
+              if (ride.isDark)
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/images/fondoInicioOscuro-v2.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  ),
+                )
+              else ...[
+                Positioned(
+                  left: -120,
+                  top: -140,
+                  child: Container(
+                    width: 320,
+                    height: 320,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [Color(0x387DDBEE), Color(0x007DDBEE)],
+                        stops: [0, 0.68],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: height * 0.6,
-                child: const _CityArt(),
-              ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: height * 0.6,
+                  child: const _CityArt(),
+                ),
+              ],
               // Velo entre la ilustración y el texto. Sin él, el trazo de la
               // ruta y los edificios cruzan por encima del titular y no hay
               // manera de leerlo.
@@ -278,45 +290,70 @@ class BrandPanel extends StatelessWidget {
             decoration: BoxDecoration(gradient: ride.hero),
             child: Stack(
               children: [
+                if (ride.isDark)
+                  Positioned.fill(
+                    child: Image.asset(
+                      'assets/images/fondoInicioOscuro-v2.png',
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                    ),
+                  ),
                 // Aurora superior izquierda (`.brand-panel:before`).
-                Positioned(
-                  left: -170,
-                  top: -160,
-                  child: Container(
-                    width: 430,
-                    height: 430,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [Color(0x2A7DDBEE), Color(0x007DDBEE)],
-                        stops: [0, 0.68],
+                if (!ride.isDark)
+                  Positioned(
+                    left: -170,
+                    top: -160,
+                    child: Container(
+                      width: 430,
+                      height: 430,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [Color(0x2A7DDBEE), Color(0x007DDBEE)],
+                          stops: [0, 0.68],
+                        ),
                       ),
                     ),
                   ),
-                ),
                 // Anillo superior derecho (`.brand-panel:after`).
-                Positioned(
-                  right: -220,
-                  top: -200,
-                  child: Container(
-                    width: 520,
-                    height: 520,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFF97E2F1).withValues(alpha: 0.05),
-                        width: 90,
+                if (!ride.isDark)
+                  Positioned(
+                    right: -220,
+                    top: -200,
+                    child: Container(
+                      width: 520,
+                      height: 520,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(
+                            0xFF97E2F1,
+                          ).withValues(alpha: 0.05),
+                          width: 90,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: height * 0.43,
-                  child: const _CityArt(),
-                ),
+                if (!ride.isDark)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: height * 0.43,
+                    child: const _CityArt(),
+                  )
+                else
+                  const Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0x22061F31), Color(0xA6030F19)],
+                        ),
+                      ),
+                    ),
+                  ),
                 Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal: math.max(32, width * 0.09),
@@ -425,7 +462,7 @@ class _TrustBadge extends StatelessWidget {
   }
 }
 
-/// Ilustración de la ciudad (`.city-art`): luna, ruta, auto y edificios.
+/// Ilustración de la ciudad (`.city-art`): ruta, auto y edificios.
 class _CityArt extends StatelessWidget {
   const _CityArt();
 

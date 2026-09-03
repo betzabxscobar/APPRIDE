@@ -114,17 +114,14 @@ class _SplashScreenState extends State<SplashScreen>
                   1.0 + Curves.easeOut.transform(_zoomCtrl.value) * 0.15;
               return Transform.scale(scale: scale, child: child);
             },
-            child: ColorFiltered(
-              colorFilter: ColorFilter.mode(
-                dark ? const Color(0xFF4B9CB5) : Colors.white,
-                dark ? BlendMode.multiply : BlendMode.dst,
-              ),
-              child: Image.asset(
-                'assets/images/fondo.png',
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-              ),
+            child: Image.asset(
+              dark
+                  ? 'assets/images/fondoInicioOscuro-v2.png'
+                  : 'assets/images/fondo.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+              width: double.infinity,
+              height: double.infinity,
             ),
           ),
 
@@ -135,7 +132,7 @@ class _SplashScreenState extends State<SplashScreen>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: dark
-                      ? const [Color(0x330A3047), Color(0x88104E66)]
+                      ? const [Color(0x44061F31), Color(0xB8030F19)]
                       : const [Color(0x18FFFFFF), Color(0x77F1F5FA)],
                 ),
               ),
