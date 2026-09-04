@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/ride_colors.dart';
 
-/// Isotipo de Ride: imagen del logo.
+/// Isotipo de Ride construido con el icono Material de transporte.
 class RideMark extends StatelessWidget {
   const RideMark({super.key, this.size = 52});
 
@@ -12,11 +12,10 @@ class RideMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
-      'assets/images/logo.png',
-      width: size,
-      height: size,
-      fit: BoxFit.contain,
+    return Icon(
+      Icons.local_taxi_rounded,
+      size: size,
+      color: context.ride.accent,
     );
   }
 }

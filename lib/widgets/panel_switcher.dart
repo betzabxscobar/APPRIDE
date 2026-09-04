@@ -78,7 +78,7 @@ class PanelSwitcher extends StatelessWidget {
   }
 }
 
-class _PanelOption extends StatelessWidget {
+class _PanelOption extends StatefulWidget {
   const _PanelOption({
     required this.view,
     required this.selected,
@@ -90,6 +90,15 @@ class _PanelOption extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
+  State<_PanelOption> createState() => _PanelOptionState();
+}
+
+class _PanelOptionState extends State<_PanelOption> {
+  static const _hoverTextColor = Color(0xFF00CFFF);
+
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final ride = context.ride;
     final radius = BorderRadius.circular(AppTheme.radiusAction);
@@ -97,42 +106,60 @@ class _PanelOption extends StatelessWidget {
     // blanco. Sobre el tema oscuro deslumbran, así que allí el resaltado se
     // hace con el propio acento a baja opacidad.
     final fondoSeleccion = ride.isDark
-        ? view.accent.withValues(alpha: 0.18)
-        : view.accentSoft;
+        ? widget.view.accent.withValues(alpha: 0.18)
+        : widget.view.accentSoft;
 
-    return Material(
-      color: selected ? fondoSeleccion : ride.surfaceAlt,
-      borderRadius: radius,
-      child: InkWell(
-        onTap: onTap,
+    return MouseRegion(
+      cursor: widget.onTap == null
+          ? MouseCursor.defer
+          : SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Material(
+        color: widget.selected ? fondoSeleccion : ride.surfaceAlt,
         borderRadius: radius,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: AppTheme.tapTarget),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            border: Border.all(
-              color: selected ? view.accent : ride.border,
-              width: selected ? 1.8 : 1.4,
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: radius,
+          hoverColor: Colors.transparent,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: AppTheme.tapTarget),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              border: Border.all(
+                color: widget.selected ? widget.view.accent : ride.border,
+                width: widget.selected ? 1.8 : 1.4,
+              ),
             ),
-          ),
-          child: Row(
-            children: [
-              Icon(view.icon, size: 22, color: view.accent),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  panelLabel(view),
-                  style: TextStyle(
-                    fontSize: AppText.small,
-                    fontWeight: FontWeight.w700,
-                    color: selected ? view.accent : ride.ink,
+            child: Row(
+              children: [
+                Icon(widget.view.icon, size: 22, color: widget.view.accent),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 140),
+                    curve: Curves.easeOut,
+                    style: TextStyle(
+                      fontSize: AppText.small,
+                      fontWeight: FontWeight.w700,
+                      color: _hovered
+                          ? _hoverTextColor
+                          : widget.selected
+                          ? widget.view.accent
+                          : ride.ink,
+                    ),
+                    child: Text(panelLabel(widget.view)),
                   ),
                 ),
-              ),
-              if (selected)
-                Icon(Icons.check_circle, size: 20, color: view.accent),
-            ],
+                if (widget.selected)
+                  Icon(
+                    Icons.check_circle,
+                    size: 20,
+                    color: widget.view.accent,
+                  ),
+              ],
+            ),
           ),
         ),
       ),

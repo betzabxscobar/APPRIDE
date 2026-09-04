@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/ride_colors.dart';
+import '../../widgets/ride_logo.dart';
 
 /// Pantalla de bienvenida que muestra el logo y los pilares de marca
 /// con una animación secuencial de fade-in sobre la imagen de fondo.
@@ -159,13 +160,9 @@ class _SplashScreenState extends State<SplashScreen>
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Logo
+                          // Isotipo Material de la app.
                           _fade(
-                            Image.asset(
-                              'assets/images/logo.png',
-                              width: logoSize,
-                              height: logoSize,
-                            ),
+                            RideMark(size: logoSize),
                             0,
                           ),
                           SizedBox(height: compact ? 12 : 24),

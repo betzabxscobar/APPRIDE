@@ -221,14 +221,10 @@ class _AdminDrawer extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
               child: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      width: 42,
-                      height: 42,
-                      fit: BoxFit.cover,
-                    ),
+                  Icon(
+                    Icons.local_taxi_rounded,
+                    size: 42,
+                    color: context.ride.accent,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -260,37 +256,23 @@ class _AdminDrawer extends StatelessWidget {
             ),
             const Divider(),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: [
-                  for (final section in _Section.values)
-                    ListTile(
-                      leading: Icon(
-                        section.icon,
-                        size: 21,
-                        color: section == active
-                            ? context.ride.info
-                            : context.ride.inkMuted,
+              child: ColoredBox(
+                // Solo la zona de navegación se tiñe de celeste. El resto
+                // del drawer mantiene la superficie normal del tema.
+                color: context.ride.isDark
+                    ? context.ride.surfaceAlt
+                    : const Color(0xFFDDF3FF),
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  children: [
+                    for (final section in _Section.values)
+                      _DrawerNavigationTile(
+                        section: section,
+                        selected: section == active,
+                        onTap: () => onSelect(section),
                       ),
-                      title: Text(
-                        section.label,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: section == active
-                              ? context.ride.ink
-                              : context.ride.inkMuted,
-                        ),
-                      ),
-                      selected: section == active,
-                      selectedTileColor: context.ride.infoSoft,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                      onTap: () => onSelect(section),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
             if (showPanelSwitcher) ...[
@@ -372,6 +354,67 @@ class _AdminDrawer extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DrawerNavigationTile extends StatefulWidget {
+  const _DrawerNavigationTile({
+    required this.section,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _Section section;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_DrawerNavigationTile> createState() => _DrawerNavigationTileState();
+}
+
+class _DrawerNavigationTileState extends State<_DrawerNavigationTile> {
+  static const _hoverTextColor = Color(0xFF00CFFF);
+
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: ListTile(
+        leading: Icon(
+          widget.section.icon,
+          size: 21,
+          color: widget.selected ? ride.info : ride.inkMuted,
+        ),
+        title: AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOut,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: _hovered
+                ? _hoverTextColor
+                : widget.selected
+                ? ride.ink
+                : ride.inkMuted,
+          ),
+          child: Text(widget.section.label),
+        ),
+        selected: widget.selected,
+        selectedTileColor: ride.infoSoft,
+        hoverColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+        onTap: widget.onTap,
       ),
     );
   }

@@ -432,34 +432,81 @@ class _TrustRow extends StatelessWidget {
       spacing: 25,
       runSpacing: 8,
       children: [
-        _TrustBadge(symbol: '◈', label: ' Viajes protegidos'),
-        _TrustBadge(symbol: '◉', label: ' Precio transparente'),
+        _TrustBadge(icon: _SteeringWheelIcon(), label: 'Viajes protegidos'),
+        _TrustBadge(
+          icon: Icon(Icons.contactless_outlined),
+          label: 'Precio transparente',
+        ),
       ],
     );
   }
 }
 
 class _TrustBadge extends StatelessWidget {
-  const _TrustBadge({required this.symbol, required this.label});
+  const _TrustBadge({required this.icon, required this.label});
 
-  final String symbol;
+  final Widget icon;
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(
-            text: symbol,
-            style: const TextStyle(color: AppColors.mint),
-          ),
-          TextSpan(text: label),
-        ],
-      ),
-      style: const TextStyle(fontSize: 11, color: AppColors.navyFaint),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconTheme(
+          data: const IconThemeData(color: AppColors.mint, size: 14),
+          child: SizedBox.square(dimension: 14, child: icon),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: AppColors.navyFaint),
+        ),
+      ],
     );
   }
+}
+
+class _SteeringWheelIcon extends StatelessWidget {
+  const _SteeringWheelIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _SteeringWheelPainter(IconTheme.of(context).color!),
+    );
+  }
+}
+
+class _SteeringWheelPainter extends CustomPainter {
+  const _SteeringWheelPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.shortestSide / 2 - 1;
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawCircle(center, radius, paint);
+    canvas.drawCircle(center, radius * .2, paint);
+    for (final angle in const [-1.5708, .5236, 2.618]) {
+      canvas.drawLine(
+        center + Offset.fromDirection(angle, radius * .2),
+        center + Offset.fromDirection(angle, radius * .78),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SteeringWheelPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 /// Ilustración de la ciudad (`.city-art`): ruta, auto y edificios.
