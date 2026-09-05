@@ -166,12 +166,18 @@ class PrimaryAction extends StatelessWidget {
     required this.onPressed,
     this.loading = false,
     this.showArrow = true,
+    this.backgroundColor,
+    this.foregroundColor,
+    this.border,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool loading;
   final bool showArrow;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+  final BorderSide? border;
 
   @override
   Widget build(BuildContext context) {
@@ -183,8 +189,10 @@ class PrimaryAction extends StatelessWidget {
       opacity: enabled ? 1 : 0.55,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: AppColors.primaryAction,
+          color: backgroundColor,
+          gradient: backgroundColor == null ? AppColors.primaryAction : null,
           borderRadius: radius,
+          border: border == null ? null : Border.fromBorderSide(border!),
           boxShadow: [
             BoxShadow(
               color: AppColors.primary.withValues(
@@ -210,30 +218,30 @@ class PrimaryAction extends StatelessWidget {
                   children: [
                     Text(
                       label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: AppText.body,
                         fontWeight: FontWeight.w800,
-                        color: Colors.white,
+                        color: foregroundColor ?? Colors.white,
                       ),
                     ),
                     Align(
                       alignment: Alignment.centerRight,
                       child: loading
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.4,
-                                color: Colors.white,
+                                color: foregroundColor ?? Colors.white,
                               ),
                             )
                           : showArrow
-                          ? const Text(
+                          ? Text(
                               '→',
                               style: TextStyle(
                                 fontSize: 19,
                                 fontWeight: FontWeight.w800,
-                                color: Colors.white,
+                                color: foregroundColor ?? Colors.white,
                               ),
                             )
                           : const SizedBox.shrink(),
@@ -406,7 +414,7 @@ class _RoleOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final ride = context.ride;
     final radius = BorderRadius.circular(AppTheme.radiusAction);
-    final accent = selected ? ride.accent : ride.inkMuted;
+    final iconColor = role.accent;
 
     return Material(
       color: selected ? ride.accentSoft : ride.surfaceAlt,
@@ -428,7 +436,7 @@ class _RoleOption extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(role.icon, size: 22, color: accent),
+              Icon(role.icon, size: 22, color: iconColor),
               const SizedBox(height: 10),
               Text(
                 role.label,

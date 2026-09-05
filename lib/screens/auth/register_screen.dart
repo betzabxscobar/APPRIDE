@@ -154,6 +154,9 @@ class _RegisterBoxState extends State<RegisterBox> {
               label: _submitting ? 'Creando cuenta…' : 'Crear mi cuenta',
               loading: _submitting,
               onPressed: _submit,
+              backgroundColor: const Color(0xFF81D4FA),
+              foregroundColor: Colors.black,
+              border: const BorderSide(color: Colors.black, width: 2),
             ),
             AuthFooter(
               text: '¿Ya tienes cuenta?',

@@ -137,7 +137,9 @@ abstract final class AppTheme {
       iconTheme: IconThemeData(color: ride.inkMuted, size: 24),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: ride.surface,
+        fillColor: ride.isDark
+            ? const Color(0xFF1C5874)
+            : const Color(0xFFE3F6FF),
         // 18 px de alto interior dejan el campo en ~56: el mínimo cómodo para
         // tocar sin fallar.
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),

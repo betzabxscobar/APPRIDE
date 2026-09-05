@@ -147,7 +147,7 @@ class _SplashScreenState extends State<SplashScreen>
                 final shortest = constraints.maxWidth < constraints.maxHeight
                     ? constraints.maxWidth
                     : constraints.maxHeight;
-                final logoSize = (shortest * 0.25).clamp(90.0, 160.0);
+                final logoSize = (shortest * 0.30).clamp(110.0, 180.0);
                 final compact = constraints.maxHeight < 650;
                 return Center(
                   child: SingleChildScrollView(
@@ -157,15 +157,23 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 460),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
+                      child: SizedBox(
+                        height: constraints.maxHeight - (compact ? 32 : 48),
+                        child: Stack(
+                          children: [
+                            Align(
+                              alignment: Alignment.topCenter,
+                              child: Transform.translate(
+                                offset: const Offset(0, 60),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
                           // Isotipo Material de la app.
                           _fade(
                             RideMark(size: logoSize),
                             0,
                           ),
-                          SizedBox(height: compact ? 12 : 24),
+                          const SizedBox(height: 2),
 
                           // Título "Ride"
                           _fade(
@@ -185,7 +193,7 @@ class _SplashScreenState extends State<SplashScreen>
                           // Subtítulo
                           _fade(
                             Text(
-                              'Muévete a tu manera',
+                              'Muévete con libertad',
                               style: AppTheme.display(
                                 (shortest * 0.04).clamp(17.0, 22.0),
                                 color: ride.inkMuted,
@@ -197,11 +205,24 @@ class _SplashScreenState extends State<SplashScreen>
                             2,
                           ),
 
-                          SizedBox(height: compact ? 20 : 40),
-
-                          // Pilares de marca
-                          _buildPillars(),
-                        ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.topCenter,
+                              child: Padding(
+                                padding: EdgeInsets.only(
+                                  top: logoSize + (compact ? 186 : 205),
+                                ),
+                                child: Transform.translate(
+                                  offset: const Offset(30, 0),
+                                  child: _buildPillars(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -220,16 +241,22 @@ class _SplashScreenState extends State<SplashScreen>
         icon: Icons.shield_outlined,
         title: 'Seguro',
         subtitle: 'Tecnología que\nte cuida',
+        backgroundColor: Color(0xFF12354C),
+        iconColor: Color(0xFF56B6F8),
       ),
       _PillarData(
         icon: Icons.eco_outlined,
         title: 'Sostenible',
         subtitle: 'Menos emisiones,\nmás futuro',
+        backgroundColor: Color(0xFF12354C),
+        iconColor: Color(0xFF56B6F8),
       ),
       _PillarData(
         icon: Icons.favorite_outline,
         title: 'Confiable',
         subtitle: 'Personas reales,\nviajes merecidos',
+        backgroundColor: Color(0xFF12354C),
+        iconColor: Color(0xFF56B6F8),
       ),
     ];
 
@@ -248,11 +275,15 @@ class _PillarData {
     required this.icon,
     required this.title,
     required this.subtitle,
+    required this.backgroundColor,
+    required this.iconColor,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
+  final Color backgroundColor;
+  final Color iconColor;
 }
 
 class _PillarTile extends StatelessWidget {
@@ -262,43 +293,43 @@ class _PillarTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ride = context.ride;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: ride.accentSoft,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: ride.border),
-            ),
-            child: Icon(data.icon, size: 30, color: ride.accent),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  data.title,
-                  style: AppTheme.display(19, color: ride.ink, height: 1.2),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Align(
+        alignment: Alignment.center,
+        child: SizedBox(
+          width: 250,
+          child: Row(
+            children: [
+              Icon(data.icon, size: 31, color: data.iconColor),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data.title,
+                      style: AppTheme.display(
+                        19,
+                        color: data.iconColor,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      data.subtitle,
+                      style: AppTheme.display(
+                        15,
+                        color: data.iconColor.withValues(alpha: 0.82),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  data.subtitle,
-                  style: AppTheme.display(
-                    15,
-                    color: ride.inkMuted,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
