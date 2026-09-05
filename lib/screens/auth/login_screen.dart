@@ -74,8 +74,10 @@ class _LoginBoxState extends State<LoginBox> {
             BackLink(onPressed: _submitting ? null : widget.onBack),
             const SizedBox(height: 26),
             const AuthEyebrow('ACCESO SEGURO'),
+            const SizedBox(height: 20),
             const AuthHeading('Qué bueno verte'),
             const AuthLead('Ingresa tus datos para continuar.'),
+            const SizedBox(height: 10),
             RideTextField(
               label: 'Correo electrónico',
               hint: 'nombre@correo.com',
@@ -105,6 +107,10 @@ class _LoginBoxState extends State<LoginBox> {
               label: _submitting ? 'Ingresando…' : 'Iniciar sesión',
               loading: _submitting,
               onPressed: _submit,
+              backgroundColor: const Color(0xFF81D4FA),
+              foregroundColor: Colors.black,
+              border: const BorderSide(color: Colors.black, width: 2),
+              showShadow: false,
             ),
             Center(
               child: TextButton(

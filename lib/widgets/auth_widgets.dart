@@ -169,6 +169,7 @@ class PrimaryAction extends StatelessWidget {
     this.backgroundColor,
     this.foregroundColor,
     this.border,
+    this.showShadow = true,
   });
 
   final String label;
@@ -178,6 +179,7 @@ class PrimaryAction extends StatelessWidget {
   final Color? backgroundColor;
   final Color? foregroundColor;
   final BorderSide? border;
+  final bool showShadow;
 
   @override
   Widget build(BuildContext context) {
@@ -193,15 +195,17 @@ class PrimaryAction extends StatelessWidget {
           gradient: backgroundColor == null ? AppColors.primaryAction : null,
           borderRadius: radius,
           border: border == null ? null : Border.fromBorderSide(border!),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(
-                alpha: ride.isDark ? 0.4 : 0.3,
-              ),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
-            ),
-          ],
+          boxShadow: showShadow
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(
+                      alpha: ride.isDark ? 0.4 : 0.3,
+                    ),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
+                  ),
+                ]
+              : null,
         ),
         child: Material(
           color: Colors.transparent,
