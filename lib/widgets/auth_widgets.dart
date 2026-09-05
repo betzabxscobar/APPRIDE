@@ -106,10 +106,16 @@ class AuthEyebrow extends StatelessWidget {
 
 /// Título del formulario.
 class AuthHeading extends StatelessWidget {
-  const AuthHeading(this.text, {super.key, this.size = AppText.h1});
+  const AuthHeading(
+    this.text, {
+    super.key,
+    this.size = AppText.h1,
+    this.textAlign = TextAlign.start,
+  });
 
   final String text;
   final double size;
+  final TextAlign textAlign;
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +123,7 @@ class AuthHeading extends StatelessWidget {
       padding: const EdgeInsets.only(top: 10, bottom: 8),
       child: Text(
         text,
+        textAlign: textAlign,
         style: AppTheme.display(
           size,
           color: context.ride.ink,

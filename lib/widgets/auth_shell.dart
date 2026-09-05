@@ -70,8 +70,7 @@ class _MobileAuthLayout extends StatelessWidget {
           // El alto que reporta el `body` ya descuenta el teclado, así que al
           // escribir el héroe se encoge solo y el campo enfocado sigue a la
           // vista.
-          final heroHeight =
-              padding.top + (constraints.maxHeight * 0.30).clamp(170.0, 280.0);
+          const heroHeight = 0.0;
 
           return SingleChildScrollView(
             child: Column(
@@ -84,7 +83,7 @@ class _MobileAuthLayout extends StatelessWidget {
                 _MobileSheet(
                   // Sin este mínimo, un paso corto como la bienvenida dejaría
                   // la hoja a media pantalla y el degradado asomando debajo.
-                  minHeight: constraints.maxHeight - heroHeight,
+                  minHeight: constraints.maxHeight,
                   bottomInset: padding.bottom,
                   child: child,
                 ),
@@ -167,19 +166,13 @@ class _MobileHero extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const RideWordmark(
-                      markSize: 40,
-                      fontSize: 24,
+                      markSize: 64,
+                      fontSize: 27,
                       color: Colors.white,
+                      subtitle: 'Muévete con libertad',
+                      subtitleColor: Color(0xFFD5DCE3),
                     ),
-                    Text(
-                      'Muévete con libertad.',
-                      style: AppTheme.display(
-                        AppText.h2,
-                        color: Colors.white,
-                        letterSpacing: -0.8,
-                        height: 1.2,
-                      ),
-                    ),
+                    const SizedBox.shrink(),
                   ],
                 ),
               ),
@@ -220,19 +213,14 @@ class _MobileSheet extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             color: ride.surface,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(AppTheme.radiusSheet),
+            image: const DecorationImage(
+              image: AssetImage('assets/images/FondoApp.png'),
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
             ),
-            border: Border(top: BorderSide(color: ride.border)),
-            boxShadow: [
-              BoxShadow(
-                color: ride.shadow,
-                blurRadius: 32,
-                offset: const Offset(0, -10),
-              ),
-            ],
+            borderRadius: BorderRadius.zero,
           ),
-          child: Align(alignment: Alignment.center, child: child),
+          child: Align(alignment: Alignment.topCenter, child: child),
         );
       },
     );

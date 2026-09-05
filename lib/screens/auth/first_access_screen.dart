@@ -94,7 +94,7 @@ class _FirstAccessScreenState extends State<FirstAccessScreen> {
                         children: [
                           Align(
                             alignment: Alignment.centerLeft,
-                            child: RideWordmark(markSize: 40, fontSize: 24),
+                            child: RideWordmark(markSize: 56, fontSize: 24),
                           ),
                           const SizedBox(height: 28),
                           Container(

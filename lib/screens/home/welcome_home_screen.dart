@@ -157,8 +157,8 @@ class _WelcomeContent extends StatelessWidget {
               SizedBox(height: compact ? 7 : 12),
               Text(
                 compact
-                    ? 'Tu viaje empieza aquí.'
-                    : 'Tu camino, más simple desde el inicio.',
+                    ? 'Tu viaje empieza aquí'
+                    : 'Tu próximo destino empieza aquí',
                 textAlign: wide ? TextAlign.left : TextAlign.center,
                 style: AppTheme.display(
                   compact ? 24 : (wide ? 38 : 29),
@@ -170,8 +170,8 @@ class _WelcomeContent extends StatelessWidget {
               SizedBox(height: compact ? 8 : 14),
               Text(
                 compact
-                    ? 'Solicita y sigue tu viaje desde un solo lugar.'
-                    : 'Solicita un viaje, sigue el recorrido y mantén todo bajo control desde un solo lugar.',
+                    ? 'Muévete fácil, seguro y sin complicaciones.'
+                    : 'Muévete con libertad: solicita tu viaje en segundos, sigue cada recorrido y disfruta el camino con total confianza.',
                 textAlign: wide ? TextAlign.left : TextAlign.center,
                 style: TextStyle(
                   color: ride.inkMuted,
@@ -188,14 +188,23 @@ class _WelcomeContent extends StatelessWidget {
                   _Benefit(
                     icon: Icons.route_outlined,
                     label: compact ? 'Rutas' : 'Rutas claras',
+                    backgroundColor: const Color(0xFF29B6F6),
+                    foregroundColor: Colors.white,
+                    borderColor: Colors.black,
                   ),
                   _Benefit(
                     icon: Icons.shield_outlined,
                     label: compact ? 'Seguro' : 'Viajes seguros',
+                    backgroundColor: const Color(0xFF29B6F6),
+                    foregroundColor: Colors.white,
+                    borderColor: Colors.black,
                   ),
                   _Benefit(
                     icon: Icons.payments_outlined,
                     label: compact ? 'Precio' : 'Precio visible',
+                    backgroundColor: const Color(0xFF29B6F6),
+                    foregroundColor: Colors.white,
+                    borderColor: Colors.black,
                   ),
                 ],
               ),
@@ -205,25 +214,15 @@ class _WelcomeContent extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: onContinue,
                   style: ButtonStyle(
-                    backgroundColor: WidgetStateProperty.resolveWith(
-                      (states) => states.contains(WidgetState.pressed)
-                          ? const Color(0xFF00E5FF)
-                          : null,
+                    backgroundColor: const WidgetStatePropertyAll(
+                      Color(0xFF29B6F6),
                     ),
-                    foregroundColor: WidgetStateProperty.resolveWith(
-                      (states) => states.contains(WidgetState.pressed)
-                          ? Colors.black
-                          : null,
+                    foregroundColor: const WidgetStatePropertyAll(Colors.black),
+                    side: const WidgetStatePropertyAll(
+                      BorderSide(color: Colors.black, width: 2),
                     ),
-                    side: WidgetStateProperty.resolveWith(
-                      (states) => states.contains(WidgetState.pressed)
-                          ? const BorderSide(color: Colors.black, width: 2)
-                          : null,
-                    ),
-                    overlayColor: WidgetStateProperty.resolveWith(
-                      (states) => states.contains(WidgetState.pressed)
-                          ? Colors.transparent
-                          : null,
+                    overlayColor: const WidgetStatePropertyAll(
+                      Colors.transparent,
                     ),
                   ),
                   iconAlignment: IconAlignment.end,
@@ -240,9 +239,18 @@ class _WelcomeContent extends StatelessWidget {
 }
 
 class _Benefit extends StatelessWidget {
-  const _Benefit({required this.icon, required this.label});
+  const _Benefit({
+    required this.icon,
+    required this.label,
+    this.backgroundColor,
+    this.foregroundColor,
+    this.borderColor,
+  });
   final IconData icon;
   final String label;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+  final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
@@ -252,14 +260,14 @@ class _Benefit extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: chipColor,
+        color: backgroundColor ?? chipColor,
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: chipBorder),
+        border: Border.all(color: borderColor ?? chipBorder, width: 2),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 17, color: ride.accent),
+          Icon(icon, size: 17, color: foregroundColor ?? ride.accent),
           const SizedBox(width: 7),
           Flexible(
             child: Text(
@@ -267,7 +275,7 @@ class _Benefit extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: ride.inkMuted,
+                color: foregroundColor ?? ride.inkMuted,
                 fontSize: AppText.label,
                 fontWeight: FontWeight.w700,
               ),
@@ -377,23 +385,15 @@ class _HeroVisualState extends State<_HeroVisual>
                   child: Column(
                     children: [
                       RideWordmark(
-                        markSize: (unit * 0.095).clamp(34.0, 58.0),
+                        markSize: (unit * 0.14).clamp(48.0, 76.0),
                         fontSize: (unit * 0.075).clamp(23.0, 39.0),
                         color: dark ? Colors.white : ride.ink,
+                        subtitle: widget.compact ? null : 'Muévete con libertad',
+                        subtitleColor: dark
+                            ? const Color(0xFFD5DCE3)
+                            : ride.inkMuted,
+                        subtitleFontSize: (unit * 0.03).clamp(11.0, 15.0),
                       ),
-                      if (!widget.compact) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          'Muévete con libertad.',
-                          style: AppTheme.display(
-                            (unit * 0.045).clamp(16.0, 25.0),
-                            color: dark
-                                ? const Color(0xFFE2F0F5)
-                                : ride.inkMuted,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
