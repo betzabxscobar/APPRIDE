@@ -204,6 +204,28 @@ class _WelcomeContent extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: onContinue,
+                  style: ButtonStyle(
+                    backgroundColor: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.pressed)
+                          ? const Color(0xFF00E5FF)
+                          : null,
+                    ),
+                    foregroundColor: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.pressed)
+                          ? Colors.black
+                          : null,
+                    ),
+                    side: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.pressed)
+                          ? const BorderSide(color: Colors.black, width: 2)
+                          : null,
+                    ),
+                    overlayColor: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.pressed)
+                          ? Colors.transparent
+                          : null,
+                    ),
+                  ),
                   iconAlignment: IconAlignment.end,
                   icon: const Icon(Icons.arrow_forward_rounded, size: 21),
                   label: const Text('Empezar'),
