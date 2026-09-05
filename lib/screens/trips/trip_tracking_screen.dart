@@ -17,6 +17,7 @@ import '../payments/deuna_qr_screen.dart';
 import '../support/support_screen.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/trip_route_map.dart';
+import '../../widgets/user_avatar.dart';
 import 'rate_trip_sheet.dart';
 
 /// Seguimiento del viaje, del lado del pasajero.
@@ -635,17 +636,11 @@ class _TarjetaConductor extends StatelessWidget {
     return RideCard(
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: context.ride.successSoft,
-            child: Text(
-              iniciales,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: context.ride.success,
-              ),
-            ),
+          UserAvatar(
+            iniciales: iniciales,
+            radio: 24,
+            color: context.ride.success,
+            fondo: context.ride.successSoft,
           ),
           const SizedBox(width: 14),
           Expanded(

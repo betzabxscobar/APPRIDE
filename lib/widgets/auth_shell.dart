@@ -168,7 +168,7 @@ class _MobileHero extends StatelessWidget {
                     const RideWordmark(
                       markSize: 64,
                       fontSize: 27,
-                      color: Colors.white,
+                      color: const Color(0xFFD8F3FF),
                       subtitle: 'Muévete con libertad',
                       subtitleColor: Color(0xFFD5DCE3),
                     ),
@@ -350,7 +350,7 @@ class BrandPanel extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const RideWordmark(color: Colors.white),
+                      const RideWordmark(color: Color(0xFFD8F3FF)),
                       SizedBox(height: (height * 0.1).clamp(32.0, 94.0)),
                       _Headline(size: headline),
                       SizedBox(height: compactHeight ? 14 : 25),
@@ -390,7 +390,7 @@ class _Headline extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = AppTheme.display(
       size,
-      color: Colors.white,
+      color: const Color(0xFFD8F3FF),
       letterSpacing: -3,
       height: 1.02,
     );

@@ -48,22 +48,41 @@ class UserAvatar extends StatelessWidget {
       ),
     );
 
-    return CircleAvatar(
-      radius: radio,
-      backgroundColor: fondo ?? tinta.withValues(alpha: ride.isDark ? 0.22 : 0.14),
-      child: url == null || url.isEmpty
-          ? texto
-          : ClipOval(
-              child: Image.network(
-                url,
-                width: radio * 2,
-                height: radio * 2,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => texto,
-                loadingBuilder: (context, hijo, progreso) =>
-                    progreso == null ? hijo : texto,
+    return SizedBox.square(
+      dimension: radio * 2,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          CircleAvatar(
+            radius: radio,
+            backgroundColor:
+                fondo ?? tinta.withValues(alpha: ride.isDark ? 0.22 : 0.14),
+            child: url == null || url.isEmpty
+                ? texto
+                : ClipOval(
+                    child: Image.network(
+                      url,
+                      width: radio * 2,
+                      height: radio * 2,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => texto,
+                      loadingBuilder: (context, hijo, progreso) =>
+                          progreso == null ? hijo : texto,
+                    ),
+                  ),
+          ),
+          const IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.fromBorderSide(
+                  BorderSide(color: Color(0xFFB0BEC5), width: 2),
+                ),
               ),
             ),
+          ),
+        ],
+      ),
     );
   }
 }

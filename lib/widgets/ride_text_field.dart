@@ -51,7 +51,7 @@ class RideTextField extends StatelessWidget {
         enabled: enabled,
         autofillHints: autofillHints,
         onFieldSubmitted: onSubmitted,
-        style: TextStyle(fontSize: AppText.body, color: context.ride.ink),
+        style: const TextStyle(fontSize: AppText.body, color: Colors.black),
         decoration: InputDecoration(hintText: hint),
       ),
     );
@@ -102,7 +102,7 @@ class _RidePasswordFieldState extends State<RidePasswordField> {
         textInputAction: widget.textInputAction,
         onFieldSubmitted: widget.onSubmitted,
         autofillHints: widget.autofillHints,
-        style: TextStyle(fontSize: AppText.body, color: ride.ink),
+        style: const TextStyle(fontSize: AppText.body, color: Colors.black),
         decoration: InputDecoration(
           hintText: widget.hint,
           // Un icono con área de toque propia en vez del "Ver" de 10 px que

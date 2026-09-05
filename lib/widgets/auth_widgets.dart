@@ -186,6 +186,8 @@ class PrimaryAction extends StatelessWidget {
     final ride = context.ride;
     final enabled = onPressed != null && !loading;
     final radius = BorderRadius.circular(AppTheme.radiusAction);
+    final defaultForeground =
+        ride.isDark ? const Color(0xFFD8F3FF) : Colors.white;
 
     return Opacity(
       opacity: enabled ? 1 : 0.55,
@@ -225,7 +227,7 @@ class PrimaryAction extends StatelessWidget {
                       style: TextStyle(
                         fontSize: AppText.body,
                         fontWeight: FontWeight.w800,
-                        color: foregroundColor ?? Colors.white,
+                        color: foregroundColor ?? defaultForeground,
                       ),
                     ),
                     Align(
@@ -236,7 +238,7 @@ class PrimaryAction extends StatelessWidget {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.4,
-                                color: foregroundColor ?? Colors.white,
+                                color: foregroundColor ?? defaultForeground,
                               ),
                             )
                           : showArrow
@@ -245,7 +247,7 @@ class PrimaryAction extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 19,
                                 fontWeight: FontWeight.w800,
-                                color: foregroundColor ?? Colors.white,
+                                color: foregroundColor ?? defaultForeground,
                               ),
                             )
                           : const SizedBox.shrink(),

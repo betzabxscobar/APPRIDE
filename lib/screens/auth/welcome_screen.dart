@@ -30,7 +30,7 @@ class WelcomeBox extends StatelessWidget {
           child: RideWordmark(
             markSize: compact ? 56 : 64,
             fontSize: compact ? 24 : 27,
-            color: Colors.white,
+            color: Color(0xFFD8F3FF),
             subtitle: 'Muévete con libertad',
             subtitleColor: const Color(0xFFD5DCE3),
           ),

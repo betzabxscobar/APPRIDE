@@ -47,7 +47,7 @@ class PanelSwitcher extends StatelessWidget {
               fontSize: AppText.micro,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.4,
-              color: context.ride.inkMuted,
+              color: const Color(0xFF78909C),
             ),
           ),
         ),
@@ -106,8 +106,8 @@ class _PanelOptionState extends State<_PanelOption> {
     // blanco. Sobre el tema oscuro deslumbran, así que allí el resaltado se
     // hace con el propio acento a baja opacidad.
     final fondoSeleccion = ride.isDark
-        ? widget.view.accent.withValues(alpha: 0.18)
-        : widget.view.accentSoft;
+        ? widget.view.accent.withValues(alpha: widget.selected ? 0.20 : 0.12)
+        : widget.view.accent.withValues(alpha: widget.selected ? 0.16 : 0.09);
 
     return MouseRegion(
       cursor: widget.onTap == null
@@ -116,7 +116,7 @@ class _PanelOptionState extends State<_PanelOption> {
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: Material(
-        color: widget.selected ? fondoSeleccion : ride.surfaceAlt,
+        color: fondoSeleccion,
         borderRadius: radius,
         child: InkWell(
           onTap: widget.onTap,
@@ -128,7 +128,7 @@ class _PanelOptionState extends State<_PanelOption> {
             decoration: BoxDecoration(
               borderRadius: radius,
               border: Border.all(
-                color: widget.selected ? widget.view.accent : ride.border,
+                color: widget.view.accent,
                 width: widget.selected ? 1.8 : 1.4,
               ),
             ),

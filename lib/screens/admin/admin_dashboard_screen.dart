@@ -6,6 +6,7 @@ import '../../models/app_user.dart';
 import '../../models/user_role.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/panel_switcher.dart';
+import '../../widgets/ride_logo.dart';
 import '../../widgets/user_avatar.dart';
 import '../settings/settings_screen.dart';
 import 'admin_fares_panel.dart';
@@ -221,10 +222,9 @@ class _AdminDrawer extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.local_taxi_rounded,
-                    size: 42,
-                    color: context.ride.accent,
+                  Transform.translate(
+                    offset: const Offset(0, 12),
+                    child: const RideMark(size: 42),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -259,9 +259,7 @@ class _AdminDrawer extends StatelessWidget {
               child: ColoredBox(
                 // Solo la zona de navegación se tiñe de celeste. El resto
                 // del drawer mantiene la superficie normal del tema.
-                color: context.ride.isDark
-                    ? context.ride.surfaceAlt
-                    : const Color(0xFFDDF3FF),
+                color: context.ride.surface,
                 child: ListView(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   children: [
@@ -765,17 +763,12 @@ class _UserRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 19,
-            backgroundColor: user.role.accentSoft,
-            child: Text(
-              user.initials,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: user.role.accent,
-              ),
-            ),
+          UserAvatar(
+            iniciales: user.initials,
+            fotoUrl: user.fotoUrl,
+            radio: 19,
+            color: user.role.accent,
+            fondo: user.role.accentSoft,
           ),
           const SizedBox(width: 12),
           Expanded(

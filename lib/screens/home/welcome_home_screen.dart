@@ -189,21 +189,21 @@ class _WelcomeContent extends StatelessWidget {
                     icon: Icons.route_outlined,
                     label: compact ? 'Rutas' : 'Rutas claras',
                     backgroundColor: const Color(0xFF29B6F6),
-                    foregroundColor: Colors.white,
+                    foregroundColor: const Color(0xFFD8F3FF),
                     borderColor: Colors.black,
                   ),
                   _Benefit(
                     icon: Icons.shield_outlined,
                     label: compact ? 'Seguro' : 'Viajes seguros',
                     backgroundColor: const Color(0xFF29B6F6),
-                    foregroundColor: Colors.white,
+                    foregroundColor: const Color(0xFFD8F3FF),
                     borderColor: Colors.black,
                   ),
                   _Benefit(
                     icon: Icons.payments_outlined,
                     label: compact ? 'Precio' : 'Precio visible',
                     backgroundColor: const Color(0xFF29B6F6),
-                    foregroundColor: Colors.white,
+                    foregroundColor: const Color(0xFFD8F3FF),
                     borderColor: Colors.black,
                   ),
                 ],
@@ -387,7 +387,7 @@ class _HeroVisualState extends State<_HeroVisual>
                       RideWordmark(
                         markSize: (unit * 0.14).clamp(48.0, 76.0),
                         fontSize: (unit * 0.075).clamp(23.0, 39.0),
-                        color: dark ? Colors.white : ride.ink,
+                        color: dark ? const Color(0xFFD8F3FF) : ride.ink,
                         subtitle: widget.compact ? null : 'Muévete con libertad',
                         subtitleColor: dark
                             ? const Color(0xFFD5DCE3)
