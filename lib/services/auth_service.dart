@@ -83,10 +83,31 @@ class AuthService extends ChangeNotifier {
       _setLoading(false);
     }
 
-    _client.auth.onAuthStateChange.listen((state) {
+    _client.auth.onAuthStateChange.listen((state) async {
       if (state.event == sb.AuthChangeEvent.signedOut) {
-        _olvidarSesion();
+        await _olvidarSesion();
         notifyListeners();
+        return;
+      }
+
+      // Sesión que aparece sin que nadie la haya pedido por aquí: es el enlace
+      // del correo abriendo la app (`ride://login-callback`). Supabase ya
+      // canjeó el código, pero el perfil no lo había leído nadie, así que la
+      // app se quedaba en la pantalla de entrar teniendo la sesión hecha.
+      //
+      // La condición del perfil vacío importa: al entrar con correo y
+      // contraseña, `signIn` ya lo cargó y no hay que volver a pedirlo.
+      final entra = state.event == sb.AuthChangeEvent.signedIn ||
+          state.event == sb.AuthChangeEvent.passwordRecovery;
+
+      if (entra && state.session != null && _currentUser == null) {
+        try {
+          _currentUser = await _loadProfile();
+          notifyListeners();
+        } catch (_) {
+          // Sin red se queda como estaba. La sesión sigue guardada y el
+          // siguiente arranque la recupera.
+        }
       }
     });
   }
