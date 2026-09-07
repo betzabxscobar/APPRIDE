@@ -143,6 +143,7 @@ class AuthService extends ChangeNotifier {
         response = await _client.auth.signUp(
           email: _normalize(email),
           password: password,
+          emailRedirectTo: enlaceDeVuelta,
           data: {
             'full_name': name.trim(),
             'phone': phone.trim(),
@@ -162,6 +163,19 @@ class AuthService extends ChangeNotifier {
       return user;
     });
   }
+
+  /// A dónde vuelve el correo de confirmación y el de contraseña olvidada.
+  ///
+  /// Sin esto Supabase usa la «Site URL» del proyecto, que apunta al servidor
+  /// de desarrollo de la web (`localhost:5173`). En un teléfono eso no existe:
+  /// el enlace del correo abría el navegador y moría en «No se puede acceder a
+  /// este sitio».
+  ///
+  /// El mismo esquema está declarado en `AndroidManifest.xml` y tiene que
+  /// estar dado de alta en Supabase, en Authentication → URL Configuration →
+  /// Redirect URLs. Si falta allí, Supabase lo ignora y vuelve a mandar a la
+  /// Site URL.
+  static const String enlaceDeVuelta = 'ride://login-callback';
 
   /// Primer acceso administrativo: reemplaza la contraseña temporal.
   ///
@@ -222,7 +236,10 @@ class AuthService extends ChangeNotifier {
   Future<void> requestPasswordReset(String email) async {
     _setLoading(true);
     try {
-      await _client.auth.resetPasswordForEmail(_normalize(email));
+      await _client.auth.resetPasswordForEmail(
+        _normalize(email),
+        redirectTo: enlaceDeVuelta,
+      );
     } on sb.AuthException catch (error) {
       throw AuthException(_translate(error.message));
     } finally {

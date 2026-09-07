@@ -29,6 +29,20 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- El enlace que llega por correo al confirmar la cuenta o al
+                 restablecer la contrasena. Sin esto Supabase usa la Site URL
+                 del proyecto, que apunta al servidor de desarrollo de la web
+                 (localhost:5173): en el telefono eso no existe y el correo
+                 terminaba en "No se puede acceder a este sitio".
+
+                 El esquema tiene que estar tambien en Supabase, en
+                 Authentication > URL Configuration > Redirect URLs. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="ride" android:host="login-callback"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
