@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart' show LatLng;
 
 import 'package:ride/core/app_theme.dart';
 import 'package:ride/core/busqueda_config.dart';
+import 'package:ride/core/ride_colors.dart';
 import 'package:ride/core/theme_controller.dart';
 import 'package:ride/models/app_user.dart';
 import 'package:ride/models/fleet.dart';
@@ -1381,6 +1382,25 @@ void main() {
       // almacenamiento local falle.
       ThemeController.instance.cargar();
       expect(ThemeController.instance.mode, ThemeMode.system);
+    });
+
+    test('El modo oscuro usa contraste, no una metáfora de noche', () {
+      expect(ThemeController.icono(ThemeMode.dark), Icons.contrast_outlined);
+      expect(
+        ThemeController.detalle(ThemeMode.dark),
+        contains('contraste adaptado'),
+      );
+    });
+
+    test('Los campos siguen la superficie del tema activo', () {
+      expect(
+        AppTheme.light.inputDecorationTheme.fillColor,
+        RideColors.light.surfaceAlt,
+      );
+      expect(
+        AppTheme.dark.inputDecorationTheme.fillColor,
+        RideColors.dark.surfaceAlt,
+      );
     });
   });
 
