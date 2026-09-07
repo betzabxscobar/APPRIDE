@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/ride_colors.dart';
+import '../../core/validators.dart';
 import '../../models/fleet.dart';
 import '../../models/vehicle_category.dart';
 import '../../services/fleet_service.dart';
@@ -158,15 +159,12 @@ class _FormularioVehiculoState extends State<_FormularioVehiculo> {
               const SizedBox(height: 18),
               RideTextField(
                 label: 'Placa',
-                hint: 'ABC-1234',
+                hint: _categoria == 'moto' ? 'IA-123A' : 'ABC-1234',
                 controller: _placa,
                 enabled: !_guardando,
                 textCapitalization: TextCapitalization.characters,
-                validator: (v) {
-                  final t = (v ?? '').trim();
-                  if (t.length < 5) return 'Placa incompleta';
-                  return null;
-                },
+                // El formato depende del tipo: una moto no lleva placa de auto.
+                validator: (v) => Validators.plateFor(v, _categoria),
               ),
               const SizedBox(height: 14),
               Row(
