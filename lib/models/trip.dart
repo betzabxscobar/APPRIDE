@@ -185,6 +185,10 @@ class Trip {
     this.canceladoPor,
     this.motivoCancelacion,
     this.multa = 0,
+    this.ganaConductor,
+    this.distanciaKm,
+    this.minutosEstimados,
+    this.zonaOrigen,
   });
 
   final String id;
@@ -265,6 +269,24 @@ class Trip {
   /// Este viaje acabó con una multa encima.
   bool get tieneMulta => multa > 0;
 
+  /// Lo que se lleva el chofer, ya descontada la comisión.
+  ///
+  /// Lo calcula el servidor con el porcentaje de la tarifa de ESTE viaje. Aquí
+  /// no se multiplica nada: si la app inventara el reparto, un cambio de
+  /// tarifa dejaría al chofer viendo una cifra que no es la que va a cobrar.
+  final double? ganaConductor;
+
+  /// Línea recta entre origen y destino, y los minutos que salen de ella a la
+  /// velocidad media de la ciudad.
+  ///
+  /// **No es la ruta.** Sirve para hacerse una idea antes de aceptar; el
+  /// recorrido real casi siempre es mayor.
+  final double? distanciaKm;
+  final int? minutosEstimados;
+
+  /// La zona de la que sale el viaje, o `null` si el origen cae fuera de todas.
+  final String? zonaOrigen;
+
   /// El cobro está cerrado.
   bool get pagoConfirmado => pagoEstado == 'completado';
 
@@ -327,6 +349,10 @@ class Trip {
         'cancelado_por': canceladoPor,
         'motivo_cancelacion': motivoCancelacion,
         'multa': multa,
+        'gana_conductor': ganaConductor,
+        'distancia_km': distanciaKm,
+        'minutos_estimados': minutosEstimados,
+        'zona_origen': zonaOrigen,
       };
 
   static double? _double(dynamic v) => v == null ? null : (v as num).toDouble();
@@ -372,5 +398,9 @@ class Trip {
         canceladoPor: row['cancelado_por'] as String?,
         motivoCancelacion: row['motivo_cancelacion'] as String?,
         multa: _double(row['multa']) ?? 0,
+        ganaConductor: _double(row['gana_conductor']),
+        distanciaKm: _double(row['distancia_km']),
+        minutosEstimados: (row['minutos_estimados'] as num?)?.toInt(),
+        zonaOrigen: row['zona_origen'] as String?,
       );
 }

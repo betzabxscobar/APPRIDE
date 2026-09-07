@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+import '../models/fleet.dart';
 import '../models/trip.dart';
 import '../models/vehicle_category.dart';
 import 'auth_service.dart';
@@ -34,7 +35,8 @@ class RideService {
     categoria, categoria_nombre, categoria_icono,
     pago_estado, monto_cobrado,
     llegada_verificada, desvio_detectado, distancia_recorrida_km,
-    cancelado_por, motivo_cancelacion, multa
+    cancelado_por, motivo_cancelacion, multa,
+    gana_conductor, distancia_km, minutos_estimados, zona_origen
   ''';
 
   // ---------------------------------------------------------------------------
@@ -360,6 +362,25 @@ class RideService {
   /// entra también la comisión de la app como deuda del chofer.
   Future<void> confirmarPagoRecibido(String viajeId) =>
       _rpc<void>('confirmar_pago_recibido', {'p_viaje_id': viajeId});
+
+  // ---------------------------------------------------------------------------
+  // Zonas de trabajo
+  // ---------------------------------------------------------------------------
+
+  /// Las zonas disponibles, marcando cuáles trabaja este chofer.
+  Future<List<WorkZone>> misZonas() async {
+    final filas = await _client.rpc('mis_zonas') as List<dynamic>;
+    return filas
+        .map((f) => WorkZone.fromMap(Map<String, dynamic>.from(f as Map)))
+        .toList();
+  }
+
+  /// Reemplaza las zonas del chofer por las que le pases.
+  ///
+  /// Una lista vacía lo deja sin zonas, que **no** es quedarse sin trabajo:
+  /// sin zonas marcadas recibe como antes, sin filtro. La zona se activa.
+  Future<void> elegirMisZonas(List<String> zonas) =>
+      _rpc<int>('elegir_mis_zonas', {'p_zonas': zonas});
 
   /// Reporta dónde está el chofer.
   ///

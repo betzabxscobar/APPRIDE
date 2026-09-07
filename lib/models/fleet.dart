@@ -635,3 +635,29 @@ class BankAccount {
         predeterminada: row['predeterminada'] as bool? ?? false,
       );
 }
+
+/// Una zona de trabajo, del catálogo `public.zonas`.
+///
+/// Las zonas son polígonos dibujados sobre Quito. El chofer marca en cuáles
+/// trabaja y solo le llegan solicitudes que salen de ellas, y solo mientras él
+/// está dentro.
+class WorkZone {
+  const WorkZone({
+    required this.id,
+    required this.nombre,
+    required this.elegida,
+  });
+
+  final String id;
+  final String nombre;
+  final bool elegida;
+
+  WorkZone copyWith({bool? elegida}) =>
+      WorkZone(id: id, nombre: nombre, elegida: elegida ?? this.elegida);
+
+  factory WorkZone.fromMap(Map<String, dynamic> row) => WorkZone(
+        id: row['id'] as String,
+        nombre: row['nombre'] as String,
+        elegida: row['elegida'] as bool? ?? false,
+      );
+}
