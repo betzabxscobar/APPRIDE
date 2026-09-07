@@ -31,7 +31,10 @@ class RideService {
     vehiculo_placa, vehiculo_marca, vehiculo_modelo, vehiculo_color,
     origen_lat, origen_lng, origen_texto, origen_referencia,
     destino_lat, destino_lng, destino_texto, destino_referencia,
-    categoria, categoria_nombre, categoria_icono
+    categoria, categoria_nombre, categoria_icono,
+    pago_estado, monto_cobrado,
+    llegada_verificada, desvio_detectado, distancia_recorrida_km,
+    cancelado_por, motivo_cancelacion
   ''';
 
   // ---------------------------------------------------------------------------
@@ -336,8 +339,24 @@ class RideService {
     return total.toDouble();
   }
 
-  Future<void> cancelar(String viajeId) =>
-      _rpc<void>('cancelar_viaje', {'p_viaje_id': viajeId});
+  /// Cancela el viaje y deja constancia de quién lo hizo.
+  ///
+  /// La base rechaza cancelar un viaje `EN_CURSO`: con la persona a bordo el
+  /// viaje termina en `FINALIZADO` o no termina. El [motivo] es opcional y
+  /// queda guardado para cuando haya que resolver un reclamo.
+  Future<void> cancelar(String viajeId, {String? motivo}) =>
+      _rpc<void>('cancelar_viaje', {
+        'p_viaje_id': viajeId,
+        'p_motivo': motivo,
+      });
+
+  /// El chofer confirma que recibió el efectivo del pasajero.
+  ///
+  /// Hasta que lo confirme, el cobro queda `pendiente`: nadie más puede saber
+  /// si el pasajero pagó. Con la confirmación entra también la comisión de la
+  /// app como deuda del chofer.
+  Future<void> confirmarPagoEfectivo(String viajeId) =>
+      _rpc<void>('confirmar_pago_efectivo', {'p_viaje_id': viajeId});
 
   /// Reporta dónde está el chofer.
   ///

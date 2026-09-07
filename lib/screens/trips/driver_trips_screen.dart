@@ -230,13 +230,20 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
   }
 
   Future<void> _finalizar(Trip viaje) async {
+    var cerrado = false;
     await _accion(() async {
       final total = await RideService.instance.finalizar(viaje.id);
+      cerrado = true;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Viaje cerrado. Total \$${total.toStringAsFixed(2)}')),
       );
     });
+
+    // El cobro nace pendiente, el efectivo tambien. Este es el momento en que
+    // el chofer tiene al pasajero delante: si no se le pregunta aqui, nadie
+    // vuelve a saber si el dinero entro.
+    if (cerrado && mounted) await _confirmarCobro(viaje);
 
     // Calificar al pasajero, una sola vez.
     if (!_calificacionOfrecida && mounted) {
@@ -252,6 +259,48 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
         );
       }
     }
+  }
+
+  /// Le pregunta al chofer si recibio el dinero, y solo si el cobro quedo
+  /// pendiente.
+  ///
+  /// Un viaje pagado por la pasarela no se pregunta: ese lo confirma DeUna.
+  Future<void> _confirmarCobro(Trip viaje) async {
+    final Trip? cerrado;
+    try {
+      cerrado = await RideService.instance.porId(viaje.id);
+    } catch (_) {
+      return; // Sin conexion no se insiste: queda pendiente y se ve luego.
+    }
+    if (!mounted || cerrado == null || !cerrado.pagoPendiente) return;
+
+    final recibido = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Recibiste el pago?'),
+        content: Text(
+          'Son \$${cerrado!.montoVigente.toStringAsFixed(2)} en efectivo. '
+          'Confirma solo si ya tienes el dinero: de aqui sale la comision '
+          'que le debes a la app.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Todavia no'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Si, recibi'),
+          ),
+        ],
+      ),
+    );
+
+    if (recibido != true) return;
+
+    await _accion(
+      () => RideService.instance.confirmarPagoEfectivo(viaje.id),
+    );
   }
 
   @override
@@ -285,7 +334,10 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
                       onAvanzar: () => _avanzar(_activo!),
                       onFinalizar: () => _finalizar(_activo!),
                       onCancelar: () => _accion(
-                        () => RideService.instance.cancelar(_activo!.id),
+                        () => RideService.instance.cancelar(
+                          _activo!.id,
+                          motivo: 'Cancelado por el chofer',
+                        ),
                       ),
                     )
                   else

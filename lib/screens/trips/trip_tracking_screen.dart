@@ -201,7 +201,10 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
       _error = null;
     });
     try {
-      await RideService.instance.cancelar(widget.viajeId);
+      await RideService.instance.cancelar(
+        widget.viajeId,
+        motivo: 'Cancelado por el pasajero',
+      );
       await _cargar();
     } on RideException catch (e) {
       if (!mounted) return;

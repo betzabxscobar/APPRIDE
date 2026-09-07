@@ -169,6 +169,13 @@ class Trip {
     this.origenLng,
     this.destinoLat,
     this.destinoLng,
+    this.pagoEstado,
+    this.montoCobrado = 0,
+    this.llegadaVerificada,
+    this.desvioDetectado,
+    this.distanciaRecorridaKm,
+    this.canceladoPor,
+    this.motivoCancelacion,
   });
 
   final String id;
@@ -216,6 +223,38 @@ class Trip {
   final double? origenLng;
   final double? destinoLat;
   final double? destinoLng;
+
+  /// Cómo va el cobro: `completado`, `pendiente`, `fallido`, o null si el
+  /// viaje todavía no generó ninguno.
+  ///
+  /// El efectivo también nace `pendiente`: hasta que el chofer confirme que
+  /// recibió el dinero, nadie puede afirmar que el pasajero pagó.
+  final String? pagoEstado;
+
+  /// Lo que se ha cobrado de verdad, ya descontados los reembolsos.
+  final double montoCobrado;
+
+  /// El chofer cerró el viaje junto al destino.
+  ///
+  /// `null` significa que no se pudo comprobar —no hubo rastro GPS—, no que
+  /// esté bien. Esos viajes los revisa administración a mano.
+  final bool? llegadaVerificada;
+
+  /// El recorrido se pasó de largo respecto a la línea recta origen-destino.
+  final bool? desvioDetectado;
+
+  /// Kilómetros que sumó el rastro del chofer durante el viaje.
+  final double? distanciaRecorridaKm;
+
+  /// Quién canceló, y por qué. Para resolver reclamos.
+  final String? canceladoPor;
+  final String? motivoCancelacion;
+
+  /// El cobro está cerrado.
+  bool get pagoConfirmado => pagoEstado == 'completado';
+
+  /// Hay un cobro esperando que alguien confirme que entró el dinero.
+  bool get pagoPendiente => pagoEstado == 'pendiente';
 
   /// Lo que se cobra: el definitivo si ya cerró, si no la cotización.
   double get montoVigente => tarifaFinal ?? tarifaEstimada;
@@ -265,6 +304,13 @@ class Trip {
         'origen_lng': origenLng,
         'destino_lat': destinoLat,
         'destino_lng': destinoLng,
+        'pago_estado': pagoEstado,
+        'monto_cobrado': montoCobrado,
+        'llegada_verificada': llegadaVerificada,
+        'desvio_detectado': desvioDetectado,
+        'distancia_recorrida_km': distanciaRecorridaKm,
+        'cancelado_por': canceladoPor,
+        'motivo_cancelacion': motivoCancelacion,
       };
 
   static double? _double(dynamic v) => v == null ? null : (v as num).toDouble();
@@ -302,5 +348,12 @@ class Trip {
         origenLng: _double(row['origen_lng']),
         destinoLat: _double(row['destino_lat']),
         destinoLng: _double(row['destino_lng']),
+        pagoEstado: row['pago_estado'] as String?,
+        montoCobrado: _double(row['monto_cobrado']) ?? 0,
+        llegadaVerificada: row['llegada_verificada'] as bool?,
+        desvioDetectado: row['desvio_detectado'] as bool?,
+        distanciaRecorridaKm: _double(row['distancia_recorrida_km']),
+        canceladoPor: row['cancelado_por'] as String?,
+        motivoCancelacion: row['motivo_cancelacion'] as String?,
       );
 }
