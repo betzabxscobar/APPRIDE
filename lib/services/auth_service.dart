@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../models/app_user.dart';
+import 'push_service.dart';
 import 'trip_session_store.dart';
 import '../models/user_role.dart';
 import '../models/vehicle.dart';
@@ -748,6 +750,35 @@ class AuthService extends ChangeNotifier {
       mustChangePassword: (row['must_change_password'] as bool?) ?? false,
       createdAt: createdAt == null ? null : DateTime.tryParse(createdAt),
     );
+  }
+
+  /// A quién se le están escuchando los avisos ahora mismo.
+  String? _avisandoA;
+
+  /// Engancha y desengancha los avisos del teléfono según quién tenga la
+  /// sesión.
+  ///
+  /// Va aquí, colgado de `notifyListeners`, y no repartido por los once sitios
+  /// donde se asigna el usuario: uno de esos sitios se olvida tarde o temprano
+  /// y el chofer se queda sin avisos sin que nadie sepa por qué.
+  void _sincronizarAvisos() {
+    final id = _currentUser?.id;
+    if (id == _avisandoA) return;
+    _avisandoA = id;
+
+    if (id == null) {
+      unawaited(PushService.instance.dejarDeEscuchar());
+    } else {
+      // Sin `await`: que el aviso tarde en engancharse no puede frenar la
+      // pantalla, y si falla se reintenta al siguiente cambio de sesión.
+      unawaited(PushService.instance.escuchar(id));
+    }
+  }
+
+  @override
+  void notifyListeners() {
+    _sincronizarAvisos();
+    super.notifyListeners();
   }
 
   Future<AppUser> _run(Future<AppUser> Function() action) async {

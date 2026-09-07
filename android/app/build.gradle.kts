@@ -11,6 +11,11 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // Lo pide `flutter_local_notifications`: usa clases de fecha y hora de
+        // Java 8 que no existen en los Android viejos, y el desugaring las
+        // traduce al compilar. Sin esto la compilacion falla en
+        // checkReleaseAarMetadata.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -37,6 +42,10 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 flutter {

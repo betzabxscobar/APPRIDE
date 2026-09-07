@@ -4,6 +4,9 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Avisos de viaje. Desde Android 13 hay que pedirlo en marcha, no basta
+         con declararlo: lo hace PushService al iniciar sesion. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="ride"
         android:name="${applicationName}"
