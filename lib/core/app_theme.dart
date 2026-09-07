@@ -48,6 +48,14 @@ abstract final class AppText {
 }
 
 abstract final class AppTheme {
+  /// Escala de espaciado compartida por todos los paneles.
+  static const double spaceXs = 8;
+  static const double spaceSm = 12;
+  static const double spaceMd = 16;
+  static const double spaceLg = 24;
+  static const double spaceXl = 32;
+
+  static const double radiusSmall = 12;
   static const double radius = 18;
   static const double radiusLarge = 24;
 
@@ -137,12 +145,13 @@ abstract final class AppTheme {
       iconTheme: IconThemeData(color: ride.inkMuted, size: 24),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: ride.isDark
-            ? const Color(0xFF1C5874)
-            : const Color(0xFFE3F6FF),
+        fillColor: ride.surfaceAlt,
         // 18 px de alto interior dejan el campo en ~56: el mínimo cómodo para
         // tocar sin fallar.
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 18,
+        ),
         hintStyle: TextStyle(color: ride.inkFaint, fontSize: AppText.body),
         border: _inputBorder(ride.border),
         enabledBorder: _inputBorder(ride.border),
@@ -228,7 +237,9 @@ abstract final class AppTheme {
         surfaceTintColor: Colors.transparent,
         dragHandleColor: ride.borderStrong,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(radiusSheet)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(radiusSheet),
+          ),
         ),
       ),
       dividerTheme: DividerThemeData(color: ride.border, space: 1),
@@ -246,7 +257,9 @@ abstract final class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: ride.isDark ? ride.surfaceAlt : const Color(0xFF13293D),
+        backgroundColor: ride.isDark
+            ? ride.surfaceAlt
+            : const Color(0xFF13293D),
         contentTextStyle: const TextStyle(
           fontFamily: AppFonts.body,
           fontSize: AppText.small,
@@ -257,6 +270,70 @@ abstract final class AppTheme {
         ),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(color: ride.accent),
+      cardTheme: CardThemeData(
+        color: ride.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
+          side: BorderSide(color: ride.border),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: ride.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        titleTextStyle: display(AppText.h2, color: ride.ink),
+        contentTextStyle: TextStyle(
+          fontFamily: AppFonts.body,
+          fontSize: AppText.small,
+          height: 1.5,
+          color: ride.inkMuted,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusLarge),
+          side: BorderSide(color: ride.border),
+        ),
+      ),
+      chipTheme: base.chipTheme.copyWith(
+        backgroundColor: ride.surfaceAlt,
+        selectedColor: ride.accentSoft,
+        side: BorderSide(color: ride.border),
+        labelStyle: TextStyle(
+          color: ride.ink,
+          fontFamily: AppFonts.body,
+          fontSize: AppText.label,
+          fontWeight: FontWeight.w700,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusSmall),
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: spaceMd,
+          vertical: spaceXs / 2,
+        ),
+        iconColor: ride.accent,
+        textColor: ride.ink,
+        subtitleTextStyle: TextStyle(
+          color: ride.inkMuted,
+          fontSize: AppText.small,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusSmall),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          foregroundColor: ride.inkMuted,
+          minimumSize: const Size(48, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusSmall),
+          ),
+        ),
+      ),
     );
   }
 

@@ -71,12 +71,12 @@ class UserAvatar extends StatelessWidget {
                     ),
                   ),
           ),
-          const IgnorePointer(
+          IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.fromBorderSide(
-                  BorderSide(color: Color(0xFFB0BEC5), width: 2),
+                  BorderSide(color: ride.borderStrong, width: 1.5),
                 ),
               ),
             ),

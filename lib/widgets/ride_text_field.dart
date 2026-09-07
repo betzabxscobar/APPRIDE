@@ -51,7 +51,7 @@ class RideTextField extends StatelessWidget {
         enabled: enabled,
         autofillHints: autofillHints,
         onFieldSubmitted: onSubmitted,
-        style: const TextStyle(fontSize: AppText.body, color: Colors.black),
+        style: TextStyle(fontSize: AppText.body, color: context.ride.ink),
         decoration: InputDecoration(hintText: hint),
       ),
     );
@@ -102,7 +102,7 @@ class _RidePasswordFieldState extends State<RidePasswordField> {
         textInputAction: widget.textInputAction,
         onFieldSubmitted: widget.onSubmitted,
         autofillHints: widget.autofillHints,
-        style: const TextStyle(fontSize: AppText.body, color: Colors.black),
+        style: TextStyle(fontSize: AppText.body, color: ride.ink),
         decoration: InputDecoration(
           hintText: widget.hint,
           // Un icono con área de toque propia en vez del "Ver" de 10 px que
@@ -113,7 +113,9 @@ class _RidePasswordFieldState extends State<RidePasswordField> {
             color: ride.inkMuted,
             tooltip: _obscure ? 'Ver contraseña' : 'Ocultar contraseña',
             icon: Icon(
-              _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              _obscure
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
             ),
           ),
         ),
