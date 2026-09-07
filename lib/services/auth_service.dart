@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../models/app_user.dart';
+import 'push_service.dart';
 import 'trip_session_store.dart';
 import '../models/user_role.dart';
 import '../models/vehicle.dart';
@@ -33,6 +35,10 @@ class AuthService extends ChangeNotifier {
 
   /// Longitud mínima de la contraseña definitiva de una cuenta administrativa.
   static const int adminPasswordMinLength = 10;
+
+  /// Mínimo para una cuenta normal. El mismo que exige `/api/register` en
+  /// WEB-RIDE y el que valida `Validators.password`.
+  static const int passwordMinLength = 8;
 
   static const String _profileColumns =
       'id, email, full_name, phone, role, foto_url, must_change_password, '
@@ -83,10 +89,36 @@ class AuthService extends ChangeNotifier {
       _setLoading(false);
     }
 
-    _client.auth.onAuthStateChange.listen((state) {
+    _client.auth.onAuthStateChange.listen((state) async {
       if (state.event == sb.AuthChangeEvent.signedOut) {
-        _olvidarSesion();
+        await _olvidarSesion();
         notifyListeners();
+        return;
+      }
+
+      // Sesión que aparece sin que nadie la haya pedido por aquí: es el enlace
+      // del correo abriendo la app (`ride://login-callback`). Supabase ya
+      // canjeó el código, pero el perfil no lo había leído nadie, así que la
+      // app se quedaba en la pantalla de entrar teniendo la sesión hecha.
+      //
+      // La condición del perfil vacío importa: al entrar con correo y
+      // contraseña, `signIn` ya lo cargó y no hay que volver a pedirlo.
+      if (state.event == sb.AuthChangeEvent.passwordRecovery) {
+        _recuperandoContrasena = true;
+        notifyListeners();
+      }
+
+      final entra = state.event == sb.AuthChangeEvent.signedIn ||
+          state.event == sb.AuthChangeEvent.passwordRecovery;
+
+      if (entra && state.session != null && _currentUser == null) {
+        try {
+          _currentUser = await _loadProfile();
+          notifyListeners();
+        } catch (_) {
+          // Sin red se queda como estaba. La sesión sigue guardada y el
+          // siguiente arranque la recupera.
+        }
       }
     });
   }
@@ -143,6 +175,7 @@ class AuthService extends ChangeNotifier {
         response = await _client.auth.signUp(
           email: _normalize(email),
           password: password,
+          emailRedirectTo: enlaceDeVuelta,
           data: {
             'full_name': name.trim(),
             'phone': phone.trim(),
@@ -162,6 +195,19 @@ class AuthService extends ChangeNotifier {
       return user;
     });
   }
+
+  /// A dónde vuelve el correo de confirmación y el de contraseña olvidada.
+  ///
+  /// Sin esto Supabase usa la «Site URL» del proyecto, que apunta al servidor
+  /// de desarrollo de la web (`localhost:5173`). En un teléfono eso no existe:
+  /// el enlace del correo abría el navegador y moría en «No se puede acceder a
+  /// este sitio».
+  ///
+  /// El mismo esquema está declarado en `AndroidManifest.xml` y tiene que
+  /// estar dado de alta en Supabase, en Authentication → URL Configuration →
+  /// Redirect URLs. Si falta allí, Supabase lo ignora y vuelve a mandar a la
+  /// Site URL.
+  static const String enlaceDeVuelta = 'ride://login-callback';
 
   /// Primer acceso administrativo: reemplaza la contraseña temporal.
   ///
@@ -210,6 +256,68 @@ class AuthService extends ChangeNotifier {
     });
   }
 
+  /// Convierte una cuenta de pasajero en cuenta de chofer.
+  ///
+  /// No crea una cuenta nueva: es la misma, con su correo, su teléfono y su
+  /// historial. Eso importa porque `profiles` tiene el teléfono con índice
+  /// único, así que abrir otra cuenta obligaba a inventarse un número.
+  ///
+  /// **No le da ningún permiso.** Entra en `conductores` como 'pendiente' y no
+  /// puede aprobarse solo: hasta que administración revise sus papeles no
+  /// puede conectarse ni recibir solicitudes. Lo único que cambia de
+  /// inmediato es la pantalla que ve y el poder subir sus documentos.
+  ///
+  /// La base lo rechaza si tiene un viaje pedido o en marcha: cambiarle la
+  /// pantalla debajo de los pies dejaría ese viaje huérfano.
+  Future<AppUser> convertirmeEnChofer() async {
+    return _run(() async {
+      await _client.rpc('quiero_ser_chofer');
+      // El rol lo decide el servidor, así que el perfil se vuelve a leer en
+      // vez de darlo por cambiado aquí.
+      final user = await _loadProfile();
+      _currentUser = user;
+      _activeView = null;
+      notifyListeners();
+      return user;
+    });
+  }
+
+  /// Pone la contraseña nueva de quien llegó por el enlace de recuperación.
+  ///
+  /// A diferencia de [cambiarContrasena], aquí **no** se pide la actual: quien
+  /// entra por este camino no la sabe, que es justamente el motivo. Lo que
+  /// autoriza el cambio es la sesión que creó el enlace del correo.
+  Future<void> establecerContrasenaNueva(String password) async {
+    if (_client.auth.currentSession == null) {
+      throw const AuthException(
+        'El enlace caducó. Pide otro correo para restablecerla.',
+      );
+    }
+    if (password.length < passwordMinLength) {
+      throw const AuthException(
+        'Usa al menos $passwordMinLength caracteres',
+      );
+    }
+
+    _setLoading(true);
+    try {
+      try {
+        await _client.auth.updateUser(sb.UserAttributes(password: password));
+      } on sb.AuthException catch (error) {
+        throw AuthException(_translate(error.message));
+      }
+
+      _recuperandoContrasena = false;
+
+      // El perfil puede no estar cargado: al abrir la app desde el enlace, la
+      // sesión llega antes de que nadie haya leído `profiles`.
+      _currentUser ??= await _loadProfile();
+      notifyListeners();
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   /// Pide el correo con el enlace para restablecer la contraseña.
   ///
   /// No revela si el correo existe: Supabase responde igual en ambos casos y
@@ -222,7 +330,10 @@ class AuthService extends ChangeNotifier {
   Future<void> requestPasswordReset(String email) async {
     _setLoading(true);
     try {
-      await _client.auth.resetPasswordForEmail(_normalize(email));
+      await _client.auth.resetPasswordForEmail(
+        _normalize(email),
+        redirectTo: enlaceDeVuelta,
+      );
     } on sb.AuthException catch (error) {
       throw AuthException(_translate(error.message));
     } finally {
@@ -414,7 +525,8 @@ class AuthService extends ChangeNotifier {
       if (user == null) throw const AuthException('Debes iniciar sesión');
 
       // Las cuentas administrativas tienen su propio mínimo, más largo.
-      final minimo = user.role.isAdministrative ? adminPasswordMinLength : 8;
+      final minimo =
+          user.role.isAdministrative ? adminPasswordMinLength : passwordMinLength;
       if (nueva.length < minimo) {
         throw AuthException(
           'La contraseña debe tener mínimo $minimo caracteres',
@@ -514,6 +626,7 @@ class AuthService extends ChangeNotifier {
   Future<void> _olvidarSesion() async {
     _currentUser = null;
     _activeView = null;
+    _recuperandoContrasena = false;
     await TripSessionStore.instance.limpiar();
   }
 
@@ -529,6 +642,15 @@ class AuthService extends ChangeNotifier {
   // de pasajero sigue siendo admin para la base de datos; ve la interfaz con
   // sus propios datos, no con los de otra persona.
   // ---------------------------------------------------------------------------
+
+  /// La sesión entró por un enlace de «olvidé mi contraseña».
+  ///
+  /// Mientras esté puesta, la app enseña la pantalla de poner clave nueva y
+  /// nada más. A quien llega por aquí no se le puede dejar pasar sin más:
+  /// entró sin escribir ninguna contraseña, así que hasta que ponga una la
+  /// cuenta sigue abierta para cualquiera que tenga ese correo delante.
+  bool _recuperandoContrasena = false;
+  bool get recuperandoContrasena => _recuperandoContrasena;
 
   UserRole? _activeView;
 
@@ -551,7 +673,7 @@ class AuthService extends ChangeNotifier {
     final user = _currentUser;
     if (user == null) return const [];
 
-    return user.role.viewsAllowed(hasVehicle: user.vehicle != null);
+    return user.role.viewsAllowed();
   }
 
   /// Cambia la pantalla activa dentro de lo que permite el rol real.
@@ -569,11 +691,11 @@ class AuthService extends ChangeNotifier {
       );
     }
 
-    if (view.isDriver && !user.role.isAdministrative && user.vehicle == null) {
-      throw const AuthException(
-        'Para conducir necesitas registrar tu vehículo primero',
-      );
-    }
+    // Aqui vivia una comprobacion de vehiculo que ya no puede llegar: la vista
+    // de chofer solo esta en la lista de `driver`, `admin` y `superadmin`, y a
+    // ninguno de los tres se le exige. A un chofer menos que a nadie, que su
+    // pantalla es donde registra el vehiculo: exigirselo dejaba atrapado en la
+    // vista de pasajero a quien acababa de pasarse a chofer.
 
     _activeView = view == user.role ? null : view;
     notifyListeners();
@@ -628,6 +750,35 @@ class AuthService extends ChangeNotifier {
       mustChangePassword: (row['must_change_password'] as bool?) ?? false,
       createdAt: createdAt == null ? null : DateTime.tryParse(createdAt),
     );
+  }
+
+  /// A quién se le están escuchando los avisos ahora mismo.
+  String? _avisandoA;
+
+  /// Engancha y desengancha los avisos del teléfono según quién tenga la
+  /// sesión.
+  ///
+  /// Va aquí, colgado de `notifyListeners`, y no repartido por los once sitios
+  /// donde se asigna el usuario: uno de esos sitios se olvida tarde o temprano
+  /// y el chofer se queda sin avisos sin que nadie sepa por qué.
+  void _sincronizarAvisos() {
+    final id = _currentUser?.id;
+    if (id == _avisandoA) return;
+    _avisandoA = id;
+
+    if (id == null) {
+      unawaited(PushService.instance.dejarDeEscuchar());
+    } else {
+      // Sin `await`: que el aviso tarde en engancharse no puede frenar la
+      // pantalla, y si falla se reintenta al siguiente cambio de sesión.
+      unawaited(PushService.instance.escuchar(id));
+    }
+  }
+
+  @override
+  void notifyListeners() {
+    _sincronizarAvisos();
+    super.notifyListeners();
   }
 
   Future<AppUser> _run(Future<AppUser> Function() action) async {

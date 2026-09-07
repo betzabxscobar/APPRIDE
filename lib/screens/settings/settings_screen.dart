@@ -7,6 +7,7 @@ import '../../core/app_theme.dart';
 import '../../core/ride_colors.dart';
 import '../../core/theme_controller.dart';
 import '../../models/app_user.dart';
+import '../../models/user_role.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/auth_feedback.dart';
 import '../../widgets/panel_switcher.dart';
@@ -137,6 +138,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  /// Pasa la cuenta de pasajero a cuenta de chofer.
+  ///
+  /// Se avisa antes de qué implica: no es un botón que solo cambia de pantalla.
+  /// Cambia el rol real de la cuenta, así que a partir de ahí ve la app de
+  /// chofer, y para trabajar todavía tiene que subir sus papeles y esperar a
+  /// que administración los apruebe.
+  Future<void> _pasarmeAChofer() async {
+    final ride = context.ride;
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Pasarte a chofer?'),
+        content: const Text(
+          'Tu cuenta pasa a ser de chofer, con el mismo correo y el mismo '
+          'teléfono. Después tendrás que registrar tu vehículo y subir tus '
+          'papeles: no podrás recibir viajes hasta que la administración los '
+          'apruebe.\n\n'
+          'Tus viajes anteriores como pasajero se conservan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Ahora no'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sí, quiero conducir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmado != true || !mounted) return;
+
+    try {
+      await AuthService.instance.convertirmeEnChofer();
+      if (!mounted) return;
+      // Se sale de Configuración: detrás ya no está la pantalla de pasajero.
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Ya eres chofer. Registra tu vehículo y sube tus papeles.',
+          ),
+          backgroundColor: ride.success,
+        ),
+      );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
   Future<void> _cerrarSesion() async {
     final confirmado = await showDialog<bool>(
       context: context,
@@ -234,6 +288,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             detalle: 'Cámbiala cuando quieras',
             onTap: () => _abrir(CambiarContrasenaScreen(user: user)),
           ),
+
+          // Un pasajero no tenia forma de pasarse a chofer: el rol se decidia
+          // al registrarse y para conducir habia que abrir otra cuenta, que
+          // ademas chocaba con el telefono, unico por cuenta.
+          if (user.role == UserRole.passenger) ...[
+            const SizedBox(height: 26),
+            const _Titulo('Conducir con Ride'),
+            const SizedBox(height: 10),
+            _Opcion(
+              icono: Icons.directions_car_outlined,
+              titulo: 'Quiero ser chofer',
+              detalle: 'Usa esta misma cuenta para trabajar conduciendo',
+              onTap: _pasarmeAChofer,
+            ),
+          ],
 
           if (esConductor) ...[
             const SizedBox(height: 26),

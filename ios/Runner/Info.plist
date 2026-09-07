@@ -69,5 +69,22 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- El enlace que llega por correo al confirmar la cuenta o al restablecer
+	     la contrasena. El mismo esquema esta en AndroidManifest.xml y tiene que
+	     estar dado de alta en Supabase, en Authentication > URL Configuration >
+	     Redirect URLs. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>ride-login-callback</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ride</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
