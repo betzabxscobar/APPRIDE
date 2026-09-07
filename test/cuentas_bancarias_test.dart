@@ -25,11 +25,26 @@ void main() {
       expect(banco.assetLogo, 'assets/images/bancos/banco_pichincha.png');
     });
 
+    test('los cuatro bancos del catálogo tienen su logo', () {
+      const bancos = [
+        Bank(id: 'pichincha', nombre: 'Banco Pichincha', logo: 'banco_pichincha'),
+        Bank(id: 'guayaquil', nombre: 'Banco Guayaquil', logo: 'banco_guayaquil'),
+        Bank(id: 'internacional', nombre: 'Banco Internacional', logo: 'banco_internacional'),
+        Bank(id: 'produbanco', nombre: 'Produbanco', logo: 'produbanco'),
+      ];
+      for (final b in bancos) {
+        expect(b.assetLogo, 'assets/images/bancos/${b.logo}.png',
+            reason: '${b.nombre} tiene que apuntar a un asset empaquetado');
+      }
+    });
+
     test('un banco sin logo no tiene ruta y cae a las iniciales', () {
-      const banco = Bank(id: 'guayaquil', nombre: 'Banco Guayaquil', color: '#E30613');
+      // El respaldo sigue existiendo para el próximo banco que se añada al
+      // catálogo antes de conseguir su imagen.
+      const banco = Bank(id: 'otro', nombre: 'Banco Bolivariano', color: '#0033A0');
       expect(banco.assetLogo, isNull,
           reason: 'sin esto la app pediría un asset que no existe');
-      expect(banco.iniciales, 'BG');
+      expect(banco.iniciales, 'BB');
     });
 
     test('las iniciales salen de las dos primeras palabras', () {
@@ -88,13 +103,13 @@ void main() {
 
     test('un banco sin logo llega con null y no rompe la tarjeta', () {
       final cuenta = BankAccount.fromMap(fila({
-        'banco': 'guayaquil',
-        'banco_nombre': 'Banco Guayaquil',
+        'banco': 'otro',
+        'banco_nombre': 'Banco Bolivariano',
         'banco_logo': null,
-        'banco_color': '#E30613',
+        'banco_color': '#0033A0',
       }));
       expect(cuenta.bancoComoCatalogo.assetLogo, isNull);
-      expect(cuenta.bancoComoCatalogo.iniciales, 'BG');
+      expect(cuenta.bancoComoCatalogo.iniciales, 'BB');
     });
   });
 

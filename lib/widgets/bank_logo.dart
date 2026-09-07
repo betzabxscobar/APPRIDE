@@ -12,9 +12,10 @@ import '../models/fleet.dart';
 /// logo es blanco—. Así se ven igual de día y de noche, y de paso todos ocupan
 /// lo mismo y la lista queda alineada.
 ///
-/// Cuando un banco no tiene logo utilizable —hoy, Banco Guayaquil— se dibujan
-/// sus iniciales sobre el color de la marca. Es peor que el logo, pero es
-/// legible y no deja un hueco.
+/// Cuando un banco no tiene logo utilizable se dibujan sus iniciales sobre el
+/// color de la marca. Es peor que el logo, pero es legible y no deja un hueco.
+/// Hoy los cuatro bancos tienen el suyo; el respaldo queda para el siguiente
+/// que se añada al catálogo antes de conseguir su imagen.
 class BankLogo extends StatelessWidget {
   const BankLogo({super.key, required this.banco, this.alto = 34});
 
@@ -24,9 +25,13 @@ class BankLogo extends StatelessWidget {
   /// menos lo que miden los logos horizontales de los cuatro bancos.
   final double alto;
 
-  /// Los logos que vienen en blanco necesitan el color de la marca detrás; el
-  /// resto se leen mejor sobre blanco.
-  static const _logosBlancos = {'banco_internacional'};
+  /// Logos que piden el color de la marca detrás en vez de blanco.
+  ///
+  /// El de Internacional viene en blanco sobre transparente y sobre blanco no
+  /// se vería. El de Guayaquil es un isotipo cuadrado que ya trae su propio
+  /// fondo magenta: pintando la placa del mismo color, el recuadro del logo
+  /// desaparece y queda una sola placa limpia.
+  static const _conColorDeMarca = {'banco_internacional', 'banco_guayaquil'};
 
   @override
   Widget build(BuildContext context) {
@@ -34,8 +39,9 @@ class BankLogo extends StatelessWidget {
     final ancho = alto * 2.6;
     final asset = banco.assetLogo;
     final marca = banco.colorMarca;
-    final esBlanco = banco.logo != null && _logosBlancos.contains(banco.logo);
-    final fondo = esBlanco ? (marca ?? ride.ink) : Colors.white;
+    final usaColorDeMarca =
+        banco.logo != null && _conColorDeMarca.contains(banco.logo);
+    final fondo = usaColorDeMarca ? (marca ?? ride.ink) : Colors.white;
 
     return Container(
       width: ancho,

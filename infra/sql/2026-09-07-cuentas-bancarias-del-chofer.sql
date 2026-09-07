@@ -21,6 +21,7 @@
 -- Va en tabla y no en un `check` para que mañana se añada un banco sin migrar
 -- nada. `logo` es la clave del asset que la app trae empaquetado; si está en
 -- null —o el archivo no existe— la app dibuja las iniciales y no se rompe.
+-- Los colores salen del propio logo, no de una estimación.
 create table if not exists public.bancos (
   id text primary key,
   nombre text not null,
@@ -32,7 +33,7 @@ create table if not exists public.bancos (
 
 insert into public.bancos (id, nombre, logo, color, orden) values
   ('pichincha',     'Banco Pichincha',     'banco_pichincha',     '#FFDD00', 1),
-  ('guayaquil',     'Banco Guayaquil',     null,                  '#E30613', 2),
+  ('guayaquil',     'Banco Guayaquil',     'banco_guayaquil',     '#D2006E', 2),
   ('internacional', 'Banco Internacional', 'banco_internacional', '#F5821F', 3),
   ('produbanco',    'Produbanco',          'produbanco',          '#00713C', 4)
 on conflict (id) do update
