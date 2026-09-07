@@ -199,7 +199,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('¿Cómo quieres continuar?'), findsOneWidget);
+      expect(find.text('¿Cómo quieres'), findsOneWidget);
+      expect(find.text('continuar?'), findsOneWidget);
       expect(find.text('Crear cuenta'), findsOneWidget);
       expect(find.text('Ya tengo una cuenta'), findsOneWidget);
       expect(tester.takeException(), isNull);

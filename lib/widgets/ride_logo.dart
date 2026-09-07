@@ -50,38 +50,42 @@ class RideWordmark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        RideMark(size: markSize),
-        const SizedBox(width: 7),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Ride',
-              style: AppTheme.display(
-                fontSize,
-                color: color ?? context.ride.ink,
-                letterSpacing: -0.5,
-                height: 1,
-              ),
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 1),
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RideMark(size: markSize),
+          const SizedBox(width: 7),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Text(
-                subtitle!,
-                style: TextStyle(
-                  fontSize: subtitleFontSize,
-                  color: subtitleColor ?? color ?? context.ride.inkMuted,
+                'Ride',
+                style: AppTheme.display(
+                  fontSize,
+                  color: color ?? context.ride.ink,
+                  letterSpacing: -0.5,
+                  height: 1,
                 ),
               ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 1),
+                Text(
+                  subtitle!,
+                  style: TextStyle(
+                    fontSize: subtitleFontSize,
+                    color: subtitleColor ?? color ?? context.ride.inkMuted,
+                  ),
+                ),
+              ],
             ],
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 }

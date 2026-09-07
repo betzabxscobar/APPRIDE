@@ -168,7 +168,7 @@ class _MobileHero extends StatelessWidget {
                     const RideWordmark(
                       markSize: 64,
                       fontSize: 27,
-                      color: const Color(0xFFD8F3FF),
+                      color: Color(0xFFD8F3FF),
                       subtitle: 'Muévete con libertad',
                       subtitleColor: Color(0xFFD5DCE3),
                     ),
