@@ -594,7 +594,7 @@ class AuthService extends ChangeNotifier {
     final user = _currentUser;
     if (user == null) return const [];
 
-    return user.role.viewsAllowed(hasVehicle: user.vehicle != null);
+    return user.role.viewsAllowed();
   }
 
   /// Cambia la pantalla activa dentro de lo que permite el rol real.
@@ -612,18 +612,11 @@ class AuthService extends ChangeNotifier {
       );
     }
 
-    // Pedir vehículo tiene sentido para quien se ASOMA a la vista de chofer sin
-    // serlo. A un chofer de verdad no se le puede exigir: su pantalla es
-    // justamente donde registra el vehículo, y sin esta excepción un recién
-    // convertido que se pasara a la vista de pasajero no podría volver.
-    if (view.isDriver &&
-        !user.role.isAdministrative &&
-        !user.role.isDriver &&
-        user.vehicle == null) {
-      throw const AuthException(
-        'Para conducir necesitas registrar tu vehículo primero',
-      );
-    }
+    // Aqui vivia una comprobacion de vehiculo que ya no puede llegar: la vista
+    // de chofer solo esta en la lista de `driver`, `admin` y `superadmin`, y a
+    // ninguno de los tres se le exige. A un chofer menos que a nadie, que su
+    // pantalla es donde registra el vehiculo: exigirselo dejaba atrapado en la
+    // vista de pasajero a quien acababa de pasarse a chofer.
 
     _activeView = view == user.role ? null : view;
     notifyListeners();

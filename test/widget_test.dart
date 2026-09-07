@@ -841,26 +841,21 @@ void main() {
 
     test('Ningún rol no administrativo alcanza un panel administrativo', () {
       for (final rol in [UserRole.passenger, UserRole.driver]) {
-        final vistas = rol.viewsAllowed(hasVehicle: true);
+        final vistas = rol.viewsAllowed();
         expect(vistas.any((v) => v.isAdministrative), isFalse, reason: rol.id);
       }
     });
 
     test('Todos pueden volver a su propio panel', () {
       for (final rol in UserRole.values) {
-        expect(
-          rol.viewsAllowed(hasVehicle: true),
-          contains(rol),
-          reason: rol.id,
-        );
+        expect(rol.viewsAllowed(), contains(rol), reason: rol.id);
       }
     });
 
-    test('Un pasajero sin vehículo no puede abrir la vista de chofer', () {
+    test('Un pasajero no puede abrir la vista de chofer', () {
+      // Para conducir se pasa a chofer desde Configuración, no asomándose a
+      // una vista prestada.
       expect(UserRole.passenger.viewsAllowed(), [UserRole.passenger]);
-      expect(UserRole.passenger.viewsAllowed(hasVehicle: true), [
-        UserRole.passenger,
-      ]);
     });
   });
 

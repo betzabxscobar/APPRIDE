@@ -99,7 +99,12 @@ enum UserRole {
   ///
   /// Que aparezca una vista nunca es un permiso. Si alguna vez hay que
   /// cambiarlo, se cambia en la base y esta lista se limita a acompañarlo.
-  List<UserRole> viewsAllowed({bool hasVehicle = false}) {
+  ///
+  /// Antes recibía un `hasVehicle` que no se leía en ninguna rama: la regla
+  /// del vehículo vivía suelta en `switchView` y no llegaba nunca, porque a un
+  /// pasajero esta lista ya le cierra la vista de chofer. Un parámetro que no
+  /// hace nada solo sirve para que alguien confíe en él.
+  List<UserRole> viewsAllowed() {
     return switch (this) {
       UserRole.superadmin => const [superadmin, admin, passenger, driver],
       UserRole.admin => const [admin, passenger, driver],
