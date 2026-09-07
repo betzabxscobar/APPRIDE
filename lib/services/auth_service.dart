@@ -34,6 +34,10 @@ class AuthService extends ChangeNotifier {
   /// Longitud mínima de la contraseña definitiva de una cuenta administrativa.
   static const int adminPasswordMinLength = 10;
 
+  /// Mínimo para una cuenta normal. El mismo que exige `/api/register` en
+  /// WEB-RIDE y el que valida `Validators.password`.
+  static const int passwordMinLength = 8;
+
   static const String _profileColumns =
       'id, email, full_name, phone, role, foto_url, must_change_password, '
       'created_at';
@@ -97,6 +101,11 @@ class AuthService extends ChangeNotifier {
       //
       // La condición del perfil vacío importa: al entrar con correo y
       // contraseña, `signIn` ya lo cargó y no hay que volver a pedirlo.
+      if (state.event == sb.AuthChangeEvent.passwordRecovery) {
+        _recuperandoContrasena = true;
+        notifyListeners();
+      }
+
       final entra = state.event == sb.AuthChangeEvent.signedIn ||
           state.event == sb.AuthChangeEvent.passwordRecovery;
 
@@ -269,6 +278,42 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return user;
     });
+  }
+
+  /// Pone la contraseña nueva de quien llegó por el enlace de recuperación.
+  ///
+  /// A diferencia de [cambiarContrasena], aquí **no** se pide la actual: quien
+  /// entra por este camino no la sabe, que es justamente el motivo. Lo que
+  /// autoriza el cambio es la sesión que creó el enlace del correo.
+  Future<void> establecerContrasenaNueva(String password) async {
+    if (_client.auth.currentSession == null) {
+      throw const AuthException(
+        'El enlace caducó. Pide otro correo para restablecerla.',
+      );
+    }
+    if (password.length < passwordMinLength) {
+      throw const AuthException(
+        'Usa al menos $passwordMinLength caracteres',
+      );
+    }
+
+    _setLoading(true);
+    try {
+      try {
+        await _client.auth.updateUser(sb.UserAttributes(password: password));
+      } on sb.AuthException catch (error) {
+        throw AuthException(_translate(error.message));
+      }
+
+      _recuperandoContrasena = false;
+
+      // El perfil puede no estar cargado: al abrir la app desde el enlace, la
+      // sesión llega antes de que nadie haya leído `profiles`.
+      _currentUser ??= await _loadProfile();
+      notifyListeners();
+    } finally {
+      _setLoading(false);
+    }
   }
 
   /// Pide el correo con el enlace para restablecer la contraseña.
@@ -478,7 +523,8 @@ class AuthService extends ChangeNotifier {
       if (user == null) throw const AuthException('Debes iniciar sesión');
 
       // Las cuentas administrativas tienen su propio mínimo, más largo.
-      final minimo = user.role.isAdministrative ? adminPasswordMinLength : 8;
+      final minimo =
+          user.role.isAdministrative ? adminPasswordMinLength : passwordMinLength;
       if (nueva.length < minimo) {
         throw AuthException(
           'La contraseña debe tener mínimo $minimo caracteres',
@@ -578,6 +624,7 @@ class AuthService extends ChangeNotifier {
   Future<void> _olvidarSesion() async {
     _currentUser = null;
     _activeView = null;
+    _recuperandoContrasena = false;
     await TripSessionStore.instance.limpiar();
   }
 
@@ -593,6 +640,15 @@ class AuthService extends ChangeNotifier {
   // de pasajero sigue siendo admin para la base de datos; ve la interfaz con
   // sus propios datos, no con los de otra persona.
   // ---------------------------------------------------------------------------
+
+  /// La sesión entró por un enlace de «olvidé mi contraseña».
+  ///
+  /// Mientras esté puesta, la app enseña la pantalla de poner clave nueva y
+  /// nada más. A quien llega por aquí no se le puede dejar pasar sin más:
+  /// entró sin escribir ninguna contraseña, así que hasta que ponga una la
+  /// cuenta sigue abierta para cualquiera que tenga ese correo delante.
+  bool _recuperandoContrasena = false;
+  bool get recuperandoContrasena => _recuperandoContrasena;
 
   UserRole? _activeView;
 

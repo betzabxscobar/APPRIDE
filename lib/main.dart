@@ -13,6 +13,7 @@ import 'services/auth_service.dart';
 import 'services/trip_session_store.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/auth/first_access_screen.dart';
+import 'screens/auth/reset_password_screen.dart';
 import 'screens/auth/auth_screen.dart';
 import 'screens/home/driver_home_screen.dart';
 import 'screens/home/passenger_home_screen.dart';
@@ -250,6 +251,13 @@ class AuthGate extends StatelessWidget {
       animation: AuthService.instance,
       builder: (context, _) {
         final user = AuthService.instance.currentUser;
+
+        // Llegó por el enlace de «olvidé mi contraseña»: primero pone una
+        // nueva y nada más. Va antes que la comprobación del usuario porque la
+        // sesión del enlace existe aunque el perfil todavía no se haya leído.
+        if (AuthService.instance.recuperandoContrasena) {
+          return const ResetPasswordScreen();
+        }
 
         if (user == null) return const AuthScreen();
 
