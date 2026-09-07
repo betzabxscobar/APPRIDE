@@ -38,32 +38,32 @@ class ThemeController extends ChangeNotifier {
 
   /// Nombre de la opción tal como se muestra en Configuración.
   static String etiqueta(ThemeMode modo) => switch (modo) {
-        ThemeMode.system => 'El del sistema',
-        ThemeMode.light => 'Claro',
-        ThemeMode.dark => 'Oscuro',
-      };
+    ThemeMode.system => 'El del sistema',
+    ThemeMode.light => 'Claro',
+    ThemeMode.dark => 'Oscuro',
+  };
 
   static String detalle(ThemeMode modo) => switch (modo) {
-        ThemeMode.system => 'Sigue el ajuste de tu teléfono',
-        ThemeMode.light => 'Siempre claro, aunque el teléfono esté en oscuro',
-        ThemeMode.dark => 'Siempre oscuro, aunque el teléfono esté en claro',
-      };
+    ThemeMode.system => 'Sigue el ajuste de tu teléfono',
+    ThemeMode.light => 'Mayor luminosidad en toda la interfaz',
+    ThemeMode.dark => 'Menor emisión de luz y contraste adaptado',
+  };
 
   static IconData icono(ThemeMode modo) => switch (modo) {
-        ThemeMode.system => Icons.brightness_auto_outlined,
-        ThemeMode.light => Icons.light_mode_outlined,
-        ThemeMode.dark => Icons.dark_mode_outlined,
-      };
+    ThemeMode.system => Icons.brightness_auto_outlined,
+    ThemeMode.light => Icons.light_mode_outlined,
+    ThemeMode.dark => Icons.contrast_outlined,
+  };
 
   static String _id(ThemeMode modo) => switch (modo) {
-        ThemeMode.system => 'sistema',
-        ThemeMode.light => 'claro',
-        ThemeMode.dark => 'oscuro',
-      };
+    ThemeMode.system => 'sistema',
+    ThemeMode.light => 'claro',
+    ThemeMode.dark => 'oscuro',
+  };
 
   static ThemeMode _desdeId(String? id) => switch (id) {
-        'claro' => ThemeMode.light,
-        'oscuro' => ThemeMode.dark,
-        _ => ThemeMode.system,
-      };
+    'claro' => ThemeMode.light,
+    'oscuro' => ThemeMode.dark,
+    _ => ThemeMode.system,
+  };
 }

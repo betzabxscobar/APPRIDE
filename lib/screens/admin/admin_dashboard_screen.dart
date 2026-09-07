@@ -103,9 +103,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _abrirConfiguracion() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
     // El nombre o la foto pueden haber cambiado mientras estaba dentro.
     if (mounted) setState(() {});
   }
@@ -166,18 +166,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       body: SafeArea(
         child: switch (_section) {
           _Section.resumen => _Overview(
-              user: widget.user,
-              users: _users,
-              error: _error,
-              loading: _loadingUsers,
-              passengers: _countOf(UserRole.passenger),
-              drivers: _countOf(UserRole.driver),
-              administrators: _countOf(UserRole.admin) +
-                  _countOf(UserRole.superadmin),
-              onSeeAll: () => setState(() => _section = _Section.usuarios),
-            ),
-          _Section.usuarios =>
-            _UserList(users: _users, error: _error, loading: _loadingUsers),
+            user: widget.user,
+            users: _users,
+            error: _error,
+            loading: _loadingUsers,
+            passengers: _countOf(UserRole.passenger),
+            drivers: _countOf(UserRole.driver),
+            administrators:
+                _countOf(UserRole.admin) + _countOf(UserRole.superadmin),
+            onSeeAll: () => setState(() => _section = _Section.usuarios),
+          ),
+          _Section.usuarios => _UserList(
+            users: _users,
+            error: _error,
+            loading: _loadingUsers,
+          ),
           // La revisión de conductores dejó de ser una pantalla de espera: es
           // donde se ven los papeles que suben —cédula, licencia, SPPAT y
           // matrícula— junto con su vehículo y su teléfono.
@@ -373,8 +376,6 @@ class _DrawerNavigationTile extends StatefulWidget {
 }
 
 class _DrawerNavigationTileState extends State<_DrawerNavigationTile> {
-  static const _hoverTextColor = Color(0xFF00CFFF);
-
   bool _hovered = false;
 
   @override
@@ -389,7 +390,7 @@ class _DrawerNavigationTileState extends State<_DrawerNavigationTile> {
         leading: Icon(
           widget.section.icon,
           size: 21,
-          color: widget.selected ? ride.info : ride.inkMuted,
+          color: widget.selected || _hovered ? ride.accent : ride.inkMuted,
         ),
         title: AnimatedDefaultTextStyle(
           duration: const Duration(milliseconds: 140),
@@ -397,20 +398,14 @@ class _DrawerNavigationTileState extends State<_DrawerNavigationTile> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: _hovered
-                ? _hoverTextColor
-                : widget.selected
-                ? ride.ink
-                : ride.inkMuted,
+            color: widget.selected || _hovered ? ride.ink : ride.inkMuted,
           ),
           child: Text(widget.section.label),
         ),
         selected: widget.selected,
-        selectedTileColor: ride.infoSoft,
-        hoverColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        selectedTileColor: ride.accentSoft,
+        hoverColor: ride.surfaceAlt,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 20),
         onTap: widget.onTap,
       ),
@@ -544,7 +539,7 @@ class _Overview extends StatelessWidget {
                 label: 'Viajes registrados',
                 value: 0,
                 color: context.ride.danger,
-                background: Color(0x14E5484D),
+                background: context.ride.dangerSoft,
                 icon: Icons.route_outlined,
               ),
             ),
@@ -554,7 +549,10 @@ class _Overview extends StatelessWidget {
         _Card(
           title: 'Usuarios registrados',
           subtitle: 'Información obtenida desde Supabase.',
-          action: TextButton(onPressed: onSeeAll, child: const Text('Ver todos')),
+          action: TextButton(
+            onPressed: onSeeAll,
+            child: const Text('Ver todos'),
+          ),
           child: Column(
             children: [
               if (error != null)
@@ -589,10 +587,7 @@ class _UserList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (error != null) {
-      return Padding(
-        padding: const EdgeInsets.all(20),
-        child: _Note(error!),
-      );
+      return Padding(padding: const EdgeInsets.all(20), child: _Note(error!));
     }
     if (loading) {
       return const Padding(
@@ -656,7 +651,10 @@ class _Metric extends StatelessWidget {
           Container(
             width: 36,
             height: 36,
-            decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: background,
+              shape: BoxShape.circle,
+            ),
             child: Icon(icon, size: 18, color: color),
           ),
           const SizedBox(height: 12),
@@ -750,8 +748,18 @@ class _UserRow extends StatelessWidget {
     final createdAt = user.createdAt;
     if (createdAt == null) return 'Sin fecha';
     const months = [
-      'ene', 'feb', 'mar', 'abr', 'may', 'jun',
-      'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+      'jul',
+      'ago',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
     ];
     final day = createdAt.day.toString().padLeft(2, '0');
     return '$day ${months[createdAt.month - 1]} ${createdAt.year}';
@@ -789,10 +797,7 @@ class _UserRow extends StatelessWidget {
                   user.email,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: context.ride.inkMuted,
-                  ),
+                  style: TextStyle(fontSize: 12, color: context.ride.inkMuted),
                 ),
               ],
             ),
@@ -845,9 +850,21 @@ class _ImplementationStatus extends StatelessWidget {
       (true, 'Conexión con Supabase', 'Base, autenticación, RLS y tiempo real'),
       (true, 'Ciclo de viajes', 'Pedir, aceptar, seguir en el mapa y cobrar'),
       (true, 'Tipos de vehículo', 'Moto, estándar, confort y XL con su tarifa'),
-      (true, 'Revisión de conductores', 'Documentos y aprobación desde el panel'),
-      (true, 'Chat y código de inicio', 'Mensajes del viaje y verificación de 6 dígitos'),
-      (false, 'Firma de producción', 'Pendiente: hoy se firma con la de depuración'),
+      (
+        true,
+        'Revisión de conductores',
+        'Documentos y aprobación desde el panel',
+      ),
+      (
+        true,
+        'Chat y código de inicio',
+        'Mensajes del viaje y verificación de 6 dígitos',
+      ),
+      (
+        false,
+        'Firma de producción',
+        'Pendiente: hoy se firma con la de depuración',
+      ),
     ];
 
     return _Card(
@@ -864,15 +881,23 @@ class _ImplementationStatus extends StatelessWidget {
                     width: 26,
                     height: 26,
                     decoration: BoxDecoration(
-                      color: step.$1 ? context.ride.successSoft : context.ride.background,
+                      color: step.$1
+                          ? context.ride.successSoft
+                          : context.ride.background,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: step.$1 ? context.ride.success : context.ride.border,
+                        color: step.$1
+                            ? context.ride.success
+                            : context.ride.border,
                       ),
                     ),
                     alignment: Alignment.center,
                     child: step.$1
-                        ? Icon(Icons.check, size: 14, color: context.ride.success)
+                        ? Icon(
+                            Icons.check,
+                            size: 14,
+                            color: context.ride.success,
+                          )
                         : Text(
                             '${index + 1}',
                             style: TextStyle(

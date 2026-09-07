@@ -116,10 +116,9 @@ class _WelcomeContent extends StatelessWidget {
     final ride = context.ride;
     final width = MediaQuery.sizeOf(context).width;
     final horizontal = wide ? 54.0 : (width < 360 ? 20.0 : 28.0);
-    final panel = ride.isDark ? const Color(0xFF081F2D) : ride.surface;
     return Container(
       decoration: BoxDecoration(
-        color: panel,
+        color: ride.surface,
         borderRadius: wide
             ? null
             : const BorderRadius.vertical(top: Radius.circular(28)),
@@ -188,23 +187,23 @@ class _WelcomeContent extends StatelessWidget {
                   _Benefit(
                     icon: Icons.route_outlined,
                     label: compact ? 'Rutas' : 'Rutas claras',
-                    backgroundColor: const Color(0xFF29B6F6),
-                    foregroundColor: const Color(0xFFD8F3FF),
-                    borderColor: Colors.black,
+                    backgroundColor: ride.accentSoft,
+                    foregroundColor: ride.accent,
+                    borderColor: ride.border,
                   ),
                   _Benefit(
                     icon: Icons.shield_outlined,
                     label: compact ? 'Seguro' : 'Viajes seguros',
-                    backgroundColor: const Color(0xFF29B6F6),
-                    foregroundColor: const Color(0xFFD8F3FF),
-                    borderColor: Colors.black,
+                    backgroundColor: ride.successSoft,
+                    foregroundColor: ride.success,
+                    borderColor: ride.border,
                   ),
                   _Benefit(
                     icon: Icons.payments_outlined,
                     label: compact ? 'Precio' : 'Precio visible',
-                    backgroundColor: const Color(0xFF29B6F6),
-                    foregroundColor: const Color(0xFFD8F3FF),
-                    borderColor: Colors.black,
+                    backgroundColor: ride.infoSoft,
+                    foregroundColor: ride.info,
+                    borderColor: ride.border,
                   ),
                 ],
               ),
@@ -213,18 +212,6 @@ class _WelcomeContent extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: onContinue,
-                  style: ButtonStyle(
-                    backgroundColor: const WidgetStatePropertyAll(
-                      Color(0xFF29B6F6),
-                    ),
-                    foregroundColor: const WidgetStatePropertyAll(Colors.black),
-                    side: const WidgetStatePropertyAll(
-                      BorderSide(color: Colors.black, width: 2),
-                    ),
-                    overlayColor: const WidgetStatePropertyAll(
-                      Colors.transparent,
-                    ),
-                  ),
                   iconAlignment: IconAlignment.end,
                   icon: const Icon(Icons.arrow_forward_rounded, size: 21),
                   label: const Text('Empezar'),
@@ -255,14 +242,14 @@ class _Benefit extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ride = context.ride;
-    final chipColor = ride.isDark ? const Color(0xFF14536B) : ride.surfaceAlt;
-    final chipBorder = ride.isDark ? const Color(0xFF2A7890) : ride.border;
+    final chipColor = ride.surfaceAlt;
+    final chipBorder = ride.border;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
         color: backgroundColor ?? chipColor,
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: borderColor ?? chipBorder, width: 2),
+        border: Border.all(color: borderColor ?? chipBorder),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -388,7 +375,9 @@ class _HeroVisualState extends State<_HeroVisual>
                         markSize: (unit * 0.14).clamp(48.0, 76.0),
                         fontSize: (unit * 0.075).clamp(23.0, 39.0),
                         color: dark ? const Color(0xFFD8F3FF) : ride.ink,
-                        subtitle: widget.compact ? null : 'Muévete con libertad',
+                        subtitle: widget.compact
+                            ? null
+                            : 'Muévete con libertad',
                         subtitleColor: dark
                             ? const Color(0xFFD5DCE3)
                             : ride.inkMuted,
