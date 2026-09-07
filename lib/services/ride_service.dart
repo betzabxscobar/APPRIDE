@@ -350,13 +350,16 @@ class RideService {
         'p_motivo': motivo,
       });
 
-  /// El chofer confirma que recibió el efectivo del pasajero.
+  /// El chofer confirma que le llegó el dinero del pasajero.
   ///
-  /// Hasta que lo confirme, el cobro queda `pendiente`: nadie más puede saber
-  /// si el pasajero pagó. Con la confirmación entra también la comisión de la
-  /// app como deuda del chofer.
-  Future<void> confirmarPagoEfectivo(String viajeId) =>
-      _rpc<void>('confirmar_pago_efectivo', {'p_viaje_id': viajeId});
+  /// Vale para efectivo y para transferencia: en los dos casos la app no se
+  /// entera sola, y el único que sabe si entró es el chofer. DeUna no pasa por
+  /// aquí —esa la confirma la pasarela—, y la base lo rechaza si se intenta.
+  ///
+  /// Hasta que lo confirme, el cobro queda `pendiente`. Con la confirmación
+  /// entra también la comisión de la app como deuda del chofer.
+  Future<void> confirmarPagoRecibido(String viajeId) =>
+      _rpc<void>('confirmar_pago_recibido', {'p_viaje_id': viajeId});
 
   /// Reporta dónde está el chofer.
   ///

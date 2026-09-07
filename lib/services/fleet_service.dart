@@ -342,6 +342,82 @@ class FleetService {
   }
 
   // ---------------------------------------------------------------------------
+  // Cuentas bancarias del chofer
+  // ---------------------------------------------------------------------------
+
+  /// Los bancos a los que se puede transferir, del catálogo de la base.
+  Future<List<Bank>> bancos() async {
+    final rows = await _client
+        .from('bancos')
+        .select('id, nombre, logo, color')
+        .eq('activo', true)
+        .order('orden');
+    return rows.map(Bank.fromMap).toList();
+  }
+
+  /// Las cuentas del chofer que ha iniciado sesión.
+  ///
+  /// Se leen de la tabla directamente: la RLS solo le entrega las suyas.
+  Future<List<BankAccount>> misCuentasBancarias() async {
+    final rows = await _client
+        .from('cuentas_bancarias_chofer')
+        .select('id, banco, tipo, numero, titular, cedula_titular, predeterminada, '
+            'bancos!inner(nombre, logo, color)')
+        .eq('conductor_id', _uid)
+        .eq('activa', true)
+        .order('predeterminada', ascending: false);
+
+    return rows.map((row) {
+      final banco = Map<String, dynamic>.from(row['bancos'] as Map);
+      return BankAccount.fromMap({
+        ...row,
+        'banco_nombre': banco['nombre'],
+        'banco_logo': banco['logo'],
+        'banco_color': banco['color'],
+      });
+    }).toList();
+  }
+
+  /// Guarda una cuenta. Con [cuentaId] edita la que ya existe.
+  Future<String> guardarCuentaBancaria({
+    required String banco,
+    required String tipo,
+    required String numero,
+    required String titular,
+    String? cedulaTitular,
+    bool predeterminada = true,
+    String? cuentaId,
+  }) {
+    return _rpc<String>('registrar_cuenta_bancaria', {
+      'p_banco': banco,
+      'p_tipo': tipo,
+      'p_numero': numero,
+      'p_titular': titular,
+      'p_cedula_titular': cedulaTitular,
+      'p_predeterminada': predeterminada,
+      'p_cuenta_id': cuentaId,
+    });
+  }
+
+  Future<void> eliminarCuentaBancaria(String cuentaId) =>
+      _rpc<void>('eliminar_cuenta_bancaria', {'p_cuenta_id': cuentaId});
+
+  /// Las cuentas del chofer de un viaje, para que el pasajero le transfiera.
+  ///
+  /// Un número de cuenta es dato sensible, así que no sale por una consulta
+  /// abierta: la función de base comprueba que quien pregunta sea el pasajero
+  /// de ese viaje. Sin viaje de por medio no se ve ninguna cuenta.
+  Future<List<BankAccount>> cuentasDelChofer(String viajeId) async {
+    final filas = await _client.rpc(
+      'cuentas_del_chofer',
+      params: {'p_viaje_id': viajeId},
+    ) as List<dynamic>;
+    return filas
+        .map((f) => BankAccount.fromMap(Map<String, dynamic>.from(f as Map)))
+        .toList();
+  }
+
+  // ---------------------------------------------------------------------------
   // Revisión de conductores (administración)
   //
   // Aquí no hay ninguna comprobación de rol: la vista `conductores_revision`

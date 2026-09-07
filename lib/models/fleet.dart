@@ -313,7 +313,7 @@ class PaymentMethod {
 
   final String id;
 
-  /// `tarjeta`, `efectivo` o `deuna`.
+  /// `tarjeta`, `efectivo`, `deuna` o `transferencia`.
   final String tipo;
   final bool predeterminado;
 
@@ -326,15 +326,24 @@ class PaymentMethod {
   /// propio QR. Por eso es un método sin token, como el efectivo.
   bool get esDeuna => tipo == 'deuna';
 
+  /// El pasajero transfiere desde su banco a la cuenta del chofer.
+  ///
+  /// La app no mueve el dinero ni habla con ningún banco: solo enseña la
+  /// cuenta para copiarla. Quien comprueba que llegó es el chofer, mirando su
+  /// propia cuenta.
+  bool get esTransferencia => tipo == 'transferencia';
+
   String get label => switch (tipo) {
         'efectivo' => 'Efectivo',
         'deuna' => 'DeUna',
+        'transferencia' => 'Transferencia',
         _ => 'Tarjeta',
       };
 
   IconData get icon => switch (tipo) {
         'efectivo' => Icons.payments_outlined,
         'deuna' => Icons.qr_code_2,
+        'transferencia' => Icons.account_balance_outlined,
         _ => Icons.credit_card,
       };
 
@@ -343,6 +352,7 @@ class PaymentMethod {
   String get descripcion {
     if (esEfectivo) return 'Pagas al llegar';
     if (esDeuna) return 'Escaneas el QR al terminar';
+    if (esTransferencia) return 'Transfieres a la cuenta del chofer';
     final t = detalle ?? '';
     return t.length <= 4 ? 'Tarjeta guardada' : '···· ${t.substring(t.length - 4)}';
   }
@@ -496,4 +506,115 @@ class DriverReview {
       ],
     );
   }
+}
+
+/// Un banco al que se le puede transferir, del catálogo `public.bancos`.
+class Bank {
+  const Bank({
+    required this.id,
+    required this.nombre,
+    this.logo,
+    this.color,
+  });
+
+  final String id;
+  final String nombre;
+
+  /// Nombre del asset empaquetado, sin ruta ni extensión.
+  ///
+  /// Puede ser `null`: hay bancos para los que todavía no hay logo utilizable.
+  /// En ese caso la app dibuja las iniciales, que es feo pero funciona; lo que
+  /// no puede es quedarse en blanco.
+  final String? logo;
+
+  /// Color de marca, en `#RRGGBB`. Sirve de fondo cuando no hay logo, y de
+  /// respaldo del propio logo cuando este es blanco.
+  final String? color;
+
+  /// La ruta del asset, o `null` si este banco no tiene logo.
+  String? get assetLogo => logo == null ? null : 'assets/images/bancos/$logo.png';
+
+  /// Iniciales para cuando no hay logo: «Banco Guayaquil» → «BG».
+  String get iniciales {
+    final palabras = nombre
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty && p.toLowerCase() != 'de')
+        .toList();
+    if (palabras.isEmpty) return '?';
+    if (palabras.length == 1) {
+      final p = palabras.first;
+      return (p.length < 2 ? p : p.substring(0, 2)).toUpperCase();
+    }
+    return (palabras[0][0] + palabras[1][0]).toUpperCase();
+  }
+
+  Color? get colorMarca {
+    final c = color;
+    if (c == null) return null;
+    final hex = c.replaceAll('#', '');
+    if (hex.length != 6) return null;
+    final valor = int.tryParse(hex, radix: 16);
+    return valor == null ? null : Color(0xFF000000 | valor);
+  }
+
+  factory Bank.fromMap(Map<String, dynamic> row) => Bank(
+        id: row['id'] as String,
+        nombre: row['nombre'] as String,
+        logo: row['logo'] as String?,
+        color: row['color'] as String?,
+      );
+}
+
+/// Una cuenta bancaria del chofer, a la que el pasajero transfiere.
+class BankAccount {
+  const BankAccount({
+    required this.id,
+    required this.banco,
+    required this.bancoNombre,
+    required this.tipo,
+    required this.numero,
+    required this.titular,
+    this.bancoLogo,
+    this.bancoColor,
+    this.cedulaTitular,
+    this.predeterminada = false,
+  });
+
+  final String id;
+
+  /// `pichincha`, `guayaquil`, `internacional` o `produbanco`.
+  final String banco;
+  final String bancoNombre;
+  final String? bancoLogo;
+  final String? bancoColor;
+
+  /// `ahorros` o `corriente`.
+  final String tipo;
+
+  /// El número, tal cual se copia. Solo dígitos.
+  final String numero;
+  final String titular;
+
+  /// La cédula del titular, si el chofer la puso. El pasajero la coteja en su
+  /// banco antes de transferir.
+  final String? cedulaTitular;
+  final bool predeterminada;
+
+  String get tipoLabel => tipo == 'corriente' ? 'Cuenta corriente' : 'Cuenta de ahorros';
+
+  Bank get bancoComoCatalogo =>
+      Bank(id: banco, nombre: bancoNombre, logo: bancoLogo, color: bancoColor);
+
+  factory BankAccount.fromMap(Map<String, dynamic> row) => BankAccount(
+        id: row['id'] as String,
+        banco: row['banco'] as String,
+        bancoNombre: (row['banco_nombre'] as String?) ?? 'Banco',
+        bancoLogo: row['banco_logo'] as String?,
+        bancoColor: row['banco_color'] as String?,
+        tipo: (row['tipo'] as String?) ?? 'ahorros',
+        numero: row['numero'] as String,
+        titular: (row['titular'] as String?) ?? '',
+        cedulaTitular: row['cedula_titular'] as String?,
+        predeterminada: row['predeterminada'] as bool? ?? false,
+      );
 }

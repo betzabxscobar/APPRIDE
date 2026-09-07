@@ -161,6 +161,31 @@ abstract final class Validators {
     return 'El tercer dígito no corresponde a ningún tipo de RUC';
   }
 
+  /// Número de cuenta bancaria: solo dígitos.
+  ///
+  /// El largo cambia según el banco —Pichincha usa 10, Guayaquil suele dar 10
+  /// u 11, Produbanco 11— así que se acepta un rango en vez de casarse con uno
+  /// y rechazar cuentas buenas. La misma regla que la base en
+  /// `registrar_cuenta_bancaria`.
+  ///
+  /// Se toleran espacios y guiones, que es como la gente copia el número del
+  /// banco, pero **no** cualquier otro carácter. Borrar en silencio una letra
+  /// mal tecleada dejaría un número más corto, igual de válido y de otra
+  /// persona: el dinero se iría a una cuenta ajena sin que nadie lo notara.
+  static String? numeroDeCuenta(String? value) {
+    final vacio = required(value, campo: 'El número de cuenta');
+    if (vacio != null) return vacio;
+
+    final v = value!.replaceAll(RegExp(r'[\s-]'), '');
+    if (!RegExp(r'^[0-9]+$').hasMatch(v)) {
+      return 'El número de cuenta son solo dígitos';
+    }
+    if (v.length < 6 || v.length > 20) {
+      return 'Son entre 6 y 20 dígitos';
+    }
+    return null;
+  }
+
   /// Provincia válida: 01 a 24, más el 30 de los ecuatorianos en el exterior.
   static bool _provinciaValida(String v) {
     final p = int.parse(v.substring(0, 2));

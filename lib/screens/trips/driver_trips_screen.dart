@@ -240,9 +240,9 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
       );
     });
 
-    // El cobro nace pendiente, el efectivo tambien. Este es el momento en que
-    // el chofer tiene al pasajero delante: si no se le pregunta aqui, nadie
-    // vuelve a saber si el dinero entro.
+    // El cobro nace pendiente, tanto el efectivo como la transferencia. Este
+    // es el momento en que el chofer tiene al pasajero delante: si no se le
+    // pregunta aqui, nadie vuelve a saber si el dinero entro.
     if (cerrado && mounted) await _confirmarCobro(viaje);
 
     // Calificar al pasajero, una sola vez.
@@ -264,7 +264,8 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
   /// Le pregunta al chofer si recibio el dinero, y solo si el cobro quedo
   /// pendiente.
   ///
-  /// Un viaje pagado por la pasarela no se pregunta: ese lo confirma DeUna.
+  /// Sirve para efectivo y para transferencia. Un viaje pagado por la pasarela
+  /// no se pregunta: ese lo confirma DeUna, y la base rechaza el intento.
   Future<void> _confirmarCobro(Trip viaje) async {
     final Trip? cerrado;
     try {
@@ -279,9 +280,9 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
       builder: (context) => AlertDialog(
         title: const Text('¿Recibiste el pago?'),
         content: Text(
-          'Son \$${cerrado!.montoVigente.toStringAsFixed(2)} en efectivo. '
-          'Confirma solo si ya tienes el dinero: de aqui sale la comision '
-          'que le debes a la app.',
+          'Son \$${cerrado!.montoVigente.toStringAsFixed(2)}. Confirma solo si '
+          'ya tienes el dinero: en la mano, o en tu cuenta si te transfirieron. '
+          'De aqui sale la comision que le debes a la app.',
         ),
         actions: [
           TextButton(
@@ -290,7 +291,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Si, recibi'),
+            child: const Text('Si, ya lo recibi'),
           ),
         ],
       ),
@@ -299,7 +300,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     if (recibido != true) return;
 
     await _accion(
-      () => RideService.instance.confirmarPagoEfectivo(viaje.id),
+      () => RideService.instance.confirmarPagoRecibido(viaje.id),
     );
   }
 

@@ -86,6 +86,10 @@ flutter:
     - assets/images/ChicaDibujo.png
     - assets/images/ChicoDibujo.png
     - assets/images/carroDibujo.png
+    # Logos de los bancos a los que el pasajero puede transferir. Falta el de
+    # Banco Guayaquil: llegó en EPS y no hay con qué convertirlo aquí, así que
+    # ese banco se dibuja con sus iniciales hasta que haya un PNG.
+    - assets/images/bancos/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

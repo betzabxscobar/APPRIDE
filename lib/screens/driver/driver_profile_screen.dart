@@ -12,6 +12,7 @@ import '../../widgets/auth_feedback.dart';
 import '../../widgets/category_chip.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/ride_text_field.dart';
+import 'bank_accounts_screen.dart';
 import 'identity_form_sheet.dart';
 import 'vehicle_form_sheet.dart';
 
@@ -369,6 +370,31 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                         ),
                       const SizedBox(height: 18),
                     ],
+                  const SizedBox(height: 6),
+                  _Titulo('Cómo te pagan'),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Si registras una cuenta, el pasajero puede transferirte en '
+                    'vez de pagarte en efectivo.',
+                    style: TextStyle(fontSize: 12, color: context.ride.inkMuted),
+                  ),
+                  const SizedBox(height: 12),
+                  Card(
+                    margin: EdgeInsets.zero,
+                    child: ListTile(
+                      leading: Icon(Icons.account_balance_outlined,
+                          color: context.ride.accent),
+                      title: const Text('Cuentas para cobrar'),
+                      subtitle: const Text('Pichincha, Guayaquil, Internacional, Produbanco'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const BankAccountsScreen(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                 ],
               ),
             ),
