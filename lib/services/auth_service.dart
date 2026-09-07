@@ -672,7 +672,13 @@ class AuthService extends ChangeNotifier {
       return 'Espera unos segundos antes de reintentar.';
     }
     if (normalized.contains('database error saving new user')) {
-      return 'Este correo no puede registrarse con ese rol.';
+      // Supabase no dice QUE fallo dentro del trigger, asi que aqui no se
+      // puede afirmar cual de los dos es. Antes esto decia «este correo no
+      // puede registrarse con ese rol» y mandaba a cambiar el correo cuando
+      // casi siempre el choque era del telefono: `profiles` lo tiene con
+      // indice unico, y una cuenta de pasajero ya lo estaba usando.
+      return 'Ese correo o ese teléfono ya están registrados. '
+          'El teléfono solo puede estar en una cuenta.';
     }
     if (normalized.contains('a user with this email address has already')) {
       return 'Ese correo ya está en uso por otra cuenta.';
