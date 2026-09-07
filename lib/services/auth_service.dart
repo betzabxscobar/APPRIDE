@@ -224,6 +224,32 @@ class AuthService extends ChangeNotifier {
     });
   }
 
+  /// Convierte una cuenta de pasajero en cuenta de chofer.
+  ///
+  /// No crea una cuenta nueva: es la misma, con su correo, su teléfono y su
+  /// historial. Eso importa porque `profiles` tiene el teléfono con índice
+  /// único, así que abrir otra cuenta obligaba a inventarse un número.
+  ///
+  /// **No le da ningún permiso.** Entra en `conductores` como 'pendiente' y no
+  /// puede aprobarse solo: hasta que administración revise sus papeles no
+  /// puede conectarse ni recibir solicitudes. Lo único que cambia de
+  /// inmediato es la pantalla que ve y el poder subir sus documentos.
+  ///
+  /// La base lo rechaza si tiene un viaje pedido o en marcha: cambiarle la
+  /// pantalla debajo de los pies dejaría ese viaje huérfano.
+  Future<AppUser> convertirmeEnChofer() async {
+    return _run(() async {
+      await _client.rpc('quiero_ser_chofer');
+      // El rol lo decide el servidor, así que el perfil se vuelve a leer en
+      // vez de darlo por cambiado aquí.
+      final user = await _loadProfile();
+      _currentUser = user;
+      _activeView = null;
+      notifyListeners();
+      return user;
+    });
+  }
+
   /// Pide el correo con el enlace para restablecer la contraseña.
   ///
   /// No revela si el correo existe: Supabase responde igual en ambos casos y
@@ -586,7 +612,14 @@ class AuthService extends ChangeNotifier {
       );
     }
 
-    if (view.isDriver && !user.role.isAdministrative && user.vehicle == null) {
+    // Pedir vehículo tiene sentido para quien se ASOMA a la vista de chofer sin
+    // serlo. A un chofer de verdad no se le puede exigir: su pantalla es
+    // justamente donde registra el vehículo, y sin esta excepción un recién
+    // convertido que se pasara a la vista de pasajero no podría volver.
+    if (view.isDriver &&
+        !user.role.isAdministrative &&
+        !user.role.isDriver &&
+        user.vehicle == null) {
       throw const AuthException(
         'Para conducir necesitas registrar tu vehículo primero',
       );
