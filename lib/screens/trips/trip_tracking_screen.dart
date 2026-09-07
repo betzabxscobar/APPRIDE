@@ -176,11 +176,20 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   }
 
   Future<void> _cancelar() async {
+    // Si el chofer ya esta esperando, cancelar cuesta. Se dice ANTES de que
+    // confirme: cobrar por sorpresa no se hace.
+    final conMulta = _viaje?.status.cancelarTieneMulta ?? false;
+
     final confirmado = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('¿Cancelar el viaje?'),
-        content: const Text('Se avisará al chofer si ya tenías uno asignado.'),
+        content: Text(
+          conMulta
+              ? 'El chofer ya llegó al punto y te está esperando. Si cancelas '
+                  'ahora se te cobra \$1.00 por el viaje que hizo hasta aquí.'
+              : 'Se avisará al chofer si ya tenías uno asignado.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -189,7 +198,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(backgroundColor: context.ride.danger),
-            child: const Text('Sí, cancelar'),
+            child: Text(conMulta ? 'Cancelar y pagar \$1.00' : 'Sí, cancelar'),
           ),
         ],
       ),

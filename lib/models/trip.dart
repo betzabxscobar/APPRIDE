@@ -42,6 +42,14 @@ enum TripStatus {
   /// Todavía se puede cancelar. `EN_CURSO` ya no: la persona va a bordo.
   bool get sePuedeCancelar => index < enCurso.index;
 
+  /// Cancelar desde aquí le cuesta al pasajero.
+  ///
+  /// Solo cuando el chofer ya llegó al punto: hizo el viaje hasta ahí y está
+  /// esperando. Antes de eso cancelar sale gratis. Lo decide la base en
+  /// `cancelar_viaje`; esto es para poder avisar antes de que confirme, que
+  /// cobrar por sorpresa no se hace.
+  bool get cancelarTieneMulta => this == conductorEnOrigen;
+
   /// Cuánto del recorrido lleva, para la barra de progreso (0 a 1).
   double get progreso => switch (this) {
         solicitado => 0.08,
@@ -176,6 +184,7 @@ class Trip {
     this.distanciaRecorridaKm,
     this.canceladoPor,
     this.motivoCancelacion,
+    this.multa = 0,
   });
 
   final String id;
@@ -250,6 +259,12 @@ class Trip {
   final String? canceladoPor;
   final String? motivoCancelacion;
 
+  /// Multa por cancelar con el chofer ya esperando en el punto.
+  final double multa;
+
+  /// Este viaje acabó con una multa encima.
+  bool get tieneMulta => multa > 0;
+
   /// El cobro está cerrado.
   bool get pagoConfirmado => pagoEstado == 'completado';
 
@@ -311,6 +326,7 @@ class Trip {
         'distancia_recorrida_km': distanciaRecorridaKm,
         'cancelado_por': canceladoPor,
         'motivo_cancelacion': motivoCancelacion,
+        'multa': multa,
       };
 
   static double? _double(dynamic v) => v == null ? null : (v as num).toDouble();
@@ -355,5 +371,6 @@ class Trip {
         distanciaRecorridaKm: _double(row['distancia_recorrida_km']),
         canceladoPor: row['cancelado_por'] as String?,
         motivoCancelacion: row['motivo_cancelacion'] as String?,
+        multa: _double(row['multa']) ?? 0,
       );
 }

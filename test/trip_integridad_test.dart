@@ -95,6 +95,36 @@ void main() {
     });
   });
 
+  group('multa por cancelación tardía', () {
+    test('solo cuenta como tardía con el chofer ya en el punto', () {
+      expect(TripStatus.conductorEnOrigen.cancelarTieneMulta, isTrue);
+      expect(TripStatus.conductorEnCamino.cancelarTieneMulta, isFalse,
+          reason: 'todavía viene en camino, cancelar sale gratis');
+      expect(TripStatus.aceptado.cancelarTieneMulta, isFalse);
+      expect(TripStatus.buscandoConductor.cancelarTieneMulta, isFalse);
+      expect(TripStatus.solicitado.cancelarTieneMulta, isFalse);
+    });
+
+    test('un viaje cancelado tarde trae la multa', () {
+      final viaje = Trip.fromMap(fila({
+        'estado': 'CANCELADO',
+        'cancelado_por': 'p1',
+        'multa': 1.00,
+        'pago_estado': 'pendiente',
+      }));
+      expect(viaje.multa, 1.00);
+      expect(viaje.tieneMulta, isTrue);
+      expect(viaje.pagoPendiente, isTrue,
+          reason: 'la multa queda por cobrar, no cobrada');
+    });
+
+    test('sin multa la cifra es cero, no null', () {
+      final viaje = Trip.fromMap(fila({'estado': 'CANCELADO'}));
+      expect(viaje.multa, 0);
+      expect(viaje.tieneMulta, isFalse);
+    });
+  });
+
   test('los campos nuevos sobreviven al guardado local', () {
     final viaje = Trip.fromMap(fila({
       'pago_estado': 'pendiente',
@@ -103,6 +133,7 @@ void main() {
       'distancia_recorrida_km': 5.2,
       'cancelado_por': null,
       'motivo_cancelacion': null,
+      'multa': 1.00,
     }));
     final vuelta = Trip.fromMap(viaje.toMap());
 
@@ -110,5 +141,6 @@ void main() {
     expect(vuelta.llegadaVerificada, isTrue);
     expect(vuelta.desvioDetectado, isFalse);
     expect(vuelta.distanciaRecorridaKm, 5.2);
+    expect(vuelta.multa, 1.00);
   });
 }

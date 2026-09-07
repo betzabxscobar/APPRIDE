@@ -34,7 +34,7 @@ class RideService {
     categoria, categoria_nombre, categoria_icono,
     pago_estado, monto_cobrado,
     llegada_verificada, desvio_detectado, distancia_recorrida_km,
-    cancelado_por, motivo_cancelacion
+    cancelado_por, motivo_cancelacion, multa
   ''';
 
   // ---------------------------------------------------------------------------
