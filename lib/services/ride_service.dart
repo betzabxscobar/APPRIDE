@@ -256,19 +256,20 @@ class RideService {
 
   /// Solicitudes abiertas que este chofer puede tomar.
   ///
-  /// La política `viajes_difusion_conductores` es la que decide si las ve: solo
-  /// llegan si está aprobado y disponible.
+  /// Sale de `solicitudes_abiertas()` y **no** de la vista `viajes_detalle`.
+  /// La vista es `security_invoker`, así que aplica el RLS de todas sus tablas
+  /// con los permisos del chofer: la fila de `viajes` sí la ve por la política
+  /// de difusión, pero el `join` interno con el perfil del pasajero —que un
+  /// chofer no puede leer— borraba la fila entera y esta lista salía siempre
+  /// vacía. La función aplica las mismas reglas por dentro y devuelve solo lo
+  /// que hace falta para decidir; el nombre y el teléfono del pasajero no
+  /// llegan hasta que acepta.
   Future<List<Trip>> solicitudesAbiertas() async {
-    final rows = await _client
-        .from('viajes_detalle')
-        .select(_detalle)
-        .eq('estado', 'BUSCANDO_CONDUCTOR')
-        .isFilter('conductor_id', null)
-        // La solicitud que lleva más tiempo esperando, primero: quien
-        // pidió antes no debe quedarse al fondo de la lista.
-        .order('fecha_solicitud', ascending: true);
+    final filas = await _client.rpc('solicitudes_abiertas') as List<dynamic>;
 
-    final viajes = rows.map(Trip.fromMap).toList();
+    final viajes = filas
+        .map((f) => Trip.fromMap(Map<String, dynamic>.from(f as Map)))
+        .toList();
 
     // Solo las del tipo de vehículo que conduce.
     //

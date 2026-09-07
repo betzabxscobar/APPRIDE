@@ -66,6 +66,56 @@ void main() {
     });
   });
 
+  group('la fila que devuelve solicitudes_abiertas', () {
+    // La función de base no manda el nombre ni el teléfono del pasajero: para
+    // decidir si acepta no le hacen falta, y solo deben llegarle al aceptar.
+    // El modelo tiene que armarse igual con esa fila más corta.
+    final deLaFuncion = <String, dynamic>{
+      'id': 'v9',
+      'estado': 'BUSCANDO_CONDUCTOR',
+      'pasajero_id': 'p9',
+      'tarifa_estimada': 4.50,
+      'tarifa_nombre': 'Tarifa Estandar',
+      'fecha_solicitud': '2026-09-07T14:00:00Z',
+      'origen_lat': -0.1807,
+      'origen_lng': -78.4678,
+      'origen_texto': 'La Carolina',
+      'destino_lat': -0.1750,
+      'destino_lng': -78.4800,
+      'destino_texto': '6 de Diciembre',
+      'categoria': 'estandar',
+      'categoria_nombre': 'Estándar',
+      'gana_conductor': 3.83,
+      'distancia_km': 1.6,
+      'minutos_estimados': 4,
+      'zona_origen': 'quito_norte',
+    };
+
+    test('se arma sin los datos del pasajero', () {
+      final viaje = Trip.fromMap(deLaFuncion);
+      expect(viaje.id, 'v9');
+      expect(viaje.status, TripStatus.buscandoConductor);
+      expect(viaje.ganaConductor, 3.83);
+      expect(viaje.zonaOrigen, 'quito_norte');
+    });
+
+    test('el nombre y el teléfono del pasajero no vienen', () {
+      final viaje = Trip.fromMap(deLaFuncion);
+      expect(viaje.pasajeroTelefono, isNull,
+          reason: 'no se le entrega hasta que acepta');
+      expect(viaje.pasajeroNombre, 'Pasajero',
+          reason: 'un relleno, no un dato real del pasajero');
+    });
+
+    test('trae origen y destino para poder pintar la tarjeta', () {
+      final viaje = Trip.fromMap(deLaFuncion);
+      expect(viaje.origenTexto, 'La Carolina');
+      expect(viaje.destinoTexto, '6 de Diciembre');
+      expect(viaje.origenLat, -0.1807);
+      expect(viaje.destinoLng, -78.4800);
+    });
+  });
+
   group('zona de trabajo', () {
     test('se arma con lo que devuelve mis_zonas', () {
       final zona = WorkZone.fromMap({
