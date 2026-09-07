@@ -309,7 +309,15 @@ $function$;
 -- Sin esto, el `select` de RideService pide columnas que la vista no tiene y
 -- revienta con un 400. Van al final: `create or replace view` solo admite
 -- columnas añadidas después de las que ya estaban.
-create or replace view public.viajes_detalle as
+--
+-- El `with (security_invoker = on)` NO es decorativo y no se puede omitir:
+-- `create or replace view` sin cláusula `with` deja las opciones en blanco, y
+-- una vista sin `security_invoker` corre con los permisos de su dueño
+-- (postgres), saltándose el RLS de `viajes`. Sin esto, cualquier usuario
+-- autenticado leería todos los viajes de todo el mundo —nombres, teléfonos y
+-- direcciones— con solo pedir la vista sin filtros.
+create or replace view public.viajes_detalle
+with (security_invoker = on) as
  SELECT v.id,
     v.estado,
     v.pasajero_id,
@@ -375,6 +383,11 @@ create or replace view public.viajes_detalle as
                 END AS estado
            FROM pagos p
           WHERE p.viaje_id = v.id) cobro ON true;
+
+-- Red de seguridad para quien haya corrido una versión anterior de este
+-- archivo, que recreaba la vista sin el `with` y le dejó las opciones vacías.
+-- Repetirlo no hace daño.
+alter view public.viajes_detalle set (security_invoker = on);
 
 
 -- 8. Permisos
