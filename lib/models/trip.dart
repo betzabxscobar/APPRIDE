@@ -42,6 +42,14 @@ enum TripStatus {
   /// Todavía se puede cancelar. `EN_CURSO` ya no: la persona va a bordo.
   bool get sePuedeCancelar => index < enCurso.index;
 
+  /// Cancelar desde aquí le cuesta al pasajero.
+  ///
+  /// Solo cuando el chofer ya llegó al punto: hizo el viaje hasta ahí y está
+  /// esperando. Antes de eso cancelar sale gratis. Lo decide la base en
+  /// `cancelar_viaje`; esto es para poder avisar antes de que confirme, que
+  /// cobrar por sorpresa no se hace.
+  bool get cancelarTieneMulta => this == conductorEnOrigen;
+
   /// Cuánto del recorrido lleva, para la barra de progreso (0 a 1).
   double get progreso => switch (this) {
         solicitado => 0.08,
@@ -169,6 +177,18 @@ class Trip {
     this.origenLng,
     this.destinoLat,
     this.destinoLng,
+    this.pagoEstado,
+    this.montoCobrado = 0,
+    this.llegadaVerificada,
+    this.desvioDetectado,
+    this.distanciaRecorridaKm,
+    this.canceladoPor,
+    this.motivoCancelacion,
+    this.multa = 0,
+    this.ganaConductor,
+    this.distanciaKm,
+    this.minutosEstimados,
+    this.zonaOrigen,
   });
 
   final String id;
@@ -216,6 +236,62 @@ class Trip {
   final double? origenLng;
   final double? destinoLat;
   final double? destinoLng;
+
+  /// Cómo va el cobro: `completado`, `pendiente`, `fallido`, o null si el
+  /// viaje todavía no generó ninguno.
+  ///
+  /// El efectivo también nace `pendiente`: hasta que el chofer confirme que
+  /// recibió el dinero, nadie puede afirmar que el pasajero pagó.
+  final String? pagoEstado;
+
+  /// Lo que se ha cobrado de verdad, ya descontados los reembolsos.
+  final double montoCobrado;
+
+  /// El chofer cerró el viaje junto al destino.
+  ///
+  /// `null` significa que no se pudo comprobar —no hubo rastro GPS—, no que
+  /// esté bien. Esos viajes los revisa administración a mano.
+  final bool? llegadaVerificada;
+
+  /// El recorrido se pasó de largo respecto a la línea recta origen-destino.
+  final bool? desvioDetectado;
+
+  /// Kilómetros que sumó el rastro del chofer durante el viaje.
+  final double? distanciaRecorridaKm;
+
+  /// Quién canceló, y por qué. Para resolver reclamos.
+  final String? canceladoPor;
+  final String? motivoCancelacion;
+
+  /// Multa por cancelar con el chofer ya esperando en el punto.
+  final double multa;
+
+  /// Este viaje acabó con una multa encima.
+  bool get tieneMulta => multa > 0;
+
+  /// Lo que se lleva el chofer, ya descontada la comisión.
+  ///
+  /// Lo calcula el servidor con el porcentaje de la tarifa de ESTE viaje. Aquí
+  /// no se multiplica nada: si la app inventara el reparto, un cambio de
+  /// tarifa dejaría al chofer viendo una cifra que no es la que va a cobrar.
+  final double? ganaConductor;
+
+  /// Línea recta entre origen y destino, y los minutos que salen de ella a la
+  /// velocidad media de la ciudad.
+  ///
+  /// **No es la ruta.** Sirve para hacerse una idea antes de aceptar; el
+  /// recorrido real casi siempre es mayor.
+  final double? distanciaKm;
+  final int? minutosEstimados;
+
+  /// La zona de la que sale el viaje, o `null` si el origen cae fuera de todas.
+  final String? zonaOrigen;
+
+  /// El cobro está cerrado.
+  bool get pagoConfirmado => pagoEstado == 'completado';
+
+  /// Hay un cobro esperando que alguien confirme que entró el dinero.
+  bool get pagoPendiente => pagoEstado == 'pendiente';
 
   /// Lo que se cobra: el definitivo si ya cerró, si no la cotización.
   double get montoVigente => tarifaFinal ?? tarifaEstimada;
@@ -265,6 +341,18 @@ class Trip {
         'origen_lng': origenLng,
         'destino_lat': destinoLat,
         'destino_lng': destinoLng,
+        'pago_estado': pagoEstado,
+        'monto_cobrado': montoCobrado,
+        'llegada_verificada': llegadaVerificada,
+        'desvio_detectado': desvioDetectado,
+        'distancia_recorrida_km': distanciaRecorridaKm,
+        'cancelado_por': canceladoPor,
+        'motivo_cancelacion': motivoCancelacion,
+        'multa': multa,
+        'gana_conductor': ganaConductor,
+        'distancia_km': distanciaKm,
+        'minutos_estimados': minutosEstimados,
+        'zona_origen': zonaOrigen,
       };
 
   static double? _double(dynamic v) => v == null ? null : (v as num).toDouble();
@@ -302,5 +390,17 @@ class Trip {
         origenLng: _double(row['origen_lng']),
         destinoLat: _double(row['destino_lat']),
         destinoLng: _double(row['destino_lng']),
+        pagoEstado: row['pago_estado'] as String?,
+        montoCobrado: _double(row['monto_cobrado']) ?? 0,
+        llegadaVerificada: row['llegada_verificada'] as bool?,
+        desvioDetectado: row['desvio_detectado'] as bool?,
+        distanciaRecorridaKm: _double(row['distancia_recorrida_km']),
+        canceladoPor: row['cancelado_por'] as String?,
+        motivoCancelacion: row['motivo_cancelacion'] as String?,
+        multa: _double(row['multa']) ?? 0,
+        ganaConductor: _double(row['gana_conductor']),
+        distanciaKm: _double(row['distancia_km']),
+        minutosEstimados: (row['minutos_estimados'] as num?)?.toInt(),
+        zonaOrigen: row['zona_origen'] as String?,
       );
 }

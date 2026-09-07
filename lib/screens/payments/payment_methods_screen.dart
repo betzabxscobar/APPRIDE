@@ -73,6 +73,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
 
   bool get _tieneEfectivo => _metodos.any((m) => m.esEfectivo);
   bool get _tieneDeuna => _metodos.any((m) => m.esDeuna);
+  bool get _tieneTransferencia => _metodos.any((m) => m.esTransferencia);
 
   @override
   Widget build(BuildContext context) {
@@ -116,6 +117,24 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                       minimumSize: const Size.fromHeight(50),
                     ),
                   ),
+                if (!_tieneTransferencia) ...[
+                  const SizedBox(height: 10),
+                  // Como el efectivo y DeUna, no guarda nada del pasajero: la
+                  // cuenta a la que se transfiere es la del chofer, y se la
+                  // enseña la app al terminar el viaje.
+                  OutlinedButton.icon(
+                    onPressed: _ocupado
+                        ? null
+                        : () => _accion(() => FleetService.instance
+                            .agregarMetodoPago(tipo: 'transferencia')
+                            .then((_) {})),
+                    icon: const Icon(Icons.account_balance_outlined, size: 20),
+                    label: const Text('Agregar transferencia'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                    ),
+                  ),
+                ],
                 if (!_tieneDeuna) ...[
                   const SizedBox(height: 10),
                   // DeUna no pide guardar nada: es elegir que este viaje se

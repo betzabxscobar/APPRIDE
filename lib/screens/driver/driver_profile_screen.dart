@@ -12,6 +12,7 @@ import '../../widgets/auth_feedback.dart';
 import '../../widgets/category_chip.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/ride_text_field.dart';
+import 'bank_accounts_screen.dart';
 import 'identity_form_sheet.dart';
 import 'vehicle_form_sheet.dart';
 
@@ -369,6 +370,31 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                         ),
                       const SizedBox(height: 18),
                     ],
+                  const SizedBox(height: 6),
+                  _Titulo('Cómo te pagan'),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Si registras una cuenta, el pasajero puede transferirte en '
+                    'vez de pagarte en efectivo.',
+                    style: TextStyle(fontSize: 12, color: context.ride.inkMuted),
+                  ),
+                  const SizedBox(height: 12),
+                  Card(
+                    margin: EdgeInsets.zero,
+                    child: ListTile(
+                      leading: Icon(Icons.account_balance_outlined,
+                          color: context.ride.accent),
+                      title: const Text('Cuentas para cobrar'),
+                      subtitle: const Text('Pichincha, Guayaquil, Internacional, Produbanco'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const BankAccountsScreen(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                 ],
               ),
             ),
@@ -631,14 +657,17 @@ class _TarjetaDocumento extends StatelessWidget {
   Widget build(BuildContext context) {
     final doc = documento;
 
-    // Un aprobado que ya caducó no es un aprobado: se enseña vencido, porque
-    // con él no se puede trabajar.
-    final vencido = doc != null && doc.estado == DocumentStatus.aprobado &&
-        tipo.caduca && !doc.vigente;
+    final caduca = doc?.caducaEl;
+
+    // Las dos viven en el modelo para poder probarlas: aquí solo se pintan.
+    final vencido = doc?.vencido ?? false;
+    final sinFecha = doc?.sinFecha ?? false;
 
     final (color, icono, etiqueta) = switch (doc?.estado) {
       DocumentStatus.aprobado when vencido =>
         (context.ride.danger, Icons.event_busy, 'Vencido'),
+      DocumentStatus.aprobado when sinFecha =>
+        (context.ride.info, Icons.help_outline, 'Sin fecha'),
       DocumentStatus.aprobado => (context.ride.success, Icons.check_circle, 'Aprobado'),
       DocumentStatus.rechazado =>
         (context.ride.danger, Icons.error_outline, 'Rechazado'),
@@ -653,9 +682,13 @@ class _TarjetaDocumento extends StatelessWidget {
       // arreglar. Sin esto volvía a subir exactamente el mismo papel.
       _ when doc.estado == DocumentStatus.rechazado && doc.motivoRechazo != null =>
         doc.motivoRechazo!,
-      _ when vencido => 'Venció el ${_fechaCorta(doc.caducaEl!)}',
-      _ when doc.porCaducar => 'Vence pronto: ${_fechaCorta(doc.caducaEl!)}',
-      _ when doc.caducaEl != null => 'Vence el ${_fechaCorta(doc.caducaEl!)}',
+      // `vencido` ya exige la fecha; la comprobación va igual para no dejar
+      // ni una aserción que pueda volver a tumbar la pantalla.
+      _ when vencido && caduca != null => 'Venció el ${_fechaCorta(caduca)}',
+      _ when sinFecha => 'Aprobado, pero le falta la fecha de vencimiento',
+      _ when doc.porCaducar && caduca != null =>
+        'Vence pronto: ${_fechaCorta(caduca)}',
+      _ when caduca != null => 'Vence el ${_fechaCorta(caduca)}',
       _ => tipo.hint,
     };
 

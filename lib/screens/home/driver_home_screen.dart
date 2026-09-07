@@ -2,13 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' show MapController;
-import 'package:latlong2/latlong.dart' show LatLng;
+import 'package:latlong2/latlong.dart' show Distance, LatLng, LengthUnit;
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../../core/app_theme.dart';
 import '../../core/map_defaults.dart';
 import '../../core/ride_colors.dart';
 import '../../models/app_user.dart';
+import '../../models/fleet.dart';
 import '../../models/trip.dart';
 import '../../models/user_role.dart';
 import '../../screens/driver/driver_profile_screen.dart';
@@ -26,6 +27,7 @@ import '../../widgets/panel_switcher.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/ride_map.dart';
 import '../../widgets/user_avatar.dart';
+import '../../widgets/zone_picker_sheet.dart';
 import 'account_sheet.dart';
 
 /// Home del rol conductor.
@@ -34,8 +36,9 @@ import 'account_sheet.dart';
 /// arrastrable con el estado, los accesos y las oportunidades. Para quien
 /// conduce el mapa no es decoración: es dónde está y qué tiene alrededor.
 ///
-/// Las oportunidades siguen siendo maqueta; el flujo de aceptar rutas reales
-/// llega en la siguiente etapa.
+/// Las oportunidades son las solicitudes abiertas de verdad, filtradas por la
+/// base: solo llegan las que salen de una zona que el chofer trabaja y en la
+/// que está ahora mismo.
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key, required this.user});
 
@@ -55,6 +58,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   DriverState _estado = const DriverState.sinCuenta();
   Trip? _activo;
   bool _cambiando = false;
+
+  /// Las solicitudes abiertas que le corresponden. Quién entra aquí lo decide
+  /// la política de difusión de la base, no esta pantalla.
+  List<Trip> _oportunidades = const [];
+
+  /// Las que el chofer omitió a mano. Solo mientras la pantalla viva: no es una
+  /// decisión que valga la pena guardar, y si el viaje sigue abierto dentro de
+  /// un rato conviene volver a ofrecérselo.
+  final Set<String> _omitidas = {};
+
+  List<WorkZone> _zonas = const [];
 
   /// Dónde está el chofer y con cuánto margen de error.
   ({LatLng punto, double precision})? _yo;
@@ -99,6 +113,65 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     super.dispose();
   }
 
+  /// Abre el selector de zonas y guarda lo que elija.
+  Future<void> _elegirZonas() async {
+    final elegidas = await mostrarSelectorDeZonas(context, zonas: _zonas);
+    if (elegidas == null) return;
+    try {
+      await RideService.instance.elegirMisZonas(elegidas);
+      await _cargar();
+    } on RideException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  /// Toma la solicitud. Puede fallar si otro chofer se adelantó.
+  Future<void> _aceptar(Trip viaje) async {
+    try {
+      await RideService.instance.aceptar(viaje.id);
+      await _cargar();
+      if (!mounted) return;
+      _abrirViajes();
+    } on RideException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+      await _cargar();
+    }
+  }
+
+  /// Las que se le enseñan: las abiertas menos las que omitió, y las más
+  /// cercanas primero. La cercanía es al punto de recogida, que es el trayecto
+  /// que hace de gratis.
+  List<Trip> get _oportunidadesVisibles {
+    final yo = _yo?.punto;
+    final lista = _oportunidades
+        .where((v) => !_omitidas.contains(v.id))
+        .toList();
+    if (yo != null) {
+      lista.sort((a, b) {
+        final da = _kmHasta(yo, a) ?? double.infinity;
+        final db = _kmHasta(yo, b) ?? double.infinity;
+        return da.compareTo(db);
+      });
+    }
+    return lista;
+  }
+
+  /// Kilómetros en línea recta de donde está el chofer al punto de recogida.
+  double? _kmHasta(LatLng yo, Trip viaje) {
+    final lat = viaje.origenLat;
+    final lng = viaje.origenLng;
+    if (lat == null || lng == null) return null;
+    return const Distance().as(
+      LengthUnit.Kilometer,
+      yo,
+      LatLng(lat, lng),
+    );
+  }
+
   Future<void> _cargar() async {
     try {
       // Un superadministrador entra a conducir sin esperar a que alguien
@@ -110,10 +183,24 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
       final estado = await RideService.instance.estadoConductor();
       final activo = await RideService.instance.viajeActivo();
+
+      // Las oportunidades y las zonas no pueden tumbar la pantalla: si fallan
+      // se queda con lo que hubiera, que es mejor que un home en rojo.
+      List<Trip> oportunidades = _oportunidades;
+      List<WorkZone> zonas = _zonas;
+      try {
+        oportunidades = await RideService.instance.solicitudesAbiertas();
+      } catch (_) {}
+      try {
+        zonas = await RideService.instance.misZonas();
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
           _estado = estado;
           _activo = activo;
+          _oportunidades = oportunidades;
+          _zonas = zonas;
         });
         _ajustarLatido();
         await TripSessionStore.instance.guardar(activo);
@@ -362,6 +449,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     onDisponibilidad: _cambiarDisponibilidad,
                     onAbrirViajes: _abrirViajes,
                     onAbrirPerfil: _abrirPerfil,
+                    zonasElegidas:
+                        _zonas.where((z) => z.elegida).toList(),
+                    onCambiarZona: _elegirZonas,
+                    oportunidades: _oportunidadesVisibles,
+                    kmHasta: (viaje) {
+                      final yo = _yo?.punto;
+                      return yo == null ? null : _kmHasta(yo, viaje);
+                    },
+                    onAceptar: _aceptar,
+                    onOmitir: (viaje) =>
+                        setState(() => _omitidas.add(viaje.id)),
                   ),
                 ),
               ],
@@ -441,6 +539,12 @@ class _HojaConductor extends StatelessWidget {
     required this.onDisponibilidad,
     required this.onAbrirViajes,
     required this.onAbrirPerfil,
+    required this.zonasElegidas,
+    required this.onCambiarZona,
+    required this.oportunidades,
+    required this.kmHasta,
+    required this.onAceptar,
+    required this.onOmitir,
   });
 
   final ScrollController controller;
@@ -451,6 +555,13 @@ class _HojaConductor extends StatelessWidget {
   final ValueChanged<bool> onDisponibilidad;
   final VoidCallback onAbrirViajes;
   final VoidCallback onAbrirPerfil;
+
+  final List<WorkZone> zonasElegidas;
+  final VoidCallback onCambiarZona;
+  final List<Trip> oportunidades;
+  final double? Function(Trip) kmHasta;
+  final ValueChanged<Trip> onAceptar;
+  final ValueChanged<Trip> onOmitir;
 
   @override
   Widget build(BuildContext context) {
@@ -536,15 +647,18 @@ class _HojaConductor extends StatelessWidget {
             children: [
               Icon(Icons.place_outlined, size: 20, color: ride.inkMuted),
               const SizedBox(width: 8),
-              Text(
-                'Zona: Quito Norte',
-                style: TextStyle(
-                  fontSize: AppText.small,
-                  color: ride.inkMuted,
+              Expanded(
+                child: Text(
+                  zonasElegidas.isEmpty
+                      ? 'Sin zona: recibes de toda la ciudad'
+                      : 'Zona: ${zonasElegidas.map((z) => z.nombre).join(', ')}',
+                  style: TextStyle(
+                    fontSize: AppText.small,
+                    color: ride.inkMuted,
+                  ),
                 ),
               ),
-              const Spacer(),
-              TextButton(onPressed: () {}, child: const Text('Cambiar')),
+              TextButton(onPressed: onCambiarZona, child: const Text('Cambiar')),
             ],
           ),
           if (vehiculo != null) ...[
@@ -597,31 +711,25 @@ class _HojaConductor extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Ordenadas por compatibilidad y retorno',
+            oportunidades.isEmpty
+                ? 'Aquí aparecen las solicitudes de tu zona'
+                : 'Las más cercanas a ti primero',
             style: TextStyle(fontSize: AppText.small, color: ride.inkMuted),
           ),
           const SizedBox(height: 16),
-          const _OpportunityCard(
-            index: 1,
-            tag: 'Alta compatibilidad',
-            match: '92%',
-            from: 'Av. 6 de Diciembre',
-            to: 'Cumbayá',
-            earnings: '\$8.40',
-            duration: '14 min',
-            distance: '6.2 km',
-          ),
-          const SizedBox(height: 14),
-          const _OpportunityCard(
-            index: 2,
-            tag: 'Buen retorno',
-            match: '78%',
-            from: 'La Carolina',
-            to: 'Calderón',
-            earnings: '\$9.10',
-            duration: '18 min',
-            distance: '8.1 km',
-          ),
+          if (oportunidades.isEmpty)
+            _SinOportunidades(disponible: estado.disponible)
+          else
+            for (final (i, viaje) in oportunidades.indexed) ...[
+              _OpportunityCard(
+                index: i + 1,
+                viaje: viaje,
+                kmHastaTi: kmHasta(viaje),
+                onAceptar: () => onAceptar(viaje),
+                onOmitir: () => onOmitir(viaje),
+              ),
+              const SizedBox(height: 14),
+            ],
         ],
       ),
     );
@@ -751,26 +859,72 @@ class _ViajeActivo extends StatelessWidget {
   }
 }
 
+/// Cuando no hay nada que ofrecer. Dice por qué, que es lo útil.
+class _SinOportunidades extends StatelessWidget {
+  const _SinOportunidades({required this.disponible});
+
+  final bool disponible;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+    return RideCard(
+      child: Column(
+        children: [
+          Icon(
+            disponible ? Icons.search_off : Icons.pause_circle_outline,
+            size: 34,
+            color: ride.inkFaint,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            disponible
+                ? 'No hay solicitudes ahora mismo'
+                : 'No estás disponible',
+            style: TextStyle(
+              fontSize: AppText.h3,
+              fontWeight: FontWeight.w700,
+              color: ride.ink,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            disponible
+                ? 'Te avisamos en cuanto alguien pida un viaje en tu zona.'
+                : 'Actívate arriba para que te lleguen solicitudes.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: AppText.small, color: ride.inkMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Una solicitud abierta de verdad, con lo que el chofer necesita para decidir.
+///
+/// Antes esta tarjeta traía un «92% de compatibilidad» inventado. No se ha
+/// sustituido por otro número de adorno: lo que se enseña ahora es la distancia
+/// real hasta el punto de recogida, que es el trayecto que hace sin cobrar y lo
+/// que de verdad decide si le conviene.
 class _OpportunityCard extends StatelessWidget {
   const _OpportunityCard({
     required this.index,
-    required this.tag,
-    required this.match,
-    required this.from,
-    required this.to,
-    required this.earnings,
-    required this.duration,
-    required this.distance,
+    required this.viaje,
+    required this.kmHastaTi,
+    required this.onAceptar,
+    required this.onOmitir,
   });
 
   final int index;
-  final String tag;
-  final String match;
-  final String from;
-  final String to;
-  final String earnings;
-  final String duration;
-  final String distance;
+  final Trip viaje;
+
+  /// Cuánto tiene que ir a recogerlo. `null` si todavía no se sabe dónde está
+  /// el chofer: entonces no se enseña, en vez de poner un cero que engaña.
+  final double? kmHastaTi;
+
+  final VoidCallback onAceptar;
+  final VoidCallback onOmitir;
 
   @override
   Widget build(BuildContext context) {
@@ -785,6 +939,11 @@ class _OpportunityCard extends StatelessWidget {
       fontSize: AppText.small,
       color: ride.inkMuted,
     );
+
+    final gana = viaje.ganaConductor;
+    final km = viaje.distanciaKm;
+    final minutos = viaje.minutosEstimados;
+    final cerca = kmHastaTi;
 
     return RideCard(
       child: Column(
@@ -807,7 +966,7 @@ class _OpportunityCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  tag,
+                  viaje.categoriaNombre ?? 'Viaje',
                   style: TextStyle(
                     fontSize: AppText.small,
                     fontWeight: FontWeight.w700,
@@ -815,24 +974,25 @@ class _OpportunityCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 11,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: ride.successSoft,
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: Text(
-                  match,
-                  style: TextStyle(
-                    fontSize: AppText.label,
-                    fontWeight: FontWeight.w800,
-                    color: ride.success,
+              if (cerca != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ride.successSoft,
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Text(
+                    'A ${cerca.toStringAsFixed(1)} km de ti',
+                    style: TextStyle(
+                      fontSize: AppText.label,
+                      fontWeight: FontWeight.w800,
+                      color: ride.success,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -844,57 +1004,62 @@ class _OpportunityCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _Label('Desde'),
-                    Text(from, style: placeStyle),
+                    Text(viaje.origenTexto, style: placeStyle),
                     const SizedBox(height: 10),
                     _Label('Hasta'),
-                    Text(to, style: placeStyle),
+                    Text(viaje.destinoTexto, style: placeStyle),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: ride.successSoft,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusField),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      'Tú ganas',
-                      style: TextStyle(
-                        fontSize: AppText.label,
-                        color: ride.inkMuted,
+              if (gana != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ride.successSoft,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusField),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Tú ganas',
+                        style: TextStyle(
+                          fontSize: AppText.label,
+                          color: ride.inkMuted,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      earnings,
-                      style: AppTheme.display(
-                        AppText.h2,
-                        color: ride.ink,
-                        letterSpacing: -0.6,
-                        height: 1.1,
+                      const SizedBox(height: 3),
+                      Text(
+                        '\$${gana.toStringAsFixed(2)}',
+                        style: AppTheme.display(
+                          AppText.h2,
+                          color: ride.ink,
+                          letterSpacing: -0.6,
+                          height: 1.1,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 14),
           Row(
             children: [
-              Icon(Icons.schedule, size: 18, color: ride.inkMuted),
-              const SizedBox(width: 6),
-              Text(duration, style: metaStyle),
-              const SizedBox(width: 18),
-              Icon(Icons.route_outlined, size: 18, color: ride.inkMuted),
-              const SizedBox(width: 6),
-              Text(distance, style: metaStyle),
+              if (minutos != null) ...[
+                Icon(Icons.schedule, size: 18, color: ride.inkMuted),
+                const SizedBox(width: 6),
+                Text('$minutos min', style: metaStyle),
+                const SizedBox(width: 18),
+              ],
+              if (km != null) ...[
+                Icon(Icons.route_outlined, size: 18, color: ride.inkMuted),
+                const SizedBox(width: 6),
+                Text('${km.toStringAsFixed(1)} km', style: metaStyle),
+              ],
             ],
           ),
           const SizedBox(height: 16),
@@ -905,7 +1070,7 @@ class _OpportunityCard extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(50),
                   ),
-                  onPressed: () {},
+                  onPressed: onAceptar,
                   child: const Text('Aceptar ruta'),
                 ),
               ),
@@ -915,7 +1080,7 @@ class _OpportunityCard extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(50),
                   ),
-                  onPressed: () {},
+                  onPressed: onOmitir,
                   child: const Text('Omitir'),
                 ),
               ),

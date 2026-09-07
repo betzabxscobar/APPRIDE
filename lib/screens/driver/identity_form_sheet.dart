@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/ride_colors.dart';
+import '../../core/validators.dart';
 import '../../models/fleet.dart';
 import '../../services/fleet_service.dart';
 import '../../services/ride_service.dart';
@@ -61,35 +62,10 @@ class _FormularioIdentidadState extends State<_FormularioIdentidad> {
     super.dispose();
   }
 
-  /// El mismo algoritmo que `cedula_ecuatoriana_valida()` en Postgres.
-  ///
-  /// Está repetido a propósito, y solo aquí: sirve para avisar mientras se
-  /// escribe, sin ir al servidor. **La que manda es la de la base**, que es la
-  /// que no se puede saltar manipulando la app.
-  String? _validarCedula(String? valor) {
-    final v = (valor ?? '').replaceAll(RegExp(r'[^0-9]'), '');
-    if (v.length != 10) return 'La cédula tiene diez dígitos';
-
-    final provincia = int.parse(v.substring(0, 2));
-    if (!(provincia >= 1 && provincia <= 24) && provincia != 30) {
-      return 'Los dos primeros dígitos no son una provincia';
-    }
-    if (int.parse(v[2]) > 5) return 'Eso parece un RUC, no una cédula';
-
-    var suma = 0;
-    for (var i = 0; i < 9; i++) {
-      var d = int.parse(v[i]);
-      if (i % 2 == 0) {
-        d *= 2;
-        if (d > 9) d -= 9;
-      }
-      suma += d;
-    }
-    if ((10 - (suma % 10)) % 10 != int.parse(v[9])) {
-      return 'Esa cédula no existe. Revisa los dígitos.';
-    }
-    return null;
-  }
+  /// Delega en [Validators.cedula], que trae el mismo algoritmo que
+  /// `cedula_ecuatoriana_valida()` en Postgres. **La que manda es la de la
+  /// base**, que es la que no se puede saltar manipulando la app.
+  String? _validarCedula(String? valor) => Validators.cedula(valor);
 
   String? _validarDactilar(String? valor) {
     final v = (valor ?? '').replaceAll(' ', '').toUpperCase();

@@ -16,6 +16,7 @@ import '../../widgets/chat_button.dart';
 import '../payments/deuna_qr_screen.dart';
 import '../support/support_screen.dart';
 import '../../widgets/ride_card.dart';
+import '../../widgets/transfer_sheet.dart';
 import '../../widgets/trip_route_map.dart';
 import '../../widgets/user_avatar.dart';
 import 'rate_trip_sheet.dart';
@@ -47,6 +48,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   /// que enseñarle el QR. Se mira una vez, al terminar, y no en cada aviso de
   /// Realtime.
   bool _pagaConDeuna = false;
+  bool _pagaConTransferencia = false;
   bool _metodoConsultado = false;
 
   /// Dónde va el chofer y cuándo se supo.
@@ -138,7 +140,15 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
     try {
       final metodos = await FleetService.instance.misMetodosPago();
       final deuna = metodos.any((m) => m.esDeuna && m.predeterminado);
-      if (mounted && deuna) setState(() => _pagaConDeuna = true);
+      final transferencia =
+          metodos.any((m) => m.esTransferencia && m.predeterminado);
+      if (!mounted) return;
+      if (deuna || transferencia) {
+        setState(() {
+          _pagaConDeuna = deuna;
+          _pagaConTransferencia = transferencia;
+        });
+      }
     } catch (_) {
       // Sin red o sin permiso: se queda sin botón, no con uno roto.
     }
@@ -176,11 +186,20 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   }
 
   Future<void> _cancelar() async {
+    // Si el chofer ya esta esperando, cancelar cuesta. Se dice ANTES de que
+    // confirme: cobrar por sorpresa no se hace.
+    final conMulta = _viaje?.status.cancelarTieneMulta ?? false;
+
     final confirmado = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('¿Cancelar el viaje?'),
-        content: const Text('Se avisará al chofer si ya tenías uno asignado.'),
+        content: Text(
+          conMulta
+              ? 'El chofer ya llegó al punto y te está esperando. Si cancelas '
+                  'ahora se te cobra \$1.00 por el viaje que hizo hasta aquí.'
+              : 'Se avisará al chofer si ya tenías uno asignado.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -189,7 +208,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(backgroundColor: context.ride.danger),
-            child: const Text('Sí, cancelar'),
+            child: Text(conMulta ? 'Cancelar y pagar \$1.00' : 'Sí, cancelar'),
           ),
         ],
       ),
@@ -201,7 +220,10 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
       _error = null;
     });
     try {
-      await RideService.instance.cancelar(widget.viajeId);
+      await RideService.instance.cancelar(
+        widget.viajeId,
+        motivo: 'Cancelado por el pasajero',
+      );
       await _cargar();
     } on RideException catch (e) {
       if (!mounted) return;
@@ -266,6 +288,23 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                     ],
                     const SizedBox(height: 16),
                     _TarjetaPrecio(viaje: viaje),
+                    if (viaje.status == TripStatus.finalizado &&
+                        _pagaConTransferencia) ...[
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: () => mostrarHojaTransferencia(
+                          context,
+                          viajeId: viaje.id,
+                          monto: viaje.montoVigente,
+                          chofer: viaje.conductorNombre,
+                        ),
+                        icon: const Icon(Icons.account_balance_outlined, size: 20),
+                        label: const Text('Ver cuenta para transferir'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                        ),
+                      ),
+                    ],
                     if (viaje.status == TripStatus.finalizado &&
                         _pagaConDeuna) ...[
                       const SizedBox(height: 12),

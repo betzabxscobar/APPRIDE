@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+import '../models/fleet.dart';
 import '../models/trip.dart';
 import '../models/vehicle_category.dart';
 import 'auth_service.dart';
@@ -31,7 +32,11 @@ class RideService {
     vehiculo_placa, vehiculo_marca, vehiculo_modelo, vehiculo_color,
     origen_lat, origen_lng, origen_texto, origen_referencia,
     destino_lat, destino_lng, destino_texto, destino_referencia,
-    categoria, categoria_nombre, categoria_icono
+    categoria, categoria_nombre, categoria_icono,
+    pago_estado, monto_cobrado,
+    llegada_verificada, desvio_detectado, distancia_recorrida_km,
+    cancelado_por, motivo_cancelacion, multa,
+    gana_conductor, distancia_km, minutos_estimados, zona_origen
   ''';
 
   // ---------------------------------------------------------------------------
@@ -251,19 +256,20 @@ class RideService {
 
   /// Solicitudes abiertas que este chofer puede tomar.
   ///
-  /// La política `viajes_difusion_conductores` es la que decide si las ve: solo
-  /// llegan si está aprobado y disponible.
+  /// Sale de `solicitudes_abiertas()` y **no** de la vista `viajes_detalle`.
+  /// La vista es `security_invoker`, así que aplica el RLS de todas sus tablas
+  /// con los permisos del chofer: la fila de `viajes` sí la ve por la política
+  /// de difusión, pero el `join` interno con el perfil del pasajero —que un
+  /// chofer no puede leer— borraba la fila entera y esta lista salía siempre
+  /// vacía. La función aplica las mismas reglas por dentro y devuelve solo lo
+  /// que hace falta para decidir; el nombre y el teléfono del pasajero no
+  /// llegan hasta que acepta.
   Future<List<Trip>> solicitudesAbiertas() async {
-    final rows = await _client
-        .from('viajes_detalle')
-        .select(_detalle)
-        .eq('estado', 'BUSCANDO_CONDUCTOR')
-        .isFilter('conductor_id', null)
-        // La solicitud que lleva más tiempo esperando, primero: quien
-        // pidió antes no debe quedarse al fondo de la lista.
-        .order('fecha_solicitud', ascending: true);
+    final filas = await _client.rpc('solicitudes_abiertas') as List<dynamic>;
 
-    final viajes = rows.map(Trip.fromMap).toList();
+    final viajes = filas
+        .map((f) => Trip.fromMap(Map<String, dynamic>.from(f as Map)))
+        .toList();
 
     // Solo las del tipo de vehículo que conduce.
     //
@@ -336,8 +342,46 @@ class RideService {
     return total.toDouble();
   }
 
-  Future<void> cancelar(String viajeId) =>
-      _rpc<void>('cancelar_viaje', {'p_viaje_id': viajeId});
+  /// Cancela el viaje y deja constancia de quién lo hizo.
+  ///
+  /// La base rechaza cancelar un viaje `EN_CURSO`: con la persona a bordo el
+  /// viaje termina en `FINALIZADO` o no termina. El [motivo] es opcional y
+  /// queda guardado para cuando haya que resolver un reclamo.
+  Future<void> cancelar(String viajeId, {String? motivo}) =>
+      _rpc<void>('cancelar_viaje', {
+        'p_viaje_id': viajeId,
+        'p_motivo': motivo,
+      });
+
+  /// El chofer confirma que le llegó el dinero del pasajero.
+  ///
+  /// Vale para efectivo y para transferencia: en los dos casos la app no se
+  /// entera sola, y el único que sabe si entró es el chofer. DeUna no pasa por
+  /// aquí —esa la confirma la pasarela—, y la base lo rechaza si se intenta.
+  ///
+  /// Hasta que lo confirme, el cobro queda `pendiente`. Con la confirmación
+  /// entra también la comisión de la app como deuda del chofer.
+  Future<void> confirmarPagoRecibido(String viajeId) =>
+      _rpc<void>('confirmar_pago_recibido', {'p_viaje_id': viajeId});
+
+  // ---------------------------------------------------------------------------
+  // Zonas de trabajo
+  // ---------------------------------------------------------------------------
+
+  /// Las zonas disponibles, marcando cuáles trabaja este chofer.
+  Future<List<WorkZone>> misZonas() async {
+    final filas = await _client.rpc('mis_zonas') as List<dynamic>;
+    return filas
+        .map((f) => WorkZone.fromMap(Map<String, dynamic>.from(f as Map)))
+        .toList();
+  }
+
+  /// Reemplaza las zonas del chofer por las que le pases.
+  ///
+  /// Una lista vacía lo deja sin zonas, que **no** es quedarse sin trabajo:
+  /// sin zonas marcadas recibe como antes, sin filtro. La zona se activa.
+  Future<void> elegirMisZonas(List<String> zonas) =>
+      _rpc<int>('elegir_mis_zonas', {'p_zonas': zonas});
 
   /// Reporta dónde está el chofer.
   ///
