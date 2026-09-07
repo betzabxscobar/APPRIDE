@@ -230,6 +230,23 @@ class DriverDocument {
     return f != null && !f.isBefore(DateTime.now());
   }
 
+  /// Aprobado y con la fecha ya pasada.
+  ///
+  /// **Sin fecha no es vencido**: es [sinFecha]. Confundir las dos cosas no
+  /// solo miente al chofer, sino que llevaba a pedir una fecha que no existe.
+  bool get vencido {
+    if (estado != DocumentStatus.aprobado || !tipo.caduca) return false;
+    final f = caducaEl;
+    return f != null && f.isBefore(DateTime.now());
+  }
+
+  /// Aprobado, de los que caducan, y sin fecha registrada.
+  ///
+  /// No se sabe si sirve o no. Se dice tal cual, en vez de dar por buena o por
+  /// mala una de las dos posibilidades.
+  bool get sinFecha =>
+      estado == DocumentStatus.aprobado && tipo.caduca && caducaEl == null;
+
   /// Caduca dentro de un mes: se avisa antes de que deje de servir.
   bool get porCaducar {
     final f = caducaEl;

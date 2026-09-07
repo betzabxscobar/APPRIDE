@@ -657,14 +657,17 @@ class _TarjetaDocumento extends StatelessWidget {
   Widget build(BuildContext context) {
     final doc = documento;
 
-    // Un aprobado que ya caducó no es un aprobado: se enseña vencido, porque
-    // con él no se puede trabajar.
-    final vencido = doc != null && doc.estado == DocumentStatus.aprobado &&
-        tipo.caduca && !doc.vigente;
+    final caduca = doc?.caducaEl;
+
+    // Las dos viven en el modelo para poder probarlas: aquí solo se pintan.
+    final vencido = doc?.vencido ?? false;
+    final sinFecha = doc?.sinFecha ?? false;
 
     final (color, icono, etiqueta) = switch (doc?.estado) {
       DocumentStatus.aprobado when vencido =>
         (context.ride.danger, Icons.event_busy, 'Vencido'),
+      DocumentStatus.aprobado when sinFecha =>
+        (context.ride.info, Icons.help_outline, 'Sin fecha'),
       DocumentStatus.aprobado => (context.ride.success, Icons.check_circle, 'Aprobado'),
       DocumentStatus.rechazado =>
         (context.ride.danger, Icons.error_outline, 'Rechazado'),
@@ -679,9 +682,13 @@ class _TarjetaDocumento extends StatelessWidget {
       // arreglar. Sin esto volvía a subir exactamente el mismo papel.
       _ when doc.estado == DocumentStatus.rechazado && doc.motivoRechazo != null =>
         doc.motivoRechazo!,
-      _ when vencido => 'Venció el ${_fechaCorta(doc.caducaEl!)}',
-      _ when doc.porCaducar => 'Vence pronto: ${_fechaCorta(doc.caducaEl!)}',
-      _ when doc.caducaEl != null => 'Vence el ${_fechaCorta(doc.caducaEl!)}',
+      // `vencido` ya exige la fecha; la comprobación va igual para no dejar
+      // ni una aserción que pueda volver a tumbar la pantalla.
+      _ when vencido && caduca != null => 'Venció el ${_fechaCorta(caduca)}',
+      _ when sinFecha => 'Aprobado, pero le falta la fecha de vencimiento',
+      _ when doc.porCaducar && caduca != null =>
+        'Vence pronto: ${_fechaCorta(caduca)}',
+      _ when caduca != null => 'Vence el ${_fechaCorta(caduca)}',
       _ => tipo.hint,
     };
 
