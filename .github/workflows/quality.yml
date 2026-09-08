@@ -1,0 +1,28 @@
+name: Calidad app
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+      - name: Preparar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Instalar dependencias
+        run: flutter pub get
+      - name: Analizar el proyecto
+        run: flutter analyze
+      - name: Ejecutar pruebas
+        run: flutter test

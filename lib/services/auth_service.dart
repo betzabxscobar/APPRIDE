@@ -324,9 +324,8 @@ class AuthService extends ChangeNotifier {
   /// la pantalla muestra siempre el mismo aviso, para no filtrar qué cuentas
   /// hay registradas.
   ///
-  /// El enlace abre el navegador, no la app: allí se fija la contraseña nueva
-  /// y después se vuelve aquí a iniciar sesión. Para que abriera la app harían
-  /// falta *deep links*, que todavía no están configurados.
+  /// El enlace usa `ride://login-callback`, registrado en Android e iOS, para
+  /// devolver al usuario a la aplicación y completar el cambio allí.
   Future<void> requestPasswordReset(String email) async {
     _setLoading(true);
     try {
