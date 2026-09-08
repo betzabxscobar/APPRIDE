@@ -406,9 +406,10 @@ permiso: un viaje no puede arrancar sin auto asignado.
 - Los seis módulos del panel administrativo móvil están conectados: **Resumen**,
   **Usuarios**, **Conductores**, **Viajes**, **Tarifas** y **Soporte**. Ya no
   queda ninguna pantalla de espera.
-- La recuperación abre el navegador porque aún no están configurados los enlaces
-  profundos que devolverían al usuario directamente a la aplicación. Lo mismo
-  vale para el enlace que confirma un cambio de correo.
+- Android e iOS registran `ride://login-callback` para que la recuperación de
+  contraseña y la confirmación de correo puedan volver a la aplicación. También
+  debe añadirse esa URL a la lista de redirecciones permitidas del proyecto de
+  Supabase usado en cada entorno.
 - Pasajero y conductor disponen de un mapa visual con ubicación, puntos del
   viaje, posición del conductor y ruta por calles cuando OSRM responde.
 - El mapa usa teselas **vectoriales** de OpenFreeMap con estilos propios para
@@ -426,6 +427,39 @@ permiso: un viaje no puede arrancar sin auto asignado.
 - El seguimiento del chofer se refresca cada 30 segundos mientras la aplicación
   está abierta. No hay rastreo en segundo plano: con la app cerrada, el auto
   deja de reportar posición hasta que se vuelve a abrir.
+
+## Comprobaciones automáticas
+
+Cada envío o propuesta de cambio hacia `main` ejecuta en GitHub Actions:
+
+```sh
+flutter pub get
+flutter analyze
+flutter test
+```
+
+Estas comprobaciones detectan errores de código y regresiones cubiertas por las
+pruebas; no sustituyen una prueba manual del GPS, enlaces de correo, mapas,
+notificaciones, cámara, archivos y permisos en dispositivos Android e iOS reales.
+
+## Antes de producción
+
+- Cambiar `com.example.ride` por el identificador definitivo en Android e iOS,
+  configurar el equipo de firma de Apple y firmar Android con una clave de
+  publicación. La versión actual usa firma de depuración.
+- Registrar `ride://login-callback` en las redirecciones permitidas de Supabase y
+  probar recuperación y cambio de correo en ambos sistemas operativos.
+- Aplicar y verificar todas las migraciones en el proyecto correcto de Supabase,
+  incluidos RLS y los asesores de seguridad y rendimiento.
+- Configurar FCM y APNs si se requieren avisos con la aplicación cerrada. Hoy los
+  avisos de Realtime llegan mientras la app está ejecutándose.
+- Usar un servidor OSRM propio o contratado; el servidor público es solo una
+  dependencia provisional para desarrollo.
+- Integrar y validar la función de cobro, credenciales y webhook del proveedor de
+  pagos antes de habilitar un método distinto de efectivo.
+- Añadir un visor de PDF al panel de revisión si se aceptarán documentos en ese
+  formato y probar el rastreo de ubicación con las políticas de segundo plano
+  que finalmente se decidan.
 
 ## Configuración opcional
 
