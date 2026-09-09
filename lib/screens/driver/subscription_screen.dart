@@ -114,6 +114,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     onPagar: _pagar,
                     onRevisar: _cargar,
                   ),
+                  if (_cuota.tienePagoAMedias) ...[
+                    const SizedBox(height: AppTheme.spaceSm),
+                    _Aviso(
+                      texto: 'Dejaste un pago a medias en PayPal '
+                          '(${_cuota.pagoSinTerminar}). Mientras no lo '
+                          'apruebes no cuenta como pagado.',
+                    ),
+                  ],
                   if (_vuelveDePagar && !_cuota.vigente) ...[
                     const SizedBox(height: AppTheme.spaceSm),
                     _Aviso(
@@ -337,7 +345,9 @@ class _Boton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Al que ya está al día no se le ofrece pagar otra vez: pagaría doble.
-    if (cuota.vigente && !cuota.esCortesia) {
+    // Salvo que tenga un pago a medias, que sí conviene que termine o que se
+    // entere de que quedó colgado.
+    if (cuota.vigente && !cuota.esCortesia && !cuota.tienePagoAMedias) {
       return OutlinedButton.icon(
         onPressed: onRevisar,
         icon: const Icon(Icons.refresh),
@@ -363,11 +373,13 @@ class _Boton extends StatelessWidget {
             )
           : const Icon(Icons.account_balance_wallet_outlined),
       label: Text(
-        cuota.esCortesia
-            ? 'Pagar por adelantado'
-            : cuota.caducada
-                ? 'Renovar por \$15'
-                : 'Pagar \$15 con PayPal',
+        cuota.tienePagoAMedias
+            ? 'Terminar el pago'
+            : cuota.esCortesia
+                ? 'Pagar por adelantado'
+                : cuota.caducada
+                    ? 'Renovar por \$15'
+                    : 'Pagar \$15 con PayPal',
       ),
     );
   }

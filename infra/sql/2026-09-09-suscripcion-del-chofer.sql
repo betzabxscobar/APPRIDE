@@ -104,6 +104,16 @@ comment on function public.suscripcion_vigente(uuid) is
 -- Lo que la app necesita pintar en el panel. Devuelve una fila siempre, aunque
 -- el chofer no haya pagado nunca: asi la pantalla no tiene que distinguir
 -- entre "no hay datos" y "error de red".
+--
+-- La fila que devuelve es la que MANDA, o sea la que le deja trabajar, no la
+-- ultima que se creo. Cogiendo la ultima se mezclaban dos: un chofer con el
+-- mes de cortesia que abria una suscripcion en PayPal y no la pagaba veia
+-- "Al dia" con los datos de la de PayPal delante, como si hubiera pagado. Se
+-- vio en el telefono, no en las pruebas.
+--
+-- `pago_sin_terminar` es esa suscripcion abierta y sin aprobar. No sirve para
+-- trabajar, pero se devuelve para poder avisarla: si no, el chofer se queda
+-- creyendo que pago.
 create or replace function public.mi_suscripcion()
 returns table (
   estado text,
@@ -113,37 +123,50 @@ returns table (
   monto numeric,
   moneda text,
   proveedor text,
-  referencia_externa text
+  referencia_externa text,
+  pago_sin_terminar text
 )
 language sql
 stable
 security definer
 set search_path to ''
 as $$
+  with yo as (select auth.uid() as uid),
+  manda as (
+    select s.*
+    from public.suscripciones_chofer s, yo
+    where s.conductor_id = yo.uid
+    order by
+      (s.estado = 'activa' and s.vigente_hasta > now()) desc,
+      s.vigente_hasta desc nulls last,
+      s.created_at desc
+    limit 1
+  ),
+  sin_terminar as (
+    select s.referencia_externa
+    from public.suscripciones_chofer s, yo
+    where s.conductor_id = yo.uid
+      and s.estado = 'pendiente'
+      and s.referencia_externa is not null
+    order by s.created_at desc
+    limit 1
+  )
   select
-    coalesce(s.estado, 'pendiente'),
-    s.vigente_hasta,
+    coalesce(m.estado, 'pendiente'),
+    m.vigente_hasta,
     case
-      when s.vigente_hasta is null then null
+      when m.vigente_hasta is null then null
       -- Hacia arriba: a quien le quedan 3 horas le quedan "1 dia", no "0".
-      else greatest(0, ceil(extract(epoch from (s.vigente_hasta - now())) / 86400))::integer
+      else greatest(0, ceil(extract(epoch from (m.vigente_hasta - now())) / 86400))::integer
     end,
-    public.suscripcion_vigente(auth.uid()),
-    coalesce(s.monto, 15),
-    coalesce(s.moneda, 'USD'),
-    coalesce(s.proveedor, 'paypal'),
-    s.referencia_externa
-  from (select auth.uid() as uid) yo
-  left join public.suscripciones_chofer s
-    on s.conductor_id = yo.uid
-   -- La ultima que se creo. Un chofer que pago, dejo vencer y volvio tiene
-   -- varias filas y la que importa es la nueva.
-   and s.id = (
-     select s2.id from public.suscripciones_chofer s2
-     where s2.conductor_id = yo.uid
-     order by s2.created_at desc
-     limit 1
-   );
+    public.suscripcion_vigente((select uid from yo)),
+    coalesce(m.monto, 15),
+    coalesce(m.moneda, 'USD'),
+    coalesce(m.proveedor, 'paypal'),
+    m.referencia_externa,
+    (select referencia_externa from sin_terminar)
+  from (select 1) _
+  left join manda m on true;
 $$;
 
 -- ---------------------------------------------------------------------------

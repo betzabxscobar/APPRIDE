@@ -90,6 +90,20 @@ poder probar el flujo de chofer (CU-A26).
 navegador; quien da la cuota por pagada es el webhook. Por eso el panel ofrece
 «Ya pagué» en vez de darlo por hecho: PayPal tarda unos segundos en avisar.
 
+### Un pago abierto y sin aprobar no es un pago
+
+Al pulsar pagar queda una fila en `pendiente` aunque el chofer cierre PayPal sin
+pagar. Esa fila no sirve para trabajar —`suscripcion_vigente()` solo mira las
+`activa`— pero hay que enseñarla: `mi_suscripcion()` la devuelve aparte, en
+`pago_sin_terminar`, y el panel avisa de que quedó a medias.
+
+La primera version se equivocaba justo aquí: devolvia la fila *mas nueva* en vez
+de la que manda, asi que un chofer con mes de cortesía que abría el pago y no lo
+terminaba veía «Al día» con la referencia de PayPal delante, como si hubiera
+pagado. El acceso nunca estuvo mal dado —lo que le dejaba trabajar era la
+cortesía, correctamente—, pero la pantalla le mentía. Salió probando en el
+teléfono, no en las pruebas.
+
 ### Lo que la app no puede hacer
 
 - **No marca su propia cuota como pagada.** `suscripciones_chofer` tiene RLS con

@@ -1773,6 +1773,56 @@ void main() {
       expect(const DriverState.sinCuenta().puedeTrabajar, isFalse);
     });
 
+    test('Cortesía más un pago sin aprobar no se cuenta como pagado', () {
+      // El caso que se vio en el telefono: el chofer abria el pago, no lo
+      // terminaba, y la pantalla decia «Al dia» con la referencia de PayPal
+      // delante. `mi_suscripcion()` mezclaba dos filas: los datos de la ultima
+      // creada (la de PayPal, sin pagar) con el «vigente» de la de cortesia.
+      final s = DriverSubscription.fromMap({
+        'estado': 'activa',
+        'vigente': true,
+        'dias_restantes': 30,
+        'monto': 0,
+        'moneda': 'USD',
+        'proveedor': 'cortesia',
+        'vigente_hasta':
+            DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+        'referencia_externa': null,
+        'pago_sin_terminar': 'I-K9U1828ES000',
+      });
+
+      // Lo que manda es la cortesia, no el intento de pago.
+      expect(s.esCortesia, isTrue);
+      expect(s.vigente, isTrue);
+      expect(s.referenciaExterna, isNull);
+      // Y el pago a medias se avisa.
+      expect(s.tienePagoAMedias, isTrue);
+      expect(s.pagoSinTerminar, 'I-K9U1828ES000');
+    });
+
+    test('Una suscripción ya pagada no se confunde con un pago a medias', () {
+      // La referencia que manda y la pendiente son la misma: se aprobo, y no
+      // hay nada que terminar.
+      final s = DriverSubscription.fromMap({
+        'estado': 'activa',
+        'vigente': true,
+        'dias_restantes': 30,
+        'monto': 15,
+        'moneda': 'USD',
+        'proveedor': 'paypal',
+        'vigente_hasta':
+            DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+        'referencia_externa': 'I-YAPAGADA',
+        'pago_sin_terminar': 'I-YAPAGADA',
+      });
+      expect(s.tienePagoAMedias, isFalse);
+    });
+
+    test('Sin pagos a medias el aviso no sale', () {
+      expect(cuota().tienePagoAMedias, isFalse);
+      expect(const DriverSubscription.sinPagar().tienePagoAMedias, isFalse);
+    });
+
     test('Los días que faltan se redondean hacia arriba', () {
       // A quien le quedan tres horas le quedan "1 día", no "0": decirle cero
       // mientras todavía puede trabajar es mentirle.

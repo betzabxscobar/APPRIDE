@@ -663,6 +663,7 @@ class DriverSubscription {
     this.vigenteHasta,
     this.diasRestantes,
     this.referenciaExterna,
+    this.pagoSinTerminar,
   });
 
   /// Lo que se asume cuando no hay respuesta: no ha pagado. Nunca al revés.
@@ -674,7 +675,8 @@ class DriverSubscription {
         proveedor = 'paypal',
         vigenteHasta = null,
         diasRestantes = null,
-        referenciaExterna = null;
+        referenciaExterna = null,
+        pagoSinTerminar = null;
 
   /// `pendiente`, `activa`, `vencida` o `cancelada`.
   final String estado;
@@ -691,6 +693,18 @@ class DriverSubscription {
   /// El id de la suscripción en PayPal (`I-…`), para dar soporte cuando un
   /// chofer dice que pagó y no le consta.
   final String? referenciaExterna;
+
+  /// Una suscripción que se abrió en PayPal y nadie llegó a aprobar.
+  ///
+  /// No sirve para trabajar, pero hay que decirlo: si no, el chofer se queda
+  /// creyendo que pagó. Pasó de verdad — se abría el pago, se cerraba PayPal
+  /// sin pagar, y la pantalla decía «Al día» porque el chofer todavía tenía el
+  /// mes de cortesía por otro lado.
+  final String? pagoSinTerminar;
+
+  /// Tiene un pago a medias y no es lo que le está dejando trabajar.
+  bool get tienePagoAMedias =>
+      pagoSinTerminar != null && pagoSinTerminar != referenciaExterna;
 
   /// Cortesía: el mes de arranque que se dio a los que ya estaban.
   bool get esCortesia => proveedor == 'cortesia';
@@ -714,6 +728,7 @@ class DriverSubscription {
             : DateTime.tryParse(map['vigente_hasta'] as String)?.toLocal(),
         diasRestantes: (map['dias_restantes'] as num?)?.toInt(),
         referenciaExterna: map['referencia_externa'] as String?,
+        pagoSinTerminar: map['pago_sin_terminar'] as String?,
       );
 }
 
