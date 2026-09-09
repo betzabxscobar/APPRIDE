@@ -129,28 +129,57 @@ regala otro mes.
 
 En el panel se ve como «Mes de cortesía», con la opción de pagar por adelantado.
 
-## Desplegar, cuando lleguen las credenciales
+## Configurar las credenciales
 
-En el panel de PayPal hay que crear antes un **producto** y un **plan** de
-suscripción mensual de 15 USD; el plan da un id `P-…`. Después:
+Las dos funciones ya están desplegadas. Solo falta darles las cinco variables;
+no hay que volver a desplegar nada, porque las leen en cada llamada.
+
+### En PayPal
+
+1. **developer.paypal.com -> Apps & Credentials.** El interruptor
+   **Sandbox | Live** de arriba dice en qué entorno estás; la app aparece solo
+   en uno de los dos. Los planes de sandbox y de producción **no se mezclan**:
+   un `plan_id` de Live no existe en sandbox.
+2. Abre la app y copia el **Client ID** y el **Secret** (sale oculto, hay que
+   pulsar «Show»). Tienen que ser de la misma cuenta y entorno donde se creó el
+   plan.
+3. Abajo, en **Webhooks -> Add Webhook**, apunta a:
+
+   ```
+   https://<proyecto>.supabase.co/functions/v1/webhook-paypal
+   ```
+
+   suscrito a estos cinco eventos: `BILLING.SUBSCRIPTION.ACTIVATED`,
+   `PAYMENT.SALE.COMPLETED`, `BILLING.SUBSCRIPTION.CANCELLED`,
+   `BILLING.SUBSCRIPTION.SUSPENDED` y `BILLING.SUBSCRIPTION.EXPIRED`. Al
+   guardar da un **Webhook ID**.
+
+### En Supabase
+
+Por el panel, en **Project Settings -> Edge Functions -> Edge Function
+Secrets**, que no pide tener el CLI instalado:
+
+| Nombre | Qué es |
+|---|---|
+| `PAYPAL_CLIENT_ID` | el Client ID de la app REST |
+| `PAYPAL_SECRET` | su Secret |
+| `PAYPAL_PLAN_ID` | el plan mensual de 15 USD (`P-...`) |
+| `PAYPAL_WEBHOOK_ID` | el que devolvió el paso 3 |
+| `PAYPAL_ENTORNO` | `sandbox` o `produccion`, en minúscula y sin tilde |
+
+Con el CLI instalado y el proyecto enlazado es lo mismo en una línea:
 
 ```bash
-supabase secrets set PAYPAL_CLIENT_ID=... PAYPAL_SECRET=... \
-                     PAYPAL_PLAN_ID=P-... PAYPAL_WEBHOOK_ID=... \
-                     PAYPAL_ENTORNO=sandbox
-supabase functions deploy suscripcion-paypal
-supabase functions deploy webhook-paypal --no-verify-jwt
+supabase secrets set PAYPAL_CLIENT_ID=... PAYPAL_SECRET=... PAYPAL_PLAN_ID=P-... PAYPAL_WEBHOOK_ID=... PAYPAL_ENTORNO=sandbox
 ```
 
-Y en el panel de PayPal, apuntar el webhook a:
+### El botón de PayPal para web no sirve aquí
 
-```
-https://<proyecto>.supabase.co/functions/v1/webhook-paypal
-```
-
-suscrito a estos eventos: `BILLING.SUBSCRIPTION.ACTIVATED`,
-`PAYMENT.SALE.COMPLETED`, `BILLING.SUBSCRIPTION.CANCELLED`,
-`BILLING.SUBSCRIPTION.SUSPENDED` y `BILLING.SUBSCRIPTION.EXPIRED`.
+El generador de botones de paypal.com da un snippet de JavaScript con
+`paypal.Buttons({ createSubscription: ... })`. Ese código es para una página
+web, no para la app, y su `onApprove` no manda `custom_id`: al cobrar no habría
+forma de saber de qué chofer es el pago. Lo único aprovechable de ese snippet es
+el `plan_id` que lleva dentro.
 
 `PAYPAL_ENTORNO` acepta `sandbox` o `produccion`. Sin credenciales las dos
 funciones responden 503 y la app lo cuenta como «el cobro con PayPal todavía no
