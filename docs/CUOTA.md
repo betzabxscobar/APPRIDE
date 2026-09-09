@@ -16,12 +16,14 @@ está construido, dónde está el corte y qué falta para cobrar de verdad.
 | `mi_suscripcion()` — lo que pinta el panel | mismo archivo | aplicado |
 | Las tres puertas del corte | mismo archivo | aplicado y probado |
 | Mes de cortesía a los que ya estaban | mismo archivo | aplicado |
-| Edge Function `suscripcion-paypal` — abre la suscripción | [`infra/edge/suscripcion-paypal/`](../infra/edge/suscripcion-paypal/index.ts) | escrita, **sin desplegar** |
-| Edge Function `webhook-paypal` — la activa al cobrar | [`infra/edge/webhook-paypal/`](../infra/edge/webhook-paypal/index.ts) | escrita, **sin desplegar** |
+| Edge Function `suscripcion-paypal` — abre la suscripción | [`infra/edge/suscripcion-paypal/`](../infra/edge/suscripcion-paypal/index.ts) | desplegada, **sin credenciales** |
+| Edge Function `webhook-paypal` — la activa al cobrar | [`infra/edge/webhook-paypal/`](../infra/edge/webhook-paypal/index.ts) | desplegada, **sin credenciales** |
 | Panel del chofer | `lib/screens/driver/subscription_screen.dart` | hecho |
 
-Falta una sola cosa para cobrar: **las credenciales REST de PayPal y un plan de
-suscripción creado allí**. Todo lo demás está escrito y probado.
+Las dos funciones ya están desplegadas y responden 503 mientras no tengan
+credenciales —comprobado—, así que el webhook ya tiene una URL que dar de alta
+en PayPal. Falta una sola cosa para cobrar: **el `client_secret` de una app REST
+de PayPal y el id del webhook**. El plan de suscripción ya está creado.
 
 ## Dónde está el corte
 

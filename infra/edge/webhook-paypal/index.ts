@@ -26,7 +26,7 @@
 // y en el panel de PayPal, apuntar el webhook a:
 //   https://<proyecto>.supabase.co/functions/v1/webhook-paypal
 //
-// Ver docs/PAGOS.md.
+// Ver docs/CUOTA.md.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 

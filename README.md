@@ -444,10 +444,10 @@ de cortesía. El detalle está en [`docs/CUOTA.md`](docs/CUOTA.md).
   proveedor y webhook. La app nunca pide ni almacena un número de tarjeta.
 - La cuota mensual del chofer —15 USD para recibir viajes— está aplicada en la
   base de datos y el corte está probado con un rol real. Las dos Edge Functions
-  de PayPal están escritas pero **sin desplegar**: falta crear el plan de
-  suscripción en PayPal y configurar sus credenciales. Mientras tanto nadie
-  puede pagar, y los choferes existentes trabajan con el mes de cortesía. Ver
-  [`docs/CUOTA.md`](docs/CUOTA.md).
+  de PayPal están desplegadas y responden 503 **mientras no tengan
+  credenciales**: falta el `client_secret` y el id del webhook. Mientras tanto
+  nadie puede pagar, y los choferes existentes trabajan con el mes de cortesía.
+  Ver [`docs/CUOTA.md`](docs/CUOTA.md).
 - El precio siempre se calcula en Supabase; la distancia de OSRM se usa para
   presentar la ruta y no autoriza al cliente a fijar la tarifa.
 - El servidor público de OSRM sirve para desarrollo. Para producción debe

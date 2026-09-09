@@ -22,7 +22,7 @@
 //                        PAYPAL_PLAN_ID=P-... PAYPAL_ENTORNO=sandbox
 //   supabase functions deploy suscripcion-paypal
 //
-// Ver docs/PAGOS.md.
+// Ver docs/CUOTA.md.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
