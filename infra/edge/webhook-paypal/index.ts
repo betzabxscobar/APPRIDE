@@ -51,7 +51,16 @@ async function token(base: string, id: string, secreto: string): Promise<string 
     },
     body: 'grant_type=client_credentials',
   });
-  if (!r.ok) return null;
+  if (!r.ok) {
+    // Al log, no a la respuesta: el que llama al webhook es cualquiera de
+    // internet y no tiene por que enterarse de como estan las credenciales.
+    // `invalid_client` casi siempre es una de dos: el secreto esta mal
+    // copiado, o las credenciales son del otro entorno (las de sandbox no
+    // valen en produccion ni al reves).
+    const detalle = await r.text().catch(() => '');
+    console.error(`PayPal /oauth2/token respondio ${r.status}: ${detalle}`);
+    return null;
+  }
   return (await r.json())?.access_token ?? null;
 }
 
