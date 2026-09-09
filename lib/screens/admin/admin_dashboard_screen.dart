@@ -7,6 +7,7 @@ import '../../models/user_role.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/panel_switcher.dart';
 import '../../widgets/ride_logo.dart';
+import '../../widgets/ride_page_background.dart';
 import '../../widgets/user_avatar.dart';
 import '../settings/settings_screen.dart';
 import 'admin_fares_panel.dart';
@@ -163,8 +164,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           _abrirConfiguracion();
         },
       ),
-      body: SafeArea(
-        child: switch (_section) {
+      body: RidePageBackground(
+        child: SafeArea(
+          child: switch (_section) {
           _Section.resumen => _Overview(
             user: widget.user,
             users: _users,
@@ -188,7 +190,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           _Section.viajes => const AdminTripsPanel(),
           _Section.tarifas => const AdminFaresPanel(),
           _Section.soporte => const AdminSupportPanel(),
-        },
+          },
+        ),
       ),
     );
   }

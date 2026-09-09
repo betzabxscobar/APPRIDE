@@ -102,17 +102,17 @@ class RideColors extends ThemeExtension<RideColors> {
     brightness: Brightness.light,
     // Un punto más profundo que el #F7FAFF de la web: sobre un fondo casi
     // blanco las tarjetas blancas no llegaban a despegarse.
-    background: Color(0xFFEAF7FF),
+    background: Color(0xFFEDF7FB),
     surface: Colors.white,
-    surfaceAlt: Color(0xFFF4F8FC),
-    surfaceSunken: Color(0xFFE7EEF6),
-    ink: Color(0xFF0A1930),
+    surfaceAlt: Color(0xFFF2F9FC),
+    surfaceSunken: Color(0xFFE4F0F5),
+    ink: Color(0xFF0B2A3A),
     // El #6C7C8D de la web daba 3.6:1 sobre blanco, por debajo de AA. Este da
     // 5.9:1 y se sigue leyendo como gris, no como negro.
-    inkMuted: Color(0xFF52657B),
-    inkFaint: Color(0xFF77879A),
-    border: Color(0xFFD9E4EF),
-    borderStrong: Color(0xFFBECEDD),
+    inkMuted: Color(0xFF4D6977),
+    inkFaint: Color(0xFF708995),
+    border: Color(0xFFCCE3EC),
+    borderStrong: Color(0xFFA7CFDD),
     accent: AppColors.primary,
     accentSoft: AppColors.primarySoft,
     success: Color(0xFF0F9B78),
@@ -122,22 +122,22 @@ class RideColors extends ThemeExtension<RideColors> {
     danger: AppColors.danger,
     dangerSoft: AppColors.errorBackground,
     dangerInk: AppColors.errorInk,
-    shadow: Color(0x1A0A1930),
+    shadow: Color(0x1A0B2A3A),
   );
 
   /// Oscuro construido sobre el navy de la marca, no sobre gris neutro: así el
   /// modo oscuro sigue pareciendo Ride y no una app cualquiera.
   static const RideColors dark = RideColors(
     brightness: Brightness.dark,
-    background: Color(0xFF061420),
-    surface: Color(0xFF0E2432),
-    surfaceAlt: Color(0xFF143143),
-    surfaceSunken: Color(0xFF030C14),
-    ink: Color(0xFFE9F3FA),
-    inkMuted: Color(0xFF9CB2C4),
-    inkFaint: Color(0xFF7A91A5),
-    border: Color(0xFF1E3D52),
-    borderStrong: Color(0xFF2C566F),
+    background: Color(0xFF071B27),
+    surface: Color(0xFF102C3A),
+    surfaceAlt: Color(0xFF153644),
+    surfaceSunken: Color(0xFF04121C),
+    ink: Color(0xFFEDF7FA),
+    inkMuted: Color(0xFFB7CBD4),
+    inkFaint: Color(0xFF8FAAB6),
+    border: Color(0xFF31515F),
+    borderStrong: Color(0xFF4A7180),
     // El azul de marca sobre fondo oscuro queda flojo; se sube el brillo sin
     // moverle el tono.
     accent: Color(0xFF56B6F8),
