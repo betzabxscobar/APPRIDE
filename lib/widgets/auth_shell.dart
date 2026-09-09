@@ -64,26 +64,28 @@ class _MobileAuthLayout extends StatelessWidget {
     final padding = MediaQuery.paddingOf(context);
 
     return DecoratedBox(
-      decoration: BoxDecoration(gradient: ride.hero),
+      decoration: BoxDecoration(
+        color: ride.background,
+        gradient: ride.isDark
+            ? ride.hero
+            : const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFF9FCFD), Color(0xFFEEF6F8)],
+              ),
+      ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // El alto que reporta el `body` ya descuenta el teclado, así que al
-          // escribir el héroe se encoge solo y el campo enfocado sigue a la
-          // vista.
-          const heroHeight = 0.0;
-
           return SingleChildScrollView(
             child: Column(
               children: [
                 SizedBox(
                   width: double.infinity,
-                  height: heroHeight,
+                  height: padding.top + 72,
                   child: _MobileHero(topInset: padding.top),
                 ),
                 _MobileSheet(
-                  // Sin este mínimo, un paso corto como la bienvenida dejaría
-                  // la hoja a media pantalla y el degradado asomando debajo.
-                  minHeight: constraints.maxHeight,
+                  minHeight: constraints.maxHeight - padding.top - 72,
                   bottomInset: padding.bottom,
                   child: child,
                 ),
@@ -96,8 +98,7 @@ class _MobileAuthLayout extends StatelessWidget {
   }
 }
 
-/// Cabecera de marca del teléfono: la misma aurora, ruta y ciudad del panel de
-/// escritorio, recortadas al alto de una cabecera.
+/// Marca compacta que WEB-RIDE muestra sobre la tarjeta en pantallas angostas.
 class _MobileHero extends StatelessWidget {
   const _MobileHero({required this.topInset});
 
@@ -106,85 +107,21 @@ class _MobileHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ride = context.ride;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final height = constraints.maxHeight;
-
-        return ClipRect(
-          child: Stack(
-            children: [
-              if (ride.isDark)
-                Positioned.fill(
-                  child: Image.asset(
-                    'assets/images/fondoInicioOscuro-v2.png',
-                    fit: BoxFit.cover,
-                    alignment: Alignment.center,
-                  ),
-                )
-              else ...[
-                Positioned(
-                  left: -120,
-                  top: -140,
-                  child: Container(
-                    width: 320,
-                    height: 320,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [Color(0x387DDBEE), Color(0x007DDBEE)],
-                        stops: [0, 0.68],
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: height * 0.6,
-                  child: const _CityArt(),
-                ),
-              ],
-              // Velo entre la ilustración y el texto. Sin él, el trazo de la
-              // ruta y los edificios cruzan por encima del titular y no hay
-              // manera de leerlo.
-              const Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.center,
-                      end: Alignment.bottomCenter,
-                      colors: [Color(0x0004121B), Color(0xE604121B)],
-                    ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(24, topInset + 16, 24, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const RideWordmark(
-                      markSize: 64,
-                      fontSize: 27,
-                      color: Color(0xFFD8F3FF),
-                      subtitle: 'Muévete con libertad',
-                      subtitleColor: Color(0xFFD5DCE3),
-                    ),
-                    const SizedBox.shrink(),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, topInset + 12, 20, 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: RideWordmark(
+          markSize: 42,
+          fontSize: 22,
+          color: ride.ink,
+        ),
+      ),
     );
   }
 }
 
-/// Hoja blanca (u oscura) donde vive el formulario.
+/// Espacio desplazable donde vive la tarjeta del formulario en móvil.
 class _MobileSheet extends StatelessWidget {
   const _MobileSheet({
     required this.child,
@@ -198,7 +135,6 @@ class _MobileSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ride = context.ride;
     return LayoutBuilder(
       builder: (context, constraints) {
         final horizontal = constraints.maxWidth < 360 ? 18.0 : 24.0;
@@ -207,20 +143,14 @@ class _MobileSheet extends StatelessWidget {
           constraints: BoxConstraints(minHeight: minHeight > 0 ? minHeight : 0),
           padding: EdgeInsets.fromLTRB(
             horizontal,
-            constraints.maxHeight < 460 ? 22 : 28,
+            8,
             horizontal,
-            30 + bottomInset,
+            18 + bottomInset,
           ),
-          decoration: BoxDecoration(
-            color: ride.surface,
-            image: const DecorationImage(
-              image: AssetImage('assets/images/FondoApp.png'),
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
-            ),
-            borderRadius: BorderRadius.zero,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: _AuthSurface(child: child),
           ),
-          child: Align(alignment: Alignment.topCenter, child: child),
         );
       },
     );
@@ -237,8 +167,16 @@ class _FormPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final ride = context.ride;
 
-    return ColoredBox(
-      color: ride.surface,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: ride.isDark
+            ? ride.hero
+            : const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFF9FCFD), Color(0xFFEEF6F8)],
+              ),
+      ),
       child: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) => Center(
@@ -247,11 +185,44 @@ class _FormPanel extends StatelessWidget {
                 horizontal: constraints.maxWidth < 540 ? 28 : 48,
                 vertical: constraints.maxHeight < 650 ? 24 : 40,
               ),
-              child: Center(child: child),
+              child: Center(child: _AuthSurface(child: child)),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AuthSurface extends StatelessWidget {
+  const _AuthSurface({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+    final compact = MediaQuery.sizeOf(context).width <= 430;
+
+    return Container(
+      width: 500,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 18 : 38,
+        vertical: compact ? 23 : 34,
+      ),
+      decoration: BoxDecoration(
+        color: ride.surface.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(compact ? 18 : 24),
+        border: Border.all(color: ride.border.withValues(alpha: 0.9)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0E3649).withValues(alpha: 0.12),
+            blurRadius: 60,
+            offset: const Offset(0, 24),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 }

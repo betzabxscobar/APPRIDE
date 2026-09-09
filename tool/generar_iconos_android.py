@@ -1,4 +1,4 @@
-"""Genera el icono de la app para Android a partir de assets/images/LopoTipo.png.
+"""Genera el icono de la app para Android a partir de assets/images/LogoTipo.png.
 
 Se escribe a mano en vez de usar flutter_launcher_icons para no sumar una
 dependencia mas al proyecto: el logo cambia una vez al ano y esto es un rato de
@@ -22,7 +22,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 RAIZ = Path(__file__).resolve().parent.parent
-LOGO = RAIZ / "assets" / "images" / "LopoTipo.png"
+LOGO = RAIZ / "assets" / "images" / "LogoTipo.png"
 RES = RAIZ / "android" / "app" / "src" / "main" / "res"
 
 # Los tamanos en px de cada densidad: el icono clasico es de 48dp y el lienzo

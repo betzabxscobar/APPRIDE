@@ -7,19 +7,20 @@ import '../core/ride_colors.dart';
 class RideMark extends StatelessWidget {
   const RideMark({super.key, this.size = 52});
 
-  /// Alto del isotipo.
+  /// Ancho del isotipo, igual que en el `wordmark-logo` de WEB-RIDE.
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    return Transform.translate(
-      // El PNG tiene margen transparente arriba; se compensa para alinear la
-      // parte visible del símbolo con la palabra Ride.
-      offset: const Offset(0, -12),
+    // El archivo tiene proporción 4:3. Reservar esa misma caja evita que el
+    // logo se reduzca dentro de un cuadrado y que haya que moverlo a mano.
+    return SizedBox(
+      width: size,
+      height: size * 0.75,
       child: Image.asset(
-        'assets/images/LopoTipo.png',
+        'assets/images/LogoTipo.png',
         width: size,
-        height: size,
+        height: size * 0.75,
         fit: BoxFit.contain,
       ),
     );
@@ -55,7 +56,7 @@ class RideWordmark extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           RideMark(size: markSize),
           const SizedBox(width: 7),
