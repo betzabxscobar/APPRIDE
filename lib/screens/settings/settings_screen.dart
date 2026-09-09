@@ -12,6 +12,7 @@ import '../../services/auth_service.dart';
 import '../../widgets/auth_feedback.dart';
 import '../../widgets/panel_switcher.dart';
 import '../../widgets/ride_card.dart';
+import '../../widgets/ride_page_background.dart';
 import '../../widgets/user_avatar.dart';
 import '../driver/driver_profile_screen.dart';
 import '../notifications/notifications_screen.dart';
@@ -246,9 +247,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Configuración')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        children: [
+      body: RidePageBackground(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          children: [
           _Cabecera(
             user: user,
             subiendo: _subiendoFoto,
@@ -369,7 +371,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               side: BorderSide(color: ride.danger.withValues(alpha: 0.5)),
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
