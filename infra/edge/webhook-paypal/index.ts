@@ -137,10 +137,21 @@ Deno.serve(async (req) => {
   if (!acceso) {
     // Sin valores, solo su forma: sirve para ver de un vistazo si lo pegado
     // tiene la pinta que deberia y contra que entorno se esta hablando.
+    //
+    // Y se prueba el entorno contrario, porque `invalid_client` sale igual
+    // cuando el secreto esta mal que cuando las credenciales son del otro
+    // lado, y son dos arreglos distintos. Un par de sandbox y uno de
+    // produccion se parecen: los dos empiezan por 'A' y miden ~80 caracteres,
+    // asi que mirandolos no hay forma de saberlo.
+    const otro = entorno === 'produccion' ? 'sandbox' : 'produccion';
+    const valeEnElOtro = await token(ENTORNOS[otro], clientId, secreto);
     console.error(
       `entorno=${entorno} base=${base} ` +
       `client_id=${clientId.length} chars, empieza por "${clientId.slice(0, 4)}" ` +
-      `secret=${secreto.length} chars`,
+      `secret=${secreto.length} chars` +
+      (valeEnElOtro
+        ? ` -> ESTAS CREDENCIALES SON DE ${otro.toUpperCase()}: cambia PAYPAL_ENTORNO a "${otro}", o saca otras de la pestana correcta.`
+        : ' -> tampoco valen en el otro entorno: el client id y el secreto no son pareja, o el secreto esta mal copiado.'),
     );
     return json({ error: 'No pudimos contactar con PayPal' }, 502);
   }
