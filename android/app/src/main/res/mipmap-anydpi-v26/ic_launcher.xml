@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- El icono en Android 8 y superiores. El launcher recorta las dos capas con
+     la forma que use cada telefono (circulo, squircle, rombo), por eso el logo
+     y el fondo van separados en vez de un PNG ya recortado. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <!-- Sin capa <monochrome> a proposito: Android la dibuja de un solo color
+         guiandose por el alpha, y el pin blanco del logo es opaco, asi que
+         saldria una R maciza sin el hueco. Mejor que el modo con tema use el
+         icono a color. -->
+</adaptive-icon>
