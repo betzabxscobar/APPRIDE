@@ -8,6 +8,12 @@ de validación.
 Los dos clientes comparten autenticación, perfiles, viajes, flota, pagos,
 notificaciones y políticas de seguridad en el mismo proyecto de Supabase.
 
+La equivalencia funcional con WEB-RIDE se revisó el **8 de septiembre de
+2026**. La web incluye los flujos de pasajero, conductor y administración de la
+app, incluido el detalle completo de un viaje administrativo. Las diferencias
+restantes corresponden al entorno: permisos móviles, enlaces profundos,
+ubicación en segundo plano y notificaciones con la aplicación cerrada.
+
 La superficie que consume la app —funciones, tablas, Realtime y Storage— está
 documentada en [`docs/API.md`](docs/API.md). El mapa, en
 [`docs/MAPA.md`](docs/MAPA.md); el buscador de direcciones, en
@@ -218,8 +224,10 @@ la administración revisa antes de habilitarlo.
 **Actor:** pasajero autenticado.
 
 1. El pasajero abre **Métodos de pago** desde su cuenta.
-2. Registra efectivo, elige su opción principal o elimina una opción que no tenga pagos asociados.
-3. La interfaz informa que las tarjetas requieren una futura pasarela de tokenización.
+2. Registra efectivo, transferencia o DeUna, elige su opción principal o
+   elimina una opción que no tenga pagos asociados.
+3. Al pagar con DeUna, solicita al servidor la orden, el QR y el enlace; las
+   tarjetas siguen requiriendo una futura pasarela de tokenización.
 
 **Resultado:** la app no solicita ni almacena números de tarjeta y solo presenta
 métodos respaldados por la base de datos.
@@ -415,9 +423,10 @@ permiso: un viaje no puede arrancar sin auto asignado.
 - El mapa usa teselas **vectoriales** de OpenFreeMap con estilos propios para
   claro y oscuro, sin claves ni cuotas. Los detalles están en
   [`docs/MAPA.md`](docs/MAPA.md).
-- **No hay pasarela de pagos.** El único método real es el efectivo. La tarjeta
-  existe en el modelo de datos, pero registrarla exige la tokenización de una
-  pasarela: la app nunca pide ni almacena un número de tarjeta.
+- Efectivo funciona directamente y la transferencia es un proceso manual.
+  DeUna tiene interfaz, modelo y solicitud de cobro al servidor, pero solo debe
+  considerarse productivo después de configurar credenciales, confirmación del
+  proveedor y webhook. La app nunca pide ni almacena un número de tarjeta.
 - El precio siempre se calcula en Supabase; la distancia de OSRM se usa para
   presentar la ruta y no autoriza al cliente a fijar la tarifa.
 - El servidor público de OSRM sirve para desarrollo. Para producción debe
@@ -441,6 +450,9 @@ flutter test
 Estas comprobaciones detectan errores de código y regresiones cubiertas por las
 pruebas; no sustituyen una prueba manual del GPS, enlaces de correo, mapas,
 notificaciones, cámara, archivos y permisos en dispositivos Android e iOS reales.
+
+Estado local comprobado el **8 de septiembre de 2026**: `flutter analyze` sin
+problemas y **206 pruebas aprobadas**.
 
 ## Antes de producción
 
