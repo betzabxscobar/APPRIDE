@@ -33,6 +33,14 @@ class RideCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            background,
+            Color.lerp(background, ride.accentSoft, ride.isDark ? 0.10 : 0.035)!,
+          ],
+        ),
         boxShadow: ride.isDark
             ? null
             : [
@@ -44,7 +52,7 @@ class RideCard extends StatelessWidget {
               ],
       ),
       child: Material(
-        color: background,
+        color: Colors.transparent,
         borderRadius: radius,
         child: InkWell(
           onTap: onTap,
