@@ -72,14 +72,22 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json({ error: 'Metodo no permitido' }, 405);
 
-  const clientId = Deno.env.get('PAYPAL_CLIENT_ID');
-  const secreto = Deno.env.get('PAYPAL_SECRET');
-  const plan = Deno.env.get('PAYPAL_PLAN_ID');
-  const base = ENTORNOS[Deno.env.get('PAYPAL_ENTORNO') ?? 'sandbox'];
+  // `.trim()` en todas: el campo de secretos de Supabase es multilinea y al
+  // pegar se cuela un salto de linea con facilidad. Uno al final del secreto
+  // rompe el Basic auth y PayPal responde `invalid_client`, que se lee igual
+  // que un secreto equivocado y manda a buscar donde no es.
+  const clientId = Deno.env.get('PAYPAL_CLIENT_ID')?.trim();
+  const secreto = Deno.env.get('PAYPAL_SECRET')?.trim();
+  const plan = Deno.env.get('PAYPAL_PLAN_ID')?.trim();
+  const entorno = Deno.env.get('PAYPAL_ENTORNO')?.trim() ?? 'sandbox';
+  const base = ENTORNOS[entorno];
 
   if (!clientId || !secreto || !plan) {
     // Sin credenciales no se inventa nada: se dice que falta configurarlas.
     return json({ error: 'El cobro con PayPal todavia no esta configurado' }, 503);
+  }
+  if (!base) {
+    return json({ error: `PAYPAL_ENTORNO no vale: "${entorno}"` }, 503);
   }
 
   const autorizacion = req.headers.get('Authorization');
