@@ -4,13 +4,15 @@ Son 15 USD al mes. Existe porque hacerlo por los menus de PayPal es facil de
 equivocar —y sobre todo, porque el plan hay que crearlo una vez por entorno: uno
 de produccion NO existe en sandbox ni al reves, y ese es el tropiezo tipico—.
 
-Las credenciales se leen del entorno, nunca de argumentos: lo que se escribe en
-la linea de comandos queda en el historial del shell.
+Se corre sin argumentos:
 
-    export PAYPAL_CLIENT_ID=A...
-    export PAYPAL_SECRET=E...
-    export PAYPAL_ENTORNO=sandbox        # o `produccion`
     python tool/crear_plan_paypal.py
+
+y te pregunta las credenciales. El secreto se escribe a ciegas y no queda en el
+historial del shell, que es justo lo que pasa si se pone en la linea de
+comandos: PowerShell lo guarda en ConsoleHost_history.txt aunque el comando
+falle. Tambien se pueden dar por variables de entorno (PAYPAL_CLIENT_ID,
+PAYPAL_SECRET, PAYPAL_ENTORNO) si ya estan puestas.
 
 Imprime el `P-...` que hay que poner en el secreto `PAYPAL_PLAN_ID` de Supabase.
 Si el producto ya existe, se reutiliza y solo se crea el plan.
@@ -19,6 +21,7 @@ Ver docs/CUOTA.md.
 """
 
 import base64
+import getpass
 import json
 import os
 import sys
@@ -48,15 +51,23 @@ def pedir(url: str, datos: dict | None, cabeceras: dict) -> dict:
 def main() -> None:
     client = (os.environ.get("PAYPAL_CLIENT_ID") or "").strip()
     secreto = (os.environ.get("PAYPAL_SECRET") or "").strip()
-    entorno = (os.environ.get("PAYPAL_ENTORNO") or "sandbox").strip()
+    entorno = (os.environ.get("PAYPAL_ENTORNO") or "").strip()
+
+    # Si no vienen del entorno, se preguntan. Es la via recomendada: escribir
+    # el secreto en la linea de comandos lo deja en el historial del shell
+    # —PowerShell lo guarda en ConsoleHost_history.txt aunque el comando falle—
+    # y `getpass` no lo muestra ni lo guarda en ningun sitio.
+    if not client:
+        client = input("Client ID de PayPal (empieza por 'A'): ").strip()
+    if not secreto:
+        secreto = getpass.getpass("Secret de la MISMA app (no se vera al escribir): ").strip()
+    if not entorno:
+        entorno = input("Entorno [sandbox]: ").strip() or "sandbox"
 
     if not client or not secreto:
-        raise SystemExit(
-            "Faltan PAYPAL_CLIENT_ID o PAYPAL_SECRET en el entorno.\n"
-            "Tienen que ser los dos de la MISMA app de PayPal."
-        )
+        raise SystemExit("Sin client id y secreto no se puede crear nada.")
     if entorno not in ENTORNOS:
-        raise SystemExit(f"PAYPAL_ENTORNO tiene que ser sandbox o produccion, no {entorno!r}")
+        raise SystemExit(f"El entorno tiene que ser sandbox o produccion, no {entorno!r}")
 
     base = ENTORNOS[entorno]
     print(f"Entorno: {entorno} ({base})")
