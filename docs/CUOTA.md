@@ -188,9 +188,18 @@ Con la **personal** se inicia sesión al aprobar la suscripción; trae saldo
 ficticio. Si no se sabe su contraseña: en esa página, icono de la cuenta →
 *View/Edit Account* → Profile → *Change password*.
 
-El producto y el plan de 15 USD hay que crearlos **de nuevo dentro de sandbox**
-con la cuenta business, entrando a `sandbox.paypal.com`. Un `plan_id` de
-producción no existe allí.
+El producto y el plan de 15 USD hay que crearlos **una vez por entorno**: un
+`plan_id` de producción no existe en sandbox ni al revés, y ese es el tropiezo
+típico. Para no pelearse con los menús de PayPal:
+
+```bash
+PAYPAL_ENTORNO=sandbox PAYPAL_CLIENT_ID=... PAYPAL_SECRET=...   python tool/crear_plan_paypal.py
+```
+
+Imprime el `P-…` listo para pegar en `PAYPAL_PLAN_ID`. Lee las credenciales del
+entorno y no de argumentos, para que el secreto no quede en el historial del
+shell. Por los menús es *Pay & Get Paid → Subscriptions → Create plan* en
+`sandbox.paypal.com`, con la cuenta business.
 
 La prueba de punta a punta:
 
