@@ -61,6 +61,20 @@ class DeunaCharge {
   }
 }
 
+/// Una suscripción recién abierta en PayPal, todavía sin aprobar.
+///
+/// Tener esto NO significa que el chofer haya pagado: solo que PayPal ya sabe
+/// de la suscripción y espera que la apruebe en [aprobarEn].
+class PaypalSubscription {
+  const PaypalSubscription({required this.id, required this.aprobarEn});
+
+  /// El identificador de PayPal (`I-…`). Sirve para dar soporte.
+  final String id;
+
+  /// La página de PayPal donde el chofer aprueba el cobro recurrente.
+  final String aprobarEn;
+}
+
 /// Cobros de un viaje.
 ///
 /// La app no habla nunca con Payválida: pide el cobro a la Edge Function
@@ -94,6 +108,48 @@ class PaymentsService {
         'No pudimos generar el cobro. Revisa tu conexión e inténtalo de nuevo.',
       );
     }
+  }
+
+  /// Abre la suscripción mensual del chofer y devuelve dónde la aprueba.
+  ///
+  /// Ni el importe ni el plan viajan desde aquí: los pone la Edge Function
+  /// leyendo sus variables de entorno. Y volver del navegador **no** activa
+  /// nada — quien da por pagada la cuota es el webhook de PayPal, que es el
+  /// único que la base de datos deja escribir.
+  Future<PaypalSubscription> abrirSuscripcion() async {
+    try {
+      final res = await _client.functions.invoke('suscripcion-paypal');
+      final datos = res.data;
+      if (datos is! Map || datos['aprobar_en'] is! String) {
+        throw const RideException('PayPal respondió algo que no entendemos.');
+      }
+      return PaypalSubscription(
+        id: (datos['suscripcion_id'] as String?) ?? '',
+        aprobarEn: datos['aprobar_en'] as String,
+      );
+    } on sb.FunctionException catch (e) {
+      throw RideException(_traducirPaypal(e));
+    } on RideException {
+      rethrow;
+    } catch (_) {
+      throw const RideException(
+        'No pudimos abrir el pago. Revisa tu conexión e inténtalo de nuevo.',
+      );
+    }
+  }
+
+  String _traducirPaypal(sb.FunctionException e) {
+    final detalles = e.details;
+    if (detalles is Map && detalles['error'] is String) {
+      return detalles['error'] as String;
+    }
+    return switch (e.status) {
+      401 => 'Debes iniciar sesión para pagar.',
+      403 => 'Solo un chofer paga la cuota mensual.',
+      404 => 'El cobro con PayPal todavía no está configurado.',
+      503 => 'El cobro con PayPal todavía no está configurado.',
+      _ => 'No pudimos abrir el pago. Inténtalo de nuevo en un momento.',
+    };
   }
 
   /// Los mensajes de la función ya vienen en español; esto cubre los que no

@@ -4,6 +4,10 @@ Ride cobra en efectivo desde el primer día. DeUna es el segundo método: el
 pasajero termina el viaje, ve un QR y paga desde su banco. Este documento cuenta
 qué está construido, qué falta y qué hay que preguntarle a Payválida.
 
+> Esto es lo que **el pasajero paga por su viaje**. Lo que **el chofer paga por
+> usar la app** —15 USD al mes, con PayPal— es otro circuito y está en
+> [`CUOTA.md`](CUOTA.md).
+
 La integración es contra **Payválida**, que es quien expone la API de DeUna
 (`docs.payvalida.com/api-deuna`). Toda su documentación pública son dos páginas:
 una introducción y el método de creación de QR.

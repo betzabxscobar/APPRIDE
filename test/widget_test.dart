@@ -1663,4 +1663,131 @@ void main() {
       expect(cobro.qr, isNull);
     });
   });
+
+  group('Cuota mensual del chofer', () {
+    DriverSubscription cuota({
+      String estado = 'activa',
+      bool vigente = true,
+      int? dias = 20,
+      String proveedor = 'paypal',
+      DateTime? hasta,
+    }) =>
+        DriverSubscription.fromMap({
+          'estado': estado,
+          'vigente': vigente,
+          'dias_restantes': dias,
+          'monto': 15,
+          'moneda': 'USD',
+          'proveedor': proveedor,
+          'vigente_hasta':
+              (hasta ?? DateTime.now().add(Duration(days: dias ?? 0)))
+                  .toIso8601String(),
+        });
+
+    DriverState estado({
+      bool aprobado = true,
+      bool vehiculo = true,
+      DriverSubscription? suscripcion,
+    }) =>
+        DriverState(
+          existe: true,
+          aprobado: aprobado,
+          estadoAprobacion: aprobado ? 'aprobado' : 'pendiente',
+          disponible: false,
+          tieneVehiculoActivo: vehiculo,
+          suscripcion: suscripcion ?? cuota(),
+        );
+
+    test('Sin cuota al día no puede trabajar, aunque esté todo lo demás', () {
+      // Es el corazón del cobro: aprobado y con auto, pero sin pagar.
+      final s = estado(suscripcion: cuota(estado: 'vencida', vigente: false));
+      expect(s.puedeTrabajar, isFalse);
+      expect(s.soloLeFaltaPagar, isTrue);
+    });
+
+    test('Con la cuota al día y todo en orden, sí puede', () {
+      expect(estado().puedeTrabajar, isTrue);
+      expect(estado().soloLeFaltaPagar, isFalse);
+    });
+
+    test('Al que le falta la aprobación no se le pide pagar primero', () {
+      // Pagar no le desbloquearía nada: eso lo decide la administración. Sacar
+      // el botón de cobro ahí sería cobrarle por algo que no puede usar.
+      final s = estado(
+        aprobado: false,
+        suscripcion: cuota(estado: 'pendiente', vigente: false, dias: null),
+      );
+      expect(s.soloLeFaltaPagar, isFalse);
+      expect(s.motivoBloqueo, contains('todavía no aprueba'));
+    });
+
+    test('El motivo distingue entre no haber pagado nunca y que se venciera',
+        () {
+      final nueva = estado(
+        suscripcion: cuota(estado: 'pendiente', vigente: false, dias: null),
+      );
+      // `fromMap` con vigente_hasta null es el que nunca pagó.
+      final jamas = DriverSubscription.fromMap({
+        'estado': 'pendiente',
+        'vigente': false,
+        'monto': 15,
+        'moneda': 'USD',
+        'proveedor': 'paypal',
+      });
+      expect(jamas.caducada, isFalse);
+      expect(estado(suscripcion: jamas).motivoBloqueo, contains('empezar'));
+
+      final vencida = cuota(
+        estado: 'vencida',
+        vigente: false,
+        dias: 0,
+        hasta: DateTime.now().subtract(const Duration(days: 3)),
+      );
+      expect(vencida.caducada, isTrue);
+      expect(estado(suscripcion: vencida).motivoBloqueo, contains('venció'));
+      expect(nueva.motivoBloqueo, isNotEmpty);
+    });
+
+    test('Avisa cuando quedan pocos días, no cuando ya se venció', () {
+      expect(cuota(dias: 3).porVencer, isTrue);
+      expect(cuota(dias: 5).porVencer, isTrue);
+      expect(cuota(dias: 6).porVencer, isFalse);
+      // Vencida no es "por vencer": ahí el aviso ya no sirve, toca renovar.
+      expect(cuota(estado: 'vencida', vigente: false, dias: 0).porVencer, isFalse);
+    });
+
+    test('El mes de cortesía se distingue del que pagó', () {
+      expect(cuota(proveedor: 'cortesia').esCortesia, isTrue);
+      expect(cuota().esCortesia, isFalse);
+      // Pero cuenta igual para trabajar.
+      expect(estado(suscripcion: cuota(proveedor: 'cortesia')).puedeTrabajar,
+          isTrue);
+    });
+
+    test('Sin respuesta del servidor se asume que no pagó, nunca al revés', () {
+      // Si la red falla, lo barato es enseñar el panel de cobro de más. Darlo
+      // por pagado sería regalar viajes a quien no pagó.
+      const caida = DriverSubscription.sinPagar();
+      expect(caida.vigente, isFalse);
+      expect(caida.monto, 15);
+      expect(const DriverState.sinCuenta().puedeTrabajar, isFalse);
+    });
+
+    test('Los días que faltan se redondean hacia arriba', () {
+      // A quien le quedan tres horas le quedan "1 día", no "0": decirle cero
+      // mientras todavía puede trabajar es mentirle.
+      final s = DriverSubscription.fromMap({
+        'estado': 'activa',
+        'vigente': true,
+        'dias_restantes': 1,
+        'monto': 15,
+        'moneda': 'USD',
+        'proveedor': 'paypal',
+        'vigente_hasta':
+            DateTime.now().add(const Duration(hours: 3)).toIso8601String(),
+      });
+      expect(s.diasRestantes, 1);
+      expect(s.porVencer, isTrue);
+    });
+  });
 }
