@@ -173,6 +173,34 @@ Con el CLI instalado y el proyecto enlazado es lo mismo en una línea:
 supabase secrets set PAYPAL_CLIENT_ID=... PAYPAL_SECRET=... PAYPAL_PLAN_ID=P-... PAYPAL_WEBHOOK_ID=... PAYPAL_ENTORNO=sandbox
 ```
 
+### Probar en sandbox, sin dinero real
+
+Hacen falta **dos** cuentas de prueba, y PayPal ya las creó al registrarse como
+desarrollador. Están en *Sandbox → Accounts*:
+
+| Cuenta | En Ride es |
+|---|---|
+| `sb-…@business.example.com` | Ride, quien cobra los 15 USD |
+| `sb-…@personal.example.com` | el chofer, quien paga |
+
+De la **business** salen el `PAYPAL_CLIENT_ID` y el `PAYPAL_SECRET` de sandbox.
+Con la **personal** se inicia sesión al aprobar la suscripción; trae saldo
+ficticio. Si no se sabe su contraseña: en esa página, icono de la cuenta →
+*View/Edit Account* → Profile → *Change password*.
+
+El producto y el plan de 15 USD hay que crearlos **de nuevo dentro de sandbox**
+con la cuenta business, entrando a `sandbox.paypal.com`. Un `plan_id` de
+producción no existe allí.
+
+La prueba de punta a punta:
+
+1. Poner los cinco secretos de sandbox, con `PAYPAL_ENTORNO=sandbox`.
+2. Entrar en la app como chofer y pulsar pagar.
+3. Aprobar en PayPal con la cuenta personal de sandbox.
+4. Comprobar que la fila de `suscripciones_chofer` quedó `activa` con su mes, y
+   que el chofer ya se puede poner en línea.
+
+
 ### El botón de PayPal para web no sirve aquí
 
 El generador de botones de paypal.com da un snippet de JavaScript con
