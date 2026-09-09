@@ -109,13 +109,21 @@ function nuevaVigencia(actual: string | null): string {
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Metodo no permitido' }, 405);
 
-  const clientId = Deno.env.get('PAYPAL_CLIENT_ID');
-  const secreto = Deno.env.get('PAYPAL_SECRET');
-  const webhookId = Deno.env.get('PAYPAL_WEBHOOK_ID');
-  const base = ENTORNOS[Deno.env.get('PAYPAL_ENTORNO') ?? 'sandbox'];
+  // `.trim()` en los tres: el campo de secretos de Supabase es multilinea y al
+  // pegar se cuela un salto de linea con facilidad. Un salto al final del
+  // secreto rompe el Basic auth y PayPal responde `invalid_client`, que se lee
+  // igual que un secreto equivocado y manda a buscar donde no es.
+  const clientId = Deno.env.get('PAYPAL_CLIENT_ID')?.trim();
+  const secreto = Deno.env.get('PAYPAL_SECRET')?.trim();
+  const webhookId = Deno.env.get('PAYPAL_WEBHOOK_ID')?.trim();
+  const entorno = Deno.env.get('PAYPAL_ENTORNO')?.trim() ?? 'sandbox';
+  const base = ENTORNOS[entorno];
 
   if (!clientId || !secreto || !webhookId) {
     return json({ error: 'El webhook de PayPal todavia no esta configurado' }, 503);
+  }
+  if (!base) {
+    return json({ error: `PAYPAL_ENTORNO no vale: "${entorno}"` }, 503);
   }
 
   let evento: Record<string, unknown>;
@@ -126,7 +134,16 @@ Deno.serve(async (req) => {
   }
 
   const acceso = await token(base, clientId, secreto);
-  if (!acceso) return json({ error: 'No pudimos contactar con PayPal' }, 502);
+  if (!acceso) {
+    // Sin valores, solo su forma: sirve para ver de un vistazo si lo pegado
+    // tiene la pinta que deberia y contra que entorno se esta hablando.
+    console.error(
+      `entorno=${entorno} base=${base} ` +
+      `client_id=${clientId.length} chars, empieza por "${clientId.slice(0, 4)}" ` +
+      `secret=${secreto.length} chars`,
+    );
+    return json({ error: 'No pudimos contactar con PayPal' }, 502);
+  }
 
   if (!await firmaValida(base, acceso, webhookId, req, evento)) {
     // 401 y no 400: esto es alguien intentando colarse, no un error de formato.
