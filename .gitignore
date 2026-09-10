@@ -59,3 +59,8 @@ app.*.map.json
 /android/.kotlin/
 # Widget Preview related
 .widget_preview/
+
+# El keystore de publicacion y sus contrasenas.
+/android/key.properties
+*.jks
+*.keystore

@@ -21,7 +21,8 @@ documentada en [`docs/API.md`](docs/API.md). El mapa, en
 [`docs/TARIFAS.md`](docs/TARIFAS.md); el cobro con DeUna, en
 [`docs/PAGOS.md`](docs/PAGOS.md); la cuota mensual que paga el chofer, en
 [`docs/CUOTA.md`](docs/CUOTA.md); lo que se le exige a un chofer, en
-[`docs/CHOFERES.md`](docs/CHOFERES.md).
+[`docs/CHOFERES.md`](docs/CHOFERES.md). Lo que falta para publicar en Play
+Store, en [`docs/PUBLICAR.md`](docs/PUBLICAR.md).
 
 ## Credenciales del equipo administrativo
 
@@ -52,6 +53,11 @@ Cuando exista la base de datos, estas cuentas pasan a Supabase, se activa
 |---|---|---|
 | Pasajero | pasajero@ride.app | Ride1234 |
 | Conductor | conductor@ride.app | Ride1234 |
+
+> **Comprobado el 2026-09-09: `conductor@ride.app` ya no entra.** O se borró la
+> cuenta o le cambiaron la contraseña. Hay que recrearla o quitarla de aquí,
+> porque una cuenta de prueba que no funciona hace perder más tiempo del que
+> ahorra.
 
 ## Comandos
 

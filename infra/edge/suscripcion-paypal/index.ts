@@ -119,14 +119,51 @@ Deno.serve(async (req) => {
   const acceso = await token(base, clientId, secreto);
   if (!acceso) return json({ error: 'No pudimos contactar con PayPal' }, 502);
 
+  // Si ya dejo una abierta y sin aprobar, se le devuelve ESA en vez de crear
+  // otra. Evita que dos toques al boton abran dos suscripciones y que el chofer
+  // termine pagando 30 al mes.
+  //
+  // Antes esto se hacia con un `PayPal-Request-Id` fijo por chofer, que PayPal
+  // trata como clave de idempotencia: el problema es que entonces el que
+  // cancelaba su suscripcion se quedaba sin poder abrir otra nunca, porque
+  // PayPal seguia devolviendo la vieja. Preguntando por el estado real se
+  // reutiliza solo lo que de verdad sigue esperando aprobacion.
+  const { data: abierta } = await comoChofer
+    .from('suscripciones_chofer')
+    .select('referencia_externa')
+    .eq('conductor_id', uid)
+    .eq('estado', 'pendiente')
+    .not('referencia_externa', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (abierta?.referencia_externa) {
+    const r = await fetch(
+      `${base}/v1/billing/subscriptions/${abierta.referencia_externa}`,
+      { headers: { Authorization: `Bearer ${acceso}` } },
+    );
+    if (r.ok) {
+      const previa = await r.json().catch(() => null);
+      if (previa?.status === 'APPROVAL_PENDING') {
+        const enlace = (previa.links ?? [])
+          .find((l: { rel: string }) => l.rel === 'approve')?.href;
+        if (enlace) {
+          return json({ suscripcion_id: previa.id, aprobar_en: enlace });
+        }
+      }
+    }
+  }
+
   const r = await fetch(`${base}/v1/billing/subscriptions`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${acceso}`,
       'Content-Type': 'application/json',
-      // Sin esto, dos toques seguidos al boton abren dos suscripciones y el
-      // chofer termina pagando 30 al mes.
-      'PayPal-Request-Id': `ride-cuota-${uid}`,
+      // Unico por intento. Protege del doble toque dentro de la misma
+      // pulsacion, pero sin dejar al chofer atado a una suscripcion vieja: de
+      // reutilizar la que sigue abierta se encarga la consulta de arriba.
+      'PayPal-Request-Id': `ride-cuota-${uid}-${Date.now()}`,
     },
     body: JSON.stringify({
       plan_id: plan,

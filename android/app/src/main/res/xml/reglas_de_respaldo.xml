@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Que se lleva Android a la copia de seguridad de Google (Android 11 y
+     anteriores).
+
+     La sesion de Supabase vive en las SharedPreferences del paquete, asi que
+     con el respaldo por defecto el token de acceso del usuario terminaba en
+     Google Drive. Se excluye ese archivo: si alguien restaura el telefono, que
+     vuelva a iniciar sesion. El resto —el tema elegido, el viaje en marcha— no
+     tiene nada sensible y puede viajar. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="FlutterSecureStorage.xml"/>
+    <exclude domain="sharedpref" path="FlutterSharedPreferences.xml"/>
+</full-backup-content>
