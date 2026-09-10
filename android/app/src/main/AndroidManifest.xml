@@ -8,9 +8,12 @@
          con declararlo: lo hace PushService al iniciar sesion. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="ride"
+        android:label="Ride"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="true"
+        android:fullBackupContent="@xml/reglas_de_respaldo"
+        android:dataExtractionRules="@xml/reglas_de_extraccion">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -45,6 +48,17 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="ride" android:host="login-callback"/>
+            </intent-filter>
+            <!-- La vuelta de PayPal despues de aprobar (o cancelar) la cuota
+                 mensual del chofer. Sin esto el navegador se queda en un
+                 "No se puede acceder a este sitio" al terminar de pagar: el
+                 cobro se completa igual, porque quien lo activa es el webhook,
+                 pero el chofer se queda mirando un error. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="ride" android:host="suscripcion"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

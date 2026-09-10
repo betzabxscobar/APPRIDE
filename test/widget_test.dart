@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart' show LatLng;
 
 import 'package:ride/core/app_theme.dart';
 import 'package:ride/core/busqueda_config.dart';
+import 'package:ride/core/validators.dart';
 import 'package:ride/core/ride_colors.dart';
 import 'package:ride/core/theme_controller.dart';
 import 'package:ride/models/app_user.dart';
@@ -13,7 +14,6 @@ import 'package:ride/services/geocoding_service.dart';
 import 'package:ride/services/h3_service.dart';
 import 'package:ride/services/ride_service.dart';
 import 'package:ride/services/map_style_service.dart';
-import 'package:ride/services/payments_service.dart';
 import 'package:ride/services/places_service.dart';
 import 'package:ride/services/routing_service.dart';
 import 'package:ride/widgets/ride_map.dart';
@@ -28,6 +28,7 @@ import 'package:ride/screens/home/welcome_home_screen.dart';
 import 'package:ride/screens/home/account_sheet.dart';
 import 'package:ride/services/auth_service.dart';
 import 'package:ride/widgets/auth_shell.dart';
+import 'package:ride/widgets/auth_widgets.dart';
 import 'package:ride/widgets/panel_switcher.dart';
 
 /// Pruebas de la app tras conectar Supabase.
@@ -200,10 +201,28 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('¿Cómo quieres'), findsOneWidget);
-      expect(find.text('continuar?'), findsOneWidget);
-      expect(find.text('Crear cuenta'), findsOneWidget);
-      expect(find.text('Ya tengo una cuenta'), findsOneWidget);
+      // El titular es copy de marca y ya cambió una vez sin que nadie tocara
+      // esta prueba (ba33156, a3ffcf4 lo pasaron de «¿Cómo quieres
+      // continuar?» a «Tu próximo viaje empieza aquí.»): se comprueba que
+      // haya titular, no qué dice. Lo que sí es contrato son las dos vías de
+      // acceso, que son lo que el usuario toca.
+      expect(find.byType(AuthHeading), findsOneWidget);
+
+      final crear = find.text('Crear cuenta');
+      final entrar = find.text('Ya tengo una cuenta');
+      expect(crear, findsOneWidget);
+      expect(entrar, findsOneWidget);
+
+      // Como en las pruebas de tamaño de arriba, el listón es que las dos
+      // opciones sean alcanzables, no que entren sin desplazar: aquí la
+      // fuente de prueba dibuja cada letra como un cuadrado del tamaño de la
+      // tipografía, así que el texto mide casi el doble que en el teléfono
+      // real y medir el corte contra los 568 px no diría nada.
+      for (final opcion in [crear, entrar]) {
+        await tester.ensureVisible(opcion);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(opcion).bottom, lessThanOrEqualTo(568.0));
+      }
       expect(tester.takeException(), isNull);
     });
   });
@@ -1586,7 +1605,7 @@ void main() {
     });
   });
 
-  group('Cobro con DeUna', () {
+  group('Cobro por transferencia', () {
     PaymentMethod metodo(String tipo, {String? token}) => PaymentMethod.fromMap({
           'id': 'm-1',
           'tipo': tipo,
@@ -1594,12 +1613,14 @@ void main() {
           'detalle_tokenizado': token,
         });
 
-    test('DeUna es un método sin token, como el efectivo', () {
-      final m = metodo('deuna');
-      expect(m.esDeuna, isTrue);
+    test('La transferencia es un metodo sin token, como el efectivo', () {
+      final m = metodo('transferencia');
+      expect(m.esTransferencia, isTrue);
       expect(m.esEfectivo, isFalse);
-      expect(m.label, 'DeUna');
-      expect(m.descripcion, 'Escaneas el QR al terminar');
+      expect(m.label, 'Transferencia');
+      expect(m.descripcion, 'Transfieres a la cuenta del chofer');
+      expect(m.detalle, isNull,
+          reason: 'la cuenta es del chofer; del pasajero no se guarda nada');
     });
 
     test('Cada método tiene su propio icono', () {
@@ -1607,60 +1628,311 @@ void main() {
       // vistazo, que es justo para lo que sirve.
       final iconos = {
         metodo('efectivo').icon,
-        metodo('deuna').icon,
+        metodo('transferencia').icon,
         metodo('tarjeta', token: 'tok_1234').icon,
       };
       expect(iconos.length, 3);
     });
 
-    // Un PNG de 1x1 en base64, que es lo mínimo que decodifica.
-    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4'
-        'zwAAAgEBAF8Q5UcAAAAASUVORK5CYII=';
+    Trip viaje({
+      String? metodo,
+      String? estadoPago,
+      String? comprobante,
+      String? reportado,
+    }) =>
+        Trip.fromMap({
+          'id': 'v-1',
+          'estado': 'EN_CURSO',
+          'pasajero_id': 'p-1',
+          'tarifa_estimada': 4.0,
+          'fecha_solicitud': DateTime.now().toIso8601String(),
+          'pago_estado': estadoPago,
+          'pago_metodo': metodo,
+          'pago_comprobante': comprobante,
+          'pago_reportado_en': reportado,
+        });
 
-    test('El QR llega como data URI y hay que quedarse con el base64', () {
-      // Payválida lo manda pensado para un <img> de una web. `Image.memory`
-      // quiere bytes: con el prefijo delante, no pinta nada.
-      final bytes = DeunaCharge.decodificarQr('data:image/png;base64,$png');
-      expect(bytes, isNotNull);
-      expect(bytes!.length, greaterThan(0));
+    test('Hay algo que revisar solo cuando el pasajero ya aviso', () {
+      // Es lo que decide si al chofer se le ensena el comprobante o no.
+      final avisado = viaje(
+        metodo: 'transferencia',
+        estadoPago: 'pendiente',
+        comprobante: 'p-1/v-1.jpg',
+        reportado: DateTime.now().toIso8601String(),
+      );
+      expect(avisado.transferenciaPorRevisar, isTrue);
+      expect(avisado.pagoEsTransferencia, isTrue);
+
+      // Transferencia elegida pero todavia sin avisar: no hay nada que mirar.
+      final sinAvisar = viaje(metodo: 'transferencia', estadoPago: 'pendiente');
+      expect(sinAvisar.transferenciaPorRevisar, isFalse);
+      expect(sinAvisar.pagoEsTransferencia, isTrue);
     });
 
-    test('Un base64 pelado también vale', () {
-      expect(DeunaCharge.decodificarQr(png), isNotNull);
+    test('Un cobro ya cerrado no vuelve a pedir revision', () {
+      final pagado = viaje(
+        metodo: 'transferencia',
+        estadoPago: 'completado',
+        reportado: DateTime.now().toIso8601String(),
+      );
+      expect(pagado.pagoConfirmado, isTrue);
+      expect(pagado.transferenciaPorRevisar, isFalse);
     });
 
-    test('Un QR roto deja la pantalla sin imagen, no reventada', () {
-      // Todavía queda el deeplink para pagar, así que perder el QR no puede
-      // tumbar la pantalla entera.
-      expect(DeunaCharge.decodificarQr('data:image/png;base64,%%%'), isNull);
-      expect(DeunaCharge.decodificarQr(''), isNull);
-      expect(DeunaCharge.decodificarQr(null), isNull);
+    test('El efectivo no pasa por la revision de la transferencia', () {
+      // El chofer tiene el dinero en la mano: no hay comprobante que mirar ni
+      // motivo para bloquear el cierre del viaje.
+      final efectivo = viaje(metodo: 'efectivo', estadoPago: 'pendiente');
+      expect(efectivo.pagoEsTransferencia, isFalse);
+      expect(efectivo.transferenciaPorRevisar, isFalse);
+      expect(efectivo.pagoPendiente, isTrue);
     });
 
-    test('La respuesta de la función trae orden, monto y deeplink', () {
-      final cobro = DeunaCharge.fromMap({
-        'orden': 'ride7f3a',
-        'monto': 1.75,
-        'qr': 'data:image/png;base64,$png',
-        'deep_link': 'https://pagar.deuna.app/H91/merchant?id=MD1Y7HWEV',
+    test('DeUna ya no existe como método', () {
+      // Se retiró: el pasajero transfiere a la cuenta del chofer. Un tipo que
+      // ya no se ofrece no puede quedarse pintando una etiqueta propia, o
+      // reaparecería en cuentas viejas como si siguiera funcionando.
+      final m = metodo('deuna');
+      expect(m.esEfectivo, isFalse);
+      expect(m.esTransferencia, isFalse);
+      expect(m.label, 'Tarjeta',
+          reason: 'cae al caso por defecto, no tiene tratamiento propio');
+    });
+  });
+
+  group('Cuota mensual del chofer', () {
+    DriverSubscription cuota({
+      String estado = 'activa',
+      bool vigente = true,
+      int? dias = 20,
+      String proveedor = 'paypal',
+      DateTime? hasta,
+    }) =>
+        DriverSubscription.fromMap({
+          'estado': estado,
+          'vigente': vigente,
+          'dias_restantes': dias,
+          'monto': 15,
+          'moneda': 'USD',
+          'proveedor': proveedor,
+          'vigente_hasta':
+              (hasta ?? DateTime.now().add(Duration(days: dias ?? 0)))
+                  .toIso8601String(),
+        });
+
+    DriverState estado({
+      bool aprobado = true,
+      bool vehiculo = true,
+      DriverSubscription? suscripcion,
+    }) =>
+        DriverState(
+          existe: true,
+          aprobado: aprobado,
+          estadoAprobacion: aprobado ? 'aprobado' : 'pendiente',
+          disponible: false,
+          tieneVehiculoActivo: vehiculo,
+          suscripcion: suscripcion ?? cuota(),
+        );
+
+    test('Sin cuota al día no puede trabajar, aunque esté todo lo demás', () {
+      // Es el corazón del cobro: aprobado y con auto, pero sin pagar.
+      final s = estado(suscripcion: cuota(estado: 'vencida', vigente: false));
+      expect(s.puedeTrabajar, isFalse);
+      expect(s.soloLeFaltaPagar, isTrue);
+    });
+
+    test('Con la cuota al día y todo en orden, sí puede', () {
+      expect(estado().puedeTrabajar, isTrue);
+      expect(estado().soloLeFaltaPagar, isFalse);
+    });
+
+    test('Al que le falta la aprobación no se le pide pagar primero', () {
+      // Pagar no le desbloquearía nada: eso lo decide la administración. Sacar
+      // el botón de cobro ahí sería cobrarle por algo que no puede usar.
+      final s = estado(
+        aprobado: false,
+        suscripcion: cuota(estado: 'pendiente', vigente: false, dias: null),
+      );
+      expect(s.soloLeFaltaPagar, isFalse);
+      expect(s.motivoBloqueo, contains('todavía no aprueba'));
+    });
+
+    test('El motivo distingue entre no haber pagado nunca y que se venciera',
+        () {
+      final nueva = estado(
+        suscripcion: cuota(estado: 'pendiente', vigente: false, dias: null),
+      );
+      // `fromMap` con vigente_hasta null es el que nunca pagó.
+      final jamas = DriverSubscription.fromMap({
+        'estado': 'pendiente',
+        'vigente': false,
+        'monto': 15,
+        'moneda': 'USD',
+        'proveedor': 'paypal',
+      });
+      expect(jamas.caducada, isFalse);
+      expect(estado(suscripcion: jamas).motivoBloqueo, contains('empezar'));
+
+      final vencida = cuota(
+        estado: 'vencida',
+        vigente: false,
+        dias: 0,
+        hasta: DateTime.now().subtract(const Duration(days: 3)),
+      );
+      expect(vencida.caducada, isTrue);
+      expect(estado(suscripcion: vencida).motivoBloqueo, contains('venció'));
+      expect(nueva.motivoBloqueo, isNotEmpty);
+    });
+
+    test('Avisa cuando quedan pocos días, no cuando ya se venció', () {
+      expect(cuota(dias: 3).porVencer, isTrue);
+      expect(cuota(dias: 5).porVencer, isTrue);
+      expect(cuota(dias: 6).porVencer, isFalse);
+      // Vencida no es "por vencer": ahí el aviso ya no sirve, toca renovar.
+      expect(cuota(estado: 'vencida', vigente: false, dias: 0).porVencer, isFalse);
+    });
+
+    test('El mes de cortesía se distingue del que pagó', () {
+      expect(cuota(proveedor: 'cortesia').esCortesia, isTrue);
+      expect(cuota().esCortesia, isFalse);
+      // Pero cuenta igual para trabajar.
+      expect(estado(suscripcion: cuota(proveedor: 'cortesia')).puedeTrabajar,
+          isTrue);
+    });
+
+    test('Sin respuesta del servidor se asume que no pagó, nunca al revés', () {
+      // Si la red falla, lo barato es enseñar el panel de cobro de más. Darlo
+      // por pagado sería regalar viajes a quien no pagó.
+      const caida = DriverSubscription.sinPagar();
+      expect(caida.vigente, isFalse);
+      expect(caida.monto, 15);
+      expect(const DriverState.sinCuenta().puedeTrabajar, isFalse);
+    });
+
+    test('Cortesía más un pago sin aprobar no se cuenta como pagado', () {
+      // El caso que se vio en el telefono: el chofer abria el pago, no lo
+      // terminaba, y la pantalla decia «Al dia» con la referencia de PayPal
+      // delante. `mi_suscripcion()` mezclaba dos filas: los datos de la ultima
+      // creada (la de PayPal, sin pagar) con el «vigente» de la de cortesia.
+      final s = DriverSubscription.fromMap({
+        'estado': 'activa',
+        'vigente': true,
+        'dias_restantes': 30,
+        'monto': 0,
+        'moneda': 'USD',
+        'proveedor': 'cortesia',
+        'vigente_hasta':
+            DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+        'referencia_externa': null,
+        'pago_sin_terminar': 'I-K9U1828ES000',
       });
 
-      expect(cobro.orden, 'ride7f3a');
-      expect(cobro.monto, 1.75);
-      expect(cobro.deepLink, contains('pagar.deuna.app'));
-      expect(cobro.yaPagado, isFalse);
+      // Lo que manda es la cortesia, no el intento de pago.
+      expect(s.esCortesia, isTrue);
+      expect(s.vigente, isTrue);
+      expect(s.referenciaExterna, isNull);
+      // Y el pago a medias se avisa.
+      expect(s.tienePagoAMedias, isTrue);
+      expect(s.pagoSinTerminar, 'I-K9U1828ES000');
     });
 
-    test('Un monto entero llega como int y no puede romper el cobro', () {
-      // PostgREST serializa un numeric sin decimales como número pelado: un
-      // viaje de 2,00 llega como 2, no como 2.0.
-      expect(DeunaCharge.fromMap({'orden': 'o', 'monto': 2}).monto, 2.0);
+    test('Una suscripción ya pagada no se confunde con un pago a medias', () {
+      // La referencia que manda y la pendiente son la misma: se aprobo, y no
+      // hay nada que terminar.
+      final s = DriverSubscription.fromMap({
+        'estado': 'activa',
+        'vigente': true,
+        'dias_restantes': 30,
+        'monto': 15,
+        'moneda': 'USD',
+        'proveedor': 'paypal',
+        'vigente_hasta':
+            DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+        'referencia_externa': 'I-YAPAGADA',
+        'pago_sin_terminar': 'I-YAPAGADA',
+      });
+      expect(s.tienePagoAMedias, isFalse);
     });
 
-    test('Un viaje ya pagado no trae QR y se dice', () {
-      final cobro = DeunaCharge.fromMap({'ya_pagado': true, 'estado': 'completado'});
-      expect(cobro.yaPagado, isTrue);
-      expect(cobro.qr, isNull);
+    test('Sin pagos a medias el aviso no sale', () {
+      expect(cuota().tienePagoAMedias, isFalse);
+      expect(const DriverSubscription.sinPagar().tienePagoAMedias, isFalse);
+    });
+
+    test('Los días que faltan se redondean hacia arriba', () {
+      // A quien le quedan tres horas le quedan "1 día", no "0": decirle cero
+      // mientras todavía puede trabajar es mentirle.
+      final s = DriverSubscription.fromMap({
+        'estado': 'activa',
+        'vigente': true,
+        'dias_restantes': 1,
+        'monto': 15,
+        'moneda': 'USD',
+        'proveedor': 'paypal',
+        'vigente_hasta':
+            DateTime.now().add(const Duration(hours: 3)).toIso8601String(),
+      });
+      expect(s.diasRestantes, 1);
+      expect(s.porVencer, isTrue);
+    });
+  });
+
+  group('Contrasenas', () {
+    // Las mismas cuatro condiciones que Supabase Auth tiene configuradas: 10
+    // caracteres, minuscula, mayuscula, numero y simbolo. Si el panel y esto
+    // se separan, el usuario escribe algo que la app aprueba y el servidor
+    // rechaza con un mensaje que no dice que falta.
+
+    test('Una contrasena que cumple las cuatro pasa', () {
+      expect(Validators.password('Ride2026!ok'), isNull);
+      expect(Validators.password(r'Abcdefg1$x'), isNull);
+    });
+
+    test('Corta se rechaza aunque tenga de todo', () {
+      // Nueve caracteres con las cuatro clases: el largo manda.
+      expect(Validators.password(r'Ab1!cdefg'), 'Usa al menos 10 caracteres');
+    });
+
+    test('Dice exactamente que falta, no "contrasena invalida"', () {
+      expect(Validators.password('ride2026!!'), 'Falta una mayúscula');
+      expect(Validators.password('RIDE2026!!'), 'Falta una minúscula');
+      expect(Validators.password('RideRide!!'), 'Falta un número');
+      expect(Validators.password('RideRide12'), 'Falta un símbolo');
+    });
+
+    test('Cuando faltan varias se enumeran en una frase', () {
+      final r = Validators.password('ridemayores');
+      expect(r, 'Faltan una mayúscula, un número y un símbolo');
+    });
+
+    test('El largo se avisa antes que los tipos', () {
+      // Decirle las cinco cosas a la vez a quien escribio "hola" no ayuda.
+      expect(Validators.password('hola'), 'Usa al menos 10 caracteres');
+    });
+
+    test('Vacia se trata como campo requerido, no como debil', () {
+      expect(Validators.password(''), isNotNull);
+      expect(Validators.password(null), isNotNull);
+      expect(Validators.password(''), isNot(contains('Falta')));
+    });
+
+    test('La administrativa exige lo mismo', () {
+      // Dejaron de ser reglas distintas cuando Supabase paso a pedir 10 y los
+      // cuatro tipos a todo el mundo.
+      expect(Validators.adminPassword('Ride2026!ok'), isNull);
+      expect(Validators.adminPassword('ride2026!!'), 'Falta una mayúscula');
+    });
+
+    test('Los simbolos son los que acepta Supabase, ni uno mas', () {
+      // El espacio no esta en su lista: si aqui contara como simbolo, una
+      // contrasena con espacio pasaria el filtro de la app y no el del
+      // servidor.
+      expect(Validators.simbolosPassword.contains(' '), isFalse);
+      expect(Validators.password('Ride 2026 x'), 'Falta un símbolo');
+      for (final s in [r'!', r'@', r'#', r'$', r'%', r'^', r'&', r'*']) {
+        expect(Validators.password('RideRide12$s'), isNull,
+            reason: '$s deberia contar como simbolo');
+      }
     });
   });
 }

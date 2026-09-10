@@ -178,6 +178,9 @@ class Trip {
     this.destinoLat,
     this.destinoLng,
     this.pagoEstado,
+    this.pagoMetodo,
+    this.pagoComprobante,
+    this.pagoReportadoEn,
     this.montoCobrado = 0,
     this.llegadaVerificada,
     this.desvioDetectado,
@@ -244,6 +247,16 @@ class Trip {
   /// recibió el dinero, nadie puede afirmar que el pasajero pagó.
   final String? pagoEstado;
 
+  /// `efectivo`, `transferencia` o `tarjeta`. Decide quién confirma el cobro.
+  final String? pagoMetodo;
+
+  /// Dónde está la foto del comprobante que subió el pasajero, si la subió.
+  final String? pagoComprobante;
+
+  /// Cuándo dijo el pasajero que ya había transferido. Que lo diga no es que
+  /// el dinero haya llegado: eso lo ve el chofer en su banco.
+  final DateTime? pagoReportadoEn;
+
   /// Lo que se ha cobrado de verdad, ya descontados los reembolsos.
   final double montoCobrado;
 
@@ -292,6 +305,14 @@ class Trip {
 
   /// Hay un cobro esperando que alguien confirme que entró el dinero.
   bool get pagoPendiente => pagoEstado == 'pendiente';
+
+  /// Se paga transfiriendo a la cuenta del chofer.
+  bool get pagoEsTransferencia => pagoMetodo == 'transferencia';
+
+  /// El pasajero ya avisó de que transfirió y el chofer todavía no lo ha
+  /// confirmado. Es el momento en que hay algo que revisar.
+  bool get transferenciaPorRevisar =>
+      pagoEsTransferencia && pagoPendiente && pagoReportadoEn != null;
 
   /// Lo que se cobra: el definitivo si ya cerró, si no la cotización.
   double get montoVigente => tarifaFinal ?? tarifaEstimada;
@@ -342,6 +363,9 @@ class Trip {
         'destino_lat': destinoLat,
         'destino_lng': destinoLng,
         'pago_estado': pagoEstado,
+        'pago_metodo': pagoMetodo,
+        'pago_comprobante': pagoComprobante,
+        'pago_reportado_en': pagoReportadoEn?.toIso8601String(),
         'monto_cobrado': montoCobrado,
         'llegada_verificada': llegadaVerificada,
         'desvio_detectado': desvioDetectado,
@@ -391,6 +415,11 @@ class Trip {
         destinoLat: _double(row['destino_lat']),
         destinoLng: _double(row['destino_lng']),
         pagoEstado: row['pago_estado'] as String?,
+        pagoMetodo: row['pago_metodo'] as String?,
+        pagoComprobante: row['pago_comprobante'] as String?,
+        pagoReportadoEn: row['pago_reportado_en'] == null
+            ? null
+            : DateTime.tryParse(row['pago_reportado_en'] as String)?.toLocal(),
         montoCobrado: _double(row['monto_cobrado']) ?? 0,
         llegadaVerificada: row['llegada_verificada'] as bool?,
         desvioDetectado: row['desvio_detectado'] as bool?,

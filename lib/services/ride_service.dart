@@ -356,8 +356,8 @@ class RideService {
   /// El chofer confirma que le llegó el dinero del pasajero.
   ///
   /// Vale para efectivo y para transferencia: en los dos casos la app no se
-  /// entera sola, y el único que sabe si entró es el chofer. DeUna no pasa por
-  /// aquí —esa la confirma la pasarela—, y la base lo rechaza si se intenta.
+  /// entera sola, y el único que sabe si entró es el chofer. Un cobro de
+  /// pasarela no pasaría por aquí, y la base lo rechaza si se intenta.
   ///
   /// Hasta que lo confirme, el cobro queda `pendiente`. Con la confirmación
   /// entra también la comisión de la app como deuda del chofer.
@@ -486,6 +486,12 @@ class RideService {
         .eq('activo', true)
         .maybeSingle();
 
+    // La cuota mensual. Se pregunta aquí para que la pantalla del chofer sepa
+    // de una sola vez si puede trabajar; el corte de verdad no es este, está
+    // en Postgres (`aceptar_viaje`), que es lo que no se puede saltar
+    // descompilando el APK.
+    final cuota = await miSuscripcion();
+
     return DriverState(
       existe: true,
       aprobado: fila['estado_aprobacion'] == 'aprobado',
@@ -493,7 +499,27 @@ class RideService {
       disponible: fila['disponible'] as bool,
       calificacion: (fila['calificacion_promedio'] as num?)?.toDouble(),
       tieneVehiculoActivo: vehiculo != null,
+      suscripcion: cuota,
     );
+  }
+
+  /// La cuota mensual del chofer que tiene la sesión abierta.
+  ///
+  /// `mi_suscripcion()` devuelve fila siempre, aunque no haya pagado nunca, así
+  /// que aquí solo se cae a [DriverSubscription.sinPagar] si la llamada falla.
+  Future<DriverSubscription> miSuscripcion() async {
+    try {
+      final filas = await _client.rpc('mi_suscripcion');
+      final lista = filas as List<dynamic>;
+      if (lista.isEmpty) return const DriverSubscription.sinPagar();
+      return DriverSubscription.fromMap(
+        Map<String, dynamic>.from(lista.first as Map),
+      );
+    } catch (_) {
+      // Sin conexión no se le da por pagada a nadie: la pantalla enseña el
+      // panel de cobro y el servidor sigue siendo quien decide.
+      return const DriverSubscription.sinPagar();
+    }
   }
 
   /// Lo que lleva ganado el chofer, por periodos.
@@ -601,6 +627,9 @@ class RideService {
     if (m.contains('conductores_disponible_requiere_aprobacion')) {
       return 'Tu cuenta debe estar aprobada para ponerte en línea';
     }
+    if (m.contains('conductor_sin_suscripcion')) {
+      return 'Paga la cuota mensual para poder recibir viajes';
+    }
     if (m.contains('violates row-level security')) {
       return 'No tienes permiso para hacer eso';
     }
@@ -619,6 +648,90 @@ class RideService {
   }
 }
 
+/// La cuota mensual que paga el chofer para poder recibir viajes.
+///
+/// Es un espejo de `mi_suscripcion()`. Quien decide de verdad es Postgres: aquí
+/// solo se guarda lo justo para pintar el panel y para no dejar que el chofer
+/// intente ponerse en línea sabiendo ya que le va a rebotar.
+class DriverSubscription {
+  const DriverSubscription({
+    required this.estado,
+    required this.vigente,
+    required this.monto,
+    required this.moneda,
+    required this.proveedor,
+    this.vigenteHasta,
+    this.diasRestantes,
+    this.referenciaExterna,
+    this.pagoSinTerminar,
+  });
+
+  /// Lo que se asume cuando no hay respuesta: no ha pagado. Nunca al revés.
+  const DriverSubscription.sinPagar()
+      : estado = 'pendiente',
+        vigente = false,
+        monto = 15,
+        moneda = 'USD',
+        proveedor = 'paypal',
+        vigenteHasta = null,
+        diasRestantes = null,
+        referenciaExterna = null,
+        pagoSinTerminar = null;
+
+  /// `pendiente`, `activa`, `vencida` o `cancelada`.
+  final String estado;
+
+  /// Si hoy puede trabajar. Mira la fecha, no solo el estado.
+  final bool vigente;
+
+  final double monto;
+  final String moneda;
+  final String proveedor;
+  final DateTime? vigenteHasta;
+  final int? diasRestantes;
+
+  /// El id de la suscripción en PayPal (`I-…`), para dar soporte cuando un
+  /// chofer dice que pagó y no le consta.
+  final String? referenciaExterna;
+
+  /// Una suscripción que se abrió en PayPal y nadie llegó a aprobar.
+  ///
+  /// No sirve para trabajar, pero hay que decirlo: si no, el chofer se queda
+  /// creyendo que pagó. Pasó de verdad — se abría el pago, se cerraba PayPal
+  /// sin pagar, y la pantalla decía «Al día» porque el chofer todavía tenía el
+  /// mes de cortesía por otro lado.
+  final String? pagoSinTerminar;
+
+  /// Tiene un pago a medias y no es lo que le está dejando trabajar.
+  bool get tienePagoAMedias =>
+      pagoSinTerminar != null && pagoSinTerminar != referenciaExterna;
+
+  /// Cortesía: el mes de arranque que se dio a los que ya estaban.
+  bool get esCortesia => proveedor == 'cortesia';
+
+  /// Le quedan pocos días. El aviso sale antes de que se quede sin trabajar.
+  bool get porVencer => vigente && (diasRestantes ?? 99) <= 5;
+
+  /// Pagó alguna vez y se le acabó, que no es lo mismo que no haber pagado
+  /// nunca: al que ya pagó se le habla de renovar, no de empezar.
+  bool get caducada => !vigente && vigenteHasta != null;
+
+  factory DriverSubscription.fromMap(Map<String, dynamic> map) =>
+      DriverSubscription(
+        estado: (map['estado'] as String?) ?? 'pendiente',
+        vigente: map['vigente'] == true,
+        monto: (map['monto'] as num?)?.toDouble() ?? 15,
+        moneda: (map['moneda'] as String?) ?? 'USD',
+        proveedor: (map['proveedor'] as String?) ?? 'paypal',
+        vigenteHasta: map['vigente_hasta'] == null
+            ? null
+            : DateTime.tryParse(map['vigente_hasta'] as String)?.toLocal(),
+        diasRestantes: (map['dias_restantes'] as num?)?.toInt(),
+        referenciaExterna: map['referencia_externa'] as String?,
+        pagoSinTerminar: map['pago_sin_terminar'] as String?,
+      );
+}
+
 /// Situación del chofer, para saber qué ofrecerle en pantalla.
 class DriverState {
   const DriverState({
@@ -628,6 +741,7 @@ class DriverState {
     required this.disponible,
     required this.tieneVehiculoActivo,
     this.calificacion,
+    this.suscripcion = const DriverSubscription.sinPagar(),
   });
 
   const DriverState.sinCuenta()
@@ -636,7 +750,8 @@ class DriverState {
         estadoAprobacion = 'pendiente',
         disponible = false,
         tieneVehiculoActivo = false,
-        calificacion = null;
+        calificacion = null,
+        suscripcion = const DriverSubscription.sinPagar();
 
   final bool existe;
   final bool aprobado;
@@ -644,9 +759,18 @@ class DriverState {
   final bool disponible;
   final bool tieneVehiculoActivo;
   final double? calificacion;
+  final DriverSubscription suscripcion;
 
-  /// Solo puede recibir solicitudes si está aprobado y con un auto en servicio.
-  bool get puedeTrabajar => aprobado && tieneVehiculoActivo;
+  /// Solo puede recibir solicitudes si está aprobado, con un auto en servicio y
+  /// con la cuota mensual al día.
+  bool get puedeTrabajar =>
+      aprobado && tieneVehiculoActivo && suscripcion.vigente;
+
+  /// La cuota es lo único que el chofer arregla solo, pagando. Lo demás
+  /// depende de la administración o de subir papeles, así que se pregunta al
+  /// final: primero lo que no puede resolver por su cuenta.
+  bool get soloLeFaltaPagar =>
+      aprobado && tieneVehiculoActivo && !suscripcion.vigente;
 
   String get motivoBloqueo {
     if (!existe) return 'Tu cuenta de chofer todavía no está creada.';
@@ -658,6 +782,11 @@ class DriverState {
     }
     if (!tieneVehiculoActivo) {
       return 'Registra un vehículo y márcalo como activo para recibir viajes.';
+    }
+    if (!suscripcion.vigente) {
+      return suscripcion.caducada
+          ? 'Se te venció la cuota mensual. Renuévala para recibir viajes.'
+          : 'Paga la cuota mensual para empezar a recibir viajes.';
     }
     return '';
   }

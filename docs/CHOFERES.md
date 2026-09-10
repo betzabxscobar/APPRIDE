@@ -3,6 +3,10 @@
 Qué se le pide a alguien para poder conducir en Ride, quién lo comprueba y
 dónde. Todo lo que decide está en Postgres; la app solo lo enseña.
 
+Aprobar a un chofer es el primer requisito, no el único: además de los papeles
+hace falta la **cuota mensual** de 15 USD al día. Una cosa la decide la
+administración y la otra la paga él; están en [`CUOTA.md`](CUOTA.md).
+
 ## Lo que hace falta
 
 **De la persona** — uno por cuenta:
@@ -124,7 +128,8 @@ grant update (disponible) on public.conductores to authenticated;
 ```
 
 Ponerse en línea y salir de línea es lo único que el chofer decide sobre su
-propia fila. Todo lo demás pasa por funciones `security definer`, que corren
+propia fila —y desde que hay cuota mensual, ni eso lo decide solo: un trigger
+comprueba que la tenga al día, ver [`CUOTA.md`](CUOTA.md)—. Todo lo demás pasa por funciones `security definer`, que corren
 como su dueño y no dependen de ese permiso. Y como cerrojo, dos triggers
 impiden cambiar `estado_aprobacion` o el estado de un documento a quien no sea
 administración, por si algún día alguien vuelve a abrir el permiso.

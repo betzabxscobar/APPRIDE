@@ -1,0 +1,266 @@
+# La cuota mensual del chofer
+
+Un chofer paga **15 USD al mes** para poder recibir viajes. Sin la cuota al día
+entra a la app, ve su perfil, su historial y sus ganancias, pero no se puede
+poner en línea ni aceptar nada.
+
+Cobra PayPal, con una suscripción que se renueva sola. Este documento cuenta qué
+está construido, dónde está el corte y qué falta para cobrar de verdad.
+
+## Qué está hecho
+
+| Pieza | Dónde | Estado |
+|---|---|---|
+| Tabla `suscripciones_chofer` | [`2026-09-09-suscripcion-del-chofer.sql`](../infra/sql/2026-09-09-suscripcion-del-chofer.sql) | aplicado |
+| `suscripcion_vigente()` — ¿puede trabajar hoy? | mismo archivo | aplicado |
+| `mi_suscripcion()` — lo que pinta el panel | mismo archivo | aplicado |
+| Las tres puertas del corte | mismo archivo | aplicado y probado |
+| Mes de cortesía a los que ya estaban | mismo archivo | aplicado |
+| Edge Function `suscripcion-paypal` — abre la suscripción | [`infra/edge/suscripcion-paypal/`](../infra/edge/suscripcion-paypal/index.ts) | desplegada, **sin credenciales** |
+| Edge Function `webhook-paypal` — la activa al cobrar | [`infra/edge/webhook-paypal/`](../infra/edge/webhook-paypal/index.ts) | desplegada, **sin credenciales** |
+| Panel del chofer | `lib/screens/driver/subscription_screen.dart` | hecho |
+
+Las dos funciones ya están desplegadas y responden 503 mientras no tengan
+credenciales —comprobado—, así que el webhook ya tiene una URL que dar de alta
+en PayPal. Falta una sola cosa para cobrar: **el `client_secret` de una app REST
+de PayPal y el id del webhook**. El plan de suscripción ya está creado.
+
+## Dónde está el corte
+
+En Postgres, no en la app. Un APK se descompila en diez minutos y el teléfono
+habla con PostgREST directamente, así que parchear la pantalla no sirve de nada.
+Son tres puertas y las tres preguntan por la cuota:
+
+| # | Puerta | Qué la protege |
+|---|---|---|
+| 1 | Ponerse `disponible` | trigger `conductor_disponible_con_cuota` |
+| 2 | Ver solicitudes abiertas | `solicitudes_abiertas()` devuelve vacío |
+| 3 | **Aceptar un viaje** | `aceptar_viaje()` lanza `conductor_sin_suscripcion` |
+
+La 3 es la que de verdad protege el dinero: aunque alguien se salte las otras
+dos y llame a `aceptar_viaje` a mano con el id de un viaje, ahí se queda. Las
+otras dos existen para que el chofer se entere **antes** y no después de haber
+intentado tomar un viaje.
+
+### La puerta 1 tiene dos comportamientos, a propósito
+
+- **Intenta encenderse sin cuota** → excepción, y la app le dice por qué.
+- **Ya estaba en línea y se le vence** → no hay excepción: se le baja el
+  interruptor y deja de recibir viajes.
+
+El segundo caso es el que se escapó en la primera versión. Mirar solo la
+transición apagado→encendido dejaba trabajando para siempre al que ya estaba en
+línea cuando venció. Y no puede lanzar excepción porque el único `update` que
+llega en ese caso es el reporte de posición, que corre cada 30 segundos:
+reventarlo dejaría al chofer sin poder ni actualizarse.
+
+### Cómo se comprobó
+
+Con un rol `authenticated` de verdad y el `sub` del chofer en el JWT, no como
+`postgres` —que ignora el RLS y da todo por bueno—. Cada prueba dentro de una
+transacción que termina en `rollback`:
+
+| Prueba | Resultado |
+|---|---|
+| Encenderse sin cuota | rebotado: `conductor_sin_suscripcion` |
+| Ya en línea y le vence | `disponible` pasa solo a `false` |
+| Ver solicitudes sin cuota | 0 visibles |
+| Aceptar viaje sin cuota | rebotado: `conductor_sin_suscripcion` |
+| Aceptar viaje con la cuota al día | pasa el filtro |
+
+Los superadministradores se saltan el cobro: son cuentas internas y necesitan
+poder probar el flujo de chofer (CU-A26).
+
+## Cómo funciona el cobro
+
+1. El chofer abre «Mi cuota mensual» y pulsa pagar.
+2. La app llama a `suscripcion-paypal`. **No manda ni el importe ni el plan**:
+   los pone la Edge Function desde sus variables de entorno. Si el teléfono
+   pudiera decir el precio, cualquiera pagaría un centavo al mes.
+3. La función crea la suscripción en PayPal con `custom_id` = el uuid del
+   chofer, sacado del JWT y nunca del cuerpo de la petición. Guarda la fila en
+   `pendiente`, que todavía no sirve para trabajar.
+4. La app abre en el navegador el enlace donde el chofer aprueba el cobro.
+5. PayPal cobra y avisa a `webhook-paypal`, que verifica la firma contra la API
+   de PayPal y marca la suscripción `activa` con un mes de vigencia.
+6. Cada mes PayPal vuelve a cobrar y a avisar (`PAYMENT.SALE.COMPLETED`), y la
+   vigencia se encadena al final del periodo que ya tenía pagado.
+
+**Volver de PayPal no activa nada.** El `return_url` es solo la vuelta del
+navegador; quien da la cuota por pagada es el webhook. Por eso el panel ofrece
+«Ya pagué» en vez de darlo por hecho: PayPal tarda unos segundos en avisar.
+
+### Un pago abierto y sin aprobar no es un pago
+
+Al pulsar pagar queda una fila en `pendiente` aunque el chofer cierre PayPal sin
+pagar. Esa fila no sirve para trabajar —`suscripcion_vigente()` solo mira las
+`activa`— pero hay que enseñarla: `mi_suscripcion()` la devuelve aparte, en
+`pago_sin_terminar`, y el panel avisa de que quedó a medias.
+
+La primera version se equivocaba justo aquí: devolvia la fila *mas nueva* en vez
+de la que manda, asi que un chofer con mes de cortesía que abría el pago y no lo
+terminaba veía «Al día» con la referencia de PayPal delante, como si hubiera
+pagado. El acceso nunca estuvo mal dado —lo que le dejaba trabajar era la
+cortesía, correctamente—, pero la pantalla le mentía. Salió probando en el
+teléfono, no en las pruebas.
+
+### Lo que la app no puede hacer
+
+- **No marca su propia cuota como pagada.** `suscripciones_chofer` tiene RLS con
+  política de `select` y ninguna de `insert` ni de `update`, así que la única
+  que escribe es la `service_role`, que vive en el webhook.
+- **No abre la suscripción de otro chofer.** El uuid sale de `auth.uid()`.
+- **No se fía de su propia caché.** Si la consulta falla, `DriverSubscription`
+  cae en `sinPagar()`: enseña el panel de cobro de más antes que regalar viajes.
+
+### Al cancelar no se corta el mes en marcha
+
+`BILLING.SUBSCRIPTION.CANCELLED` marca la fila como cancelada pero **no toca
+`vigente_hasta`**: ese mes ya está pagado. El chofer deja de recibir viajes
+cuando llega la fecha, no antes.
+
+## El enlace de pago suelto no sirve para esto
+
+El primer enlace que se manejó fue
+`paypal.com/ncp/payment/UXEAEF8N82RWU`, un PayPal No-Code Checkout de 15 USD.
+Está bien para cobrar una vez, pero no vale como cuota mensual:
+
+- **Es un pago único**, no una suscripción: nadie renueva solo.
+- **Es idéntico para todos los choferes** y no admite un identificador, así que
+  al recibir el dinero no hay forma de saber de quién es.
+- **No avisa a la app.** Sin webhook no hay nada que active a nadie.
+
+Por eso se usa la API de suscripciones, que sí manda `custom_id` de vuelta en
+cada evento.
+
+## El mes de cortesía
+
+Los choferes que ya estaban cuando se activó el cobro tienen un mes regalado,
+con `proveedor = 'cortesia'` y `monto = 0`. Si no, se habrían quedado sin poder
+salir a la calle de un día para otro. El `insert` lleva `on conflict do nothing`
+sobre el índice de «una sola activa», así que volver a correr la migración no
+regala otro mes.
+
+En el panel se ve como «Mes de cortesía», con la opción de pagar por adelantado.
+
+## Configurar las credenciales
+
+Las dos funciones ya están desplegadas. Solo falta darles las cinco variables;
+no hay que volver a desplegar nada, porque las leen en cada llamada.
+
+### En PayPal
+
+1. **developer.paypal.com -> Apps & Credentials.** El interruptor
+   **Sandbox | Live** de arriba dice en qué entorno estás; la app aparece solo
+   en uno de los dos. Los planes de sandbox y de producción **no se mezclan**:
+   un `plan_id` de Live no existe en sandbox.
+2. Abre la app y copia el **Client ID** y el **Secret** (sale oculto, hay que
+   pulsar «Show»). Tienen que ser de la misma cuenta y entorno donde se creó el
+   plan.
+3. Abajo, en **Webhooks -> Add Webhook**, apunta a:
+
+   ```
+   https://<proyecto>.supabase.co/functions/v1/webhook-paypal
+   ```
+
+   suscrito a estos cinco eventos: `BILLING.SUBSCRIPTION.ACTIVATED`,
+   `PAYMENT.SALE.COMPLETED`, `BILLING.SUBSCRIPTION.CANCELLED`,
+   `BILLING.SUBSCRIPTION.SUSPENDED` y `BILLING.SUBSCRIPTION.EXPIRED`. Al
+   guardar da un **Webhook ID**.
+
+### En Supabase
+
+Por el panel, en **Project Settings -> Edge Functions -> Edge Function
+Secrets**, que no pide tener el CLI instalado:
+
+| Nombre | Qué es |
+|---|---|
+| `PAYPAL_CLIENT_ID` | el Client ID de la app REST |
+| `PAYPAL_SECRET` | su Secret |
+| `PAYPAL_PLAN_ID` | el plan mensual de 15 USD (`P-...`) |
+| `PAYPAL_WEBHOOK_ID` | el que devolvió el paso 3 |
+| `PAYPAL_ENTORNO` | `sandbox` o `produccion`, en minúscula y sin tilde |
+
+Con el CLI instalado y el proyecto enlazado es lo mismo en una línea:
+
+```bash
+supabase secrets set PAYPAL_CLIENT_ID=... PAYPAL_SECRET=... PAYPAL_PLAN_ID=P-... PAYPAL_WEBHOOK_ID=... PAYPAL_ENTORNO=sandbox
+```
+
+### Probar en sandbox, sin dinero real
+
+Hacen falta **dos** cuentas de prueba, y PayPal ya las creó al registrarse como
+desarrollador. Están en *Sandbox → Accounts*:
+
+| Cuenta | En Ride es |
+|---|---|
+| `sb-…@business.example.com` | Ride, quien cobra los 15 USD |
+| `sb-…@personal.example.com` | el chofer, quien paga |
+
+De la **business** salen el `PAYPAL_CLIENT_ID` y el `PAYPAL_SECRET` de sandbox.
+Con la **personal** se inicia sesión al aprobar la suscripción; trae saldo
+ficticio. Si no se sabe su contraseña: en esa página, icono de la cuenta →
+*View/Edit Account* → Profile → *Change password*.
+
+El producto y el plan de 15 USD hay que crearlos **una vez por entorno**: un
+`plan_id` de producción no existe en sandbox ni al revés, y ese es el tropiezo
+típico. Para no pelearse con los menús de PayPal:
+
+```bash
+PAYPAL_ENTORNO=sandbox PAYPAL_CLIENT_ID=... PAYPAL_SECRET=...   python tool/crear_plan_paypal.py
+```
+
+Imprime el `P-…` listo para pegar en `PAYPAL_PLAN_ID`. Lee las credenciales del
+entorno y no de argumentos, para que el secreto no quede en el historial del
+shell. Por los menús es *Pay & Get Paid → Subscriptions → Create plan* en
+`sandbox.paypal.com`, con la cuenta business.
+
+La prueba de punta a punta:
+
+1. Poner los cinco secretos de sandbox, con `PAYPAL_ENTORNO=sandbox`.
+2. Entrar en la app como chofer y pulsar pagar.
+3. Aprobar en PayPal con la cuenta personal de sandbox.
+4. Comprobar que la fila de `suscripciones_chofer` quedó `activa` con su mes, y
+   que el chofer ya se puede poner en línea.
+
+
+### El botón de PayPal para web no sirve aquí
+
+El generador de botones de paypal.com da un snippet de JavaScript con
+`paypal.Buttons({ createSubscription: ... })`. Ese código es para una página
+web, no para la app, y su `onApprove` no manda `custom_id`: al cobrar no habría
+forma de saber de qué chofer es el pago. Lo único aprovechable de ese snippet es
+el `plan_id` que lleva dentro.
+
+`PAYPAL_ENTORNO` acepta `sandbox` o `produccion`. Sin credenciales las dos
+funciones responden 503 y la app lo cuenta como «el cobro con PayPal todavía no
+está configurado», que es la verdad y no un error raro.
+
+> **`webhook-paypal` se despliega con `--no-verify-jwt`.** Quien llama es
+> PayPal, que no tiene un token de Supabase. Eso deja la URL abierta a internet,
+> así que lo primero que hace la función es pedirle a PayPal que confirme la
+> firma del evento. Sin esa comprobación, cualquiera con la URL se regala meses
+> gratis mandando un JSON. **El `PAYPAL_SECRET` no entra en el repositorio.**
+
+## Dar cuota a mano
+
+Mientras no haya credenciales —o para un caso de soporte— se puede activar desde
+el SQL editor:
+
+```sql
+insert into public.suscripciones_chofer
+  (conductor_id, estado, vigente_hasta, proveedor, monto, datos)
+values
+  ('<uuid del chofer>', 'activa', now() + interval '1 month', 'cortesia', 0,
+   jsonb_build_object('motivo', 'por que se le regalo'));
+```
+
+Para ver quién está al día y a quién se le acaba:
+
+```sql
+select p.nombre, s.estado, s.proveedor, s.vigente_hasta::date,
+       public.suscripcion_vigente(s.conductor_id) as puede_trabajar
+from public.suscripciones_chofer s
+join public.profiles p on p.id = s.conductor_id
+order by s.vigente_hasta;
+```

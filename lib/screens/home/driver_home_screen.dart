@@ -14,6 +14,7 @@ import '../../models/trip.dart';
 import '../../models/user_role.dart';
 import '../../screens/driver/driver_profile_screen.dart';
 import '../../screens/driver/earnings_screen.dart';
+import '../../screens/driver/subscription_screen.dart';
 import '../../screens/settings/settings_screen.dart';
 import '../../screens/trips/trip_history_screen.dart';
 import '../../screens/notifications/notifications_screen.dart';
@@ -619,6 +620,30 @@ class _HojaConductor extends StatelessWidget {
                 ],
               ),
             ),
+            // La cuota es lo único de esta lista que arregla él solo, así que
+            // se le pone el camino delante en vez de dejarlo buscándolo.
+            if (estado.soloLeFaltaPagar) ...[
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const SubscriptionScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.account_balance_wallet_outlined, size: 21),
+                label: Text(
+                  estado.suscripcion.caducada
+                      ? 'Renovar mi cuota'
+                      : 'Pagar mi cuota mensual',
+                ),
+              ),
+            ],
+          ],
+          // Trabajando, pero se le acaba. Avisar antes es más barato que
+          // explicarle luego por qué dejaron de entrarle solicitudes.
+          if (estado.puedeTrabajar && estado.suscripcion.porVencer) ...[
+            const SizedBox(height: 14),
+            _CuotaPorVencer(cuota: estado.suscripcion),
           ],
           if (viaje != null) ...[
             const SizedBox(height: 16),
@@ -642,6 +667,20 @@ class _HojaConductor extends StatelessWidget {
                   : 'Completar mi cuenta de chofer',
             ),
           ),
+          // Cuando le falta pagar ya tiene el botón grande arriba; repetirlo
+          // aquí sería la misma acción dos veces en la misma hoja.
+          if (!estado.soloLeFaltaPagar) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const SubscriptionScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.account_balance_wallet_outlined, size: 21),
+              label: const Text('Mi cuota mensual'),
+            ),
+          ],
           const SizedBox(height: 20),
           Row(
             children: [
@@ -808,6 +847,59 @@ class _InterruptorJornada extends StatelessWidget {
 }
 
 /// Tarjeta del viaje en marcha del conductor.
+/// «Te quedan 3 días de cuota». Sale mientras todavía puede trabajar.
+class _CuotaPorVencer extends StatelessWidget {
+  const _CuotaPorVencer({required this.cuota});
+
+  final DriverSubscription cuota;
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+    final dias = cuota.diasRestantes ?? 0;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppTheme.radiusField),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const SubscriptionScreen()),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: ride.dangerSoft,
+            borderRadius: BorderRadius.circular(AppTheme.radiusField),
+            border: Border.all(color: ride.danger.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.schedule, size: 21, color: ride.danger),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  dias <= 1
+                      ? 'Hoy se te acaba la cuota. Renuévala para seguir '
+                          'recibiendo viajes.'
+                      : 'Te quedan $dias días de cuota. Renuévala para no '
+                          'quedarte sin recibir viajes.',
+                  style: TextStyle(
+                    fontSize: AppText.small,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                    color: ride.ink,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right, size: 20, color: ride.danger),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ViajeActivo extends StatelessWidget {
   const _ViajeActivo({required this.viaje, required this.onAbrir});
 

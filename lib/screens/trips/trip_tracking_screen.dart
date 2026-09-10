@@ -13,7 +13,6 @@ import '../../services/trip_session_store.dart';
 import '../../widgets/auth_feedback.dart';
 import '../../widgets/category_chip.dart';
 import '../../widgets/chat_button.dart';
-import '../payments/deuna_qr_screen.dart';
 import '../support/support_screen.dart';
 import '../../widgets/ride_card.dart';
 import '../../widgets/transfer_sheet.dart';
@@ -44,10 +43,10 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   String? _error;
   bool _calificacionOfrecida = false;
 
-  /// Si el pasajero eligió DeUna, el viaje cerrado no queda cobrado solo: hay
-  /// que enseñarle el QR. Se mira una vez, al terminar, y no en cada aviso de
-  /// Realtime.
-  bool _pagaConDeuna = false;
+  /// Si el pasajero paga por transferencia hay que enseñarle la cuenta del
+  /// chofer durante el viaje, no al final: el chofer no puede cerrarlo hasta
+  /// que confirme que le llegó el dinero. Se mira una vez y no en cada aviso
+  /// de Realtime.
   bool _pagaConTransferencia = false;
   bool _metodoConsultado = false;
 
@@ -116,7 +115,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
       }
 
       if (viaje != null && viaje.status == TripStatus.finalizado) {
-        await _mirarSiPagaConDeuna();
+        await _mirarComoPaga();
         _ofrecerCalificacion(viaje);
       }
     } catch (_) {
@@ -128,26 +127,22 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
     }
   }
 
-  /// El método predeterminado del pasajero decide qué se le ofrece al cerrar:
-  /// con efectivo no hay nada que hacer —ya pagó en la mano— y con DeUna queda
-  /// un cobro pendiente que solo se salda escaneando.
+  /// El método predeterminado del pasajero decide qué se le ofrece: con
+  /// efectivo no hay nada que hacer —paga en la mano al llegar— y con
+  /// transferencia hay que darle la cuenta del chofer para que la copie.
   ///
   /// Si esto falla no se enseña el botón. Es mejor que ofrecer un pago que
   /// después no se puede completar.
-  Future<void> _mirarSiPagaConDeuna() async {
+  Future<void> _mirarComoPaga() async {
     if (_metodoConsultado) return;
     _metodoConsultado = true;
     try {
       final metodos = await FleetService.instance.misMetodosPago();
-      final deuna = metodos.any((m) => m.esDeuna && m.predeterminado);
       final transferencia =
           metodos.any((m) => m.esTransferencia && m.predeterminado);
       if (!mounted) return;
-      if (deuna || transferencia) {
-        setState(() {
-          _pagaConDeuna = deuna;
-          _pagaConTransferencia = transferencia;
-        });
+      if (transferencia) {
+        setState(() => _pagaConTransferencia = transferencia);
       }
     } catch (_) {
       // Sin red o sin permiso: se queda sin botón, no con uno roto.
@@ -288,7 +283,11 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                     ],
                     const SizedBox(height: 16),
                     _TarjetaPrecio(viaje: viaje),
-                    if (viaje.status == TripStatus.finalizado &&
+                    // Durante el viaje, no al final: el chofer no lo puede
+                    // cerrar hasta confirmar que le llegó el dinero, así que
+                    // esperar al cierre dejaría a los dos bloqueados.
+                    if ((viaje.status == TripStatus.enCurso ||
+                            viaje.status == TripStatus.finalizado) &&
                         _pagaConTransferencia) ...[
                       const SizedBox(height: 12),
                       FilledButton.icon(
@@ -299,22 +298,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                           chofer: viaje.conductorNombre,
                         ),
                         icon: const Icon(Icons.account_balance_outlined, size: 20),
-                        label: const Text('Ver cuenta para transferir'),
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(50),
-                        ),
-                      ),
-                    ],
-                    if (viaje.status == TripStatus.finalizado &&
-                        _pagaConDeuna) ...[
-                      const SizedBox(height: 12),
-                      FilledButton.icon(
-                        onPressed: () => DeunaQrScreen.abrir(
-                          context,
-                          viajeId: viaje.id,
-                        ),
-                        icon: const Icon(Icons.qr_code_2, size: 20),
-                        label: const Text('Pagar con DeUna'),
+                        label: const Text('Pagar por transferencia'),
                         style: FilledButton.styleFrom(
                           minimumSize: const Size.fromHeight(50),
                         ),

@@ -125,7 +125,6 @@ void main() {
       final m = metodo('transferencia');
       expect(m.esTransferencia, isTrue);
       expect(m.esEfectivo, isFalse);
-      expect(m.esDeuna, isFalse);
       expect(m.label, 'Transferencia');
       expect(m.detalle, isNull,
           reason: 'la cuenta es del chofer, no se guarda nada del pasajero');
@@ -133,6 +132,8 @@ void main() {
 
     test('no se confunde con los otros métodos', () {
       expect(metodo('efectivo').esTransferencia, isFalse);
+      // 'deuna' se retiro: aqui solo se comprueba que un tipo desconocido no
+      // se cuela como transferencia.
       expect(metodo('deuna').esTransferencia, isFalse);
       expect(metodo('tarjeta').esTransferencia, isFalse);
     });

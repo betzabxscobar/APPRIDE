@@ -133,7 +133,7 @@ class _RegisterBoxState extends State<RegisterBox> {
             const SizedBox(height: 15),
             RidePasswordField(
               label: 'Contraseña',
-              hint: 'Mínimo 8 caracteres',
+              hint: '10+, con mayúscula, minúscula, número y símbolo',
               controller: _passwordController,
               validator: Validators.password,
               textInputAction: TextInputAction.done,

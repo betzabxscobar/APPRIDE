@@ -47,7 +47,7 @@ El ciclo entero vive en Postgres. La app solo pide el siguiente paso.
 | `cotizar_viaje` | `p_origen_lat`, `p_origen_lng`, `p_destino_lat`, `p_destino_lng`, `p_distancia_km`, `p_tarifa_id`, `p_categoria` | fila con `total`, `gana_conductor`, `comision_app`, `aplico_minima` | cualquiera |
 | `cotizar_categorias` | los cuatro puntos y `p_distancia_km` | una fila **por tipo de vehículo**, ya calculada | cualquiera |
 | `solicitar_viaje` | origen y destino con su texto y su referencia, `p_distancia_km`, `p_categoria`, `p_origen_celda_h3_7`, `p_celdas_difusion` | `uuid` del viaje | pasajero |
-| `aceptar_viaje` | `p_viaje_id` | `uuid` | chofer disponible |
+| `aceptar_viaje` | `p_viaje_id` | `uuid` | chofer disponible **y con la cuota al día** |
 | `avanzar_viaje` | `p_viaje_id`, `p_codigo` | el estado nuevo | el chofer del viaje |
 | `finalizar_viaje` | `p_viaje_id` | el total cobrado | el chofer del viaje |
 | `cancelar_viaje` | `p_viaje_id` | — | pasajero o chofer |
@@ -107,24 +107,47 @@ ese auto tenga sus cuatro papeles aprobados y sin caducar.
 |---|---|---|---|
 | `registrar_metodo_pago` | `p_tipo`, `p_token`, `p_predeterminado` | `uuid` | pasajero |
 | `elegir_metodo_predeterminado` | `p_metodo_id` | — | pasajero |
-| `cobro_deuna` | `p_viaje_id` | `orden`, `monto`, `estado` | el pasajero del viaje |
-| `confirmar_cobro_deuna` | `p_orden`, `p_pagado`, `p_datos` | `uuid` del pago | `service_role` o administración |
+| `reportar_transferencia` | `p_viaje_id`, `p_comprobante` | — | el pasajero del viaje |
+| `confirmar_pago_recibido` | `p_viaje_id` | — | el chofer del viaje |
 
 > **`p_token` no es un número de tarjeta y la base lo comprueba.**
 > `registrar_metodo_pago` rechaza cualquier valor con forma de PAN. Los tipos
-> que la app registra son `efectivo` y `deuna`, y ninguno guarda nada del
-> pasajero; la tarjeta espera una pasarela que tokenice, y hasta entonces no hay
-> formulario donde escribirla.
+> que la app registra son `efectivo` y `transferencia`, y ninguno guarda nada
+> del pasajero; la tarjeta espera una pasarela que tokenice, y hasta entonces no
+> hay formulario donde escribirla.
 
-`cobro_deuna` devuelve el importe que hay que cobrar y fija el número de orden,
-que es el mismo cada vez que se pide el QR de ese viaje. **La app no manda el
-importe nunca**, y quien llama a Payválida es la Edge Function `cobro-deuna`,
-que es la única que ve el `fixedhash`.
+Con transferencia el cobro se comprueba entre dos: `reportar_transferencia` es
+el pasajero diciendo que ya pagó, con el comprobante adjunto, y **no cierra
+nada**; `confirmar_pago_recibido` es el chofer diciendo que el dinero está en su
+cuenta, que es lo único que puede comprobarlo de verdad. Esa segunda mueve
+dinero: cierra el cobro y le carga al chofer la comisión, igual que el efectivo.
+Es idempotente.
 
-`confirmar_cobro_deuna` es lo que mueve dinero: marca el cobro y le abona al
-chofer su parte, igual que el efectivo le carga la comisión. Es idempotente
-porque un aviso de pasarela se reintenta. Todo el circuito, y las preguntas que
-quedan abiertas con Payválida, están en [`PAGOS.md`](PAGOS.md).
+`finalizar_viaje` rebota mientras un cobro por transferencia siga pendiente, así
+que ese cobro nace antes: al pasar el viaje a `EN_CURSO`. Todo el circuito está
+en [`PAGOS.md`](PAGOS.md).
+
+## Cuota mensual del chofer
+
+| Función | Parámetros | Devuelve | Quién |
+|---|---|---|---|
+| `suscripcion_vigente` | `p_conductor` | `boolean` | cualquier autenticado |
+| `mi_suscripcion` | — | `estado`, `vigente_hasta`, `dias_restantes`, `vigente`, `monto`, `moneda`, `proveedor`, `referencia_externa` | el propio chofer |
+
+`mi_suscripcion` devuelve **siempre** una fila, aunque el chofer no haya pagado
+nunca: así la pantalla no tiene que distinguir entre «no hay datos» y «falló la
+red». `dias_restantes` redondea hacia arriba, porque a quien le quedan tres
+horas le quedan «1 día» y no «0».
+
+Sin la cuota al día el servidor corta por tres sitios: el trigger que impide
+ponerse `disponible`, `solicitudes_abiertas()` —que devuelve vacío— y
+`aceptar_viaje()`, que lanza `conductor_sin_suscripcion`. La tercera es la que
+de verdad protege el dinero; las otras dos son para avisar antes.
+
+`suscripciones_chofer` **no la escribe nunca la app**: tiene RLS con política de
+`select` y ninguna de `insert` ni `update`, así que solo la toca la `service_role`
+desde la Edge Function `webhook-paypal`. Todo el circuito está en
+[`CUOTA.md`](CUOTA.md).
 
 ## Choferes: identidad y papeles
 
@@ -321,9 +344,14 @@ El estado de partida y los dos arreglos están en
   puede contrastar cada contraseña nueva con HaveIBeenPwned y rechazar las que
   ya se filtraron. Es un interruptor del panel, no código. Para una app donde
   la cuenta guarda viajes, dirección de casa y método de pago, vale la pena.
-- **El cobro con DeUna está escrito pero no cobra todavía.** Falta desplegar la
-  Edge Function con las credenciales de Payválida, y falta saber quién avisa de
-  que el pasajero pagó: no hay webhook ni consulta de estado documentados. Las
-  preguntas abiertas están en [`PAGOS.md`](PAGOS.md).
+- **La transferencia se comprueba a mano, y no hay otra forma.** No existe
+  integración bancaria: quien ve el dinero es el chofer en su banco. El
+  comprobante que sube el pasajero deja rastro para reclamar, pero no prueba que
+  el dinero llegara. Ver [`PAGOS.md`](PAGOS.md).
 - **La tarjeta sigue sin pasarela.** `registrar_metodo_pago` acepta un token,
   pero no hay quién lo emita.
+- **La cuota del chofer no se puede pagar todavía.** El corte está aplicado y
+  probado, pero las Edge Functions `suscripcion-paypal` y `webhook-paypal` están
+  sin desplegar: falta crear el plan de suscripción en PayPal y configurar sus
+  credenciales. Hasta entonces solo se puede dar cuota a mano. Ver
+  [`CUOTA.md`](CUOTA.md).

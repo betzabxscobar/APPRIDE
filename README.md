@@ -18,9 +18,11 @@ La superficie que consume la app —funciones, tablas, Realtime y Storage— est
 documentada en [`docs/API.md`](docs/API.md). El mapa, en
 [`docs/MAPA.md`](docs/MAPA.md); el buscador de direcciones, en
 [`docs/BUSCADOR.md`](docs/BUSCADOR.md); los precios, en
-[`docs/TARIFAS.md`](docs/TARIFAS.md); el cobro con DeUna, en
-[`docs/PAGOS.md`](docs/PAGOS.md); lo que se le exige a un chofer, en
-[`docs/CHOFERES.md`](docs/CHOFERES.md).
+[`docs/TARIFAS.md`](docs/TARIFAS.md); cómo se cobra un viaje, en
+[`docs/PAGOS.md`](docs/PAGOS.md); la cuota mensual que paga el chofer, en
+[`docs/CUOTA.md`](docs/CUOTA.md); lo que se le exige a un chofer, en
+[`docs/CHOFERES.md`](docs/CHOFERES.md). Lo que falta para publicar en Play
+Store, en [`docs/PUBLICAR.md`](docs/PUBLICAR.md).
 
 ## Credenciales del equipo administrativo
 
@@ -51,6 +53,11 @@ Cuando exista la base de datos, estas cuentas pasan a Supabase, se activa
 |---|---|---|
 | Pasajero | pasajero@ride.app | Ride1234 |
 | Conductor | conductor@ride.app | Ride1234 |
+
+> **Comprobado el 2026-09-09: `conductor@ride.app` ya no entra.** O se borró la
+> cuenta o le cambiaron la contraseña. Hay que recrearla o quitarla de aquí,
+> porque una cuenta de prueba que no funciona hace perder más tiempo del que
+> ahorra.
 
 ## Comandos
 
@@ -224,13 +231,28 @@ la administración revisa antes de habilitarlo.
 **Actor:** pasajero autenticado.
 
 1. El pasajero abre **Métodos de pago** desde su cuenta.
-2. Registra efectivo, transferencia o DeUna, elige su opción principal o
-   elimina una opción que no tenga pagos asociados.
-3. Al pagar con DeUna, solicita al servidor la orden, el QR y el enlace; las
-   tarjetas siguen requiriendo una futura pasarela de tokenización.
+2. Registra efectivo o transferencia, elige su opción principal o elimina una
+   opción que no tenga pagos asociados.
+3. Las tarjetas siguen requiriendo una futura pasarela de tokenización.
 
 **Resultado:** la app no solicita ni almacena números de tarjeta y solo presenta
 métodos respaldados por la base de datos.
+
+### CU-A13b. Pagar el viaje por transferencia
+
+**Actor:** pasajero con transferencia como método principal, y su chofer.
+
+1. Durante el viaje, el pasajero abre **Pagar por transferencia** y ve las
+   cuentas del chofer, con el número listo para copiar.
+2. Transfiere desde la app de su banco, adjunta la foto del comprobante y pulsa
+   **Ya transferí**.
+3. Al chofer le llega el aviso, mira su cuenta y contrasta con el comprobante.
+4. Confirma que le llegó, y solo entonces puede cerrar el viaje.
+
+**Resultado:** el cobro queda comprobado por quien de verdad puede verlo —el
+chofer, en su banco— y con la foto guardada por si más tarde se discute. **Ride
+no toca ese dinero**: va directo de un banco a otro. El detalle está en
+[`docs/PAGOS.md`](docs/PAGOS.md).
 
 ### CU-A14. Configurar la cuenta
 
@@ -409,6 +431,20 @@ propia cuenta. La función comprueba el rol en el servidor y rebota con 42501
 desde cualquier otra; el vehículo sigue haciendo falta, porque eso no es un
 permiso: un viaje no puede arrancar sin auto asignado.
 
+### CU-A27. Pagar la cuota mensual para recibir viajes
+
+**Actor:** conductor.
+
+1. El chofer abre «Mi cuota mensual» desde su hoja de inicio.
+2. El panel muestra si está al día, cuántos días le quedan y hasta cuándo.
+3. Pulsa pagar y la app abre PayPal con la suscripción ya creada a su nombre.
+4. PayPal cobra los 15 USD y avisa al servidor, que activa el mes.
+
+**Resultado:** puede ponerse en línea y aceptar viajes. Sin la cuota al día el
+servidor le rebota las tres cosas —encenderse, ver solicitudes y aceptar—, y el
+corte vive en Postgres, no en la app. Los choferes que ya estaban tienen un mes
+de cortesía. El detalle está en [`docs/CUOTA.md`](docs/CUOTA.md).
+
 ## Alcance actual
 
 - Los seis módulos del panel administrativo móvil están conectados: **Resumen**,
@@ -423,16 +459,28 @@ permiso: un viaje no puede arrancar sin auto asignado.
 - El mapa usa teselas **vectoriales** de OpenFreeMap con estilos propios para
   claro y oscuro, sin claves ni cuotas. Los detalles están en
   [`docs/MAPA.md`](docs/MAPA.md).
-- Efectivo funciona directamente y la transferencia es un proceso manual.
-  DeUna tiene interfaz, modelo y solicitud de cobro al servidor, pero solo debe
-  considerarse productivo después de configurar credenciales, confirmación del
-  proveedor y webhook. La app nunca pide ni almacena un número de tarjeta.
+- Efectivo y transferencia son los dos métodos disponibles. Con transferencia
+  el pasajero paga desde la app de su banco a la cuenta del chofer, adjunta el
+  comprobante y avisa; el chofer revisa su cuenta y confirma, y el viaje no se
+  cierra hasta entonces. **Ride no toca ese dinero.** DeUna se retiró. La app
+  nunca pide ni almacena un número de tarjeta.
+- La cuota mensual del chofer —15 USD para recibir viajes— está aplicada en la
+  base de datos y el corte está probado con un rol real. Las dos Edge Functions
+  de PayPal están desplegadas y responden 503 **mientras no tengan
+  credenciales**: falta el `client_secret` y el id del webhook. Mientras tanto
+  nadie puede pagar, y los choferes existentes trabajan con el mes de cortesía.
+  Ver [`docs/CUOTA.md`](docs/CUOTA.md).
 - El precio siempre se calcula en Supabase; la distancia de OSRM se usa para
   presentar la ruta y no autoriza al cliente a fijar la tarifa.
 - El servidor público de OSRM sirve para desarrollo. Para producción debe
   configurarse uno propio siguiendo [`infra/osrm/README.md`](infra/osrm/README.md).
 - Un documento subido en PDF se identifica pero no se previsualiza en la
   revisión: haría falta un visor de PDF y hoy no hay ninguno en el proyecto.
+- El icono de la app es el logotipo de Ride, en las dos variantes que pide
+  Android: adaptativo para Android 8 en adelante —fondo y logo en capas, para
+  que cada launcher lo recorte con su forma— y clásico para los anteriores. Los
+  PNG se regeneran desde `assets/images/LogoTipo.png` con
+  `python tool/generar_iconos_android.py`. iOS sigue con el icono por defecto.
 - El seguimiento del chofer se refresca cada 30 segundos mientras la aplicación
   está abierta. No hay rastreo en segundo plano: con la app cerrada, el auto
   deja de reportar posición hasta que se vuelve a abrir.
