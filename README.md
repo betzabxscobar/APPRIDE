@@ -18,7 +18,7 @@ La superficie que consume la app —funciones, tablas, Realtime y Storage— est
 documentada en [`docs/API.md`](docs/API.md). El mapa, en
 [`docs/MAPA.md`](docs/MAPA.md); el buscador de direcciones, en
 [`docs/BUSCADOR.md`](docs/BUSCADOR.md); los precios, en
-[`docs/TARIFAS.md`](docs/TARIFAS.md); el cobro con DeUna, en
+[`docs/TARIFAS.md`](docs/TARIFAS.md); cómo se cobra un viaje, en
 [`docs/PAGOS.md`](docs/PAGOS.md); la cuota mensual que paga el chofer, en
 [`docs/CUOTA.md`](docs/CUOTA.md); lo que se le exige a un chofer, en
 [`docs/CHOFERES.md`](docs/CHOFERES.md). Lo que falta para publicar en Play
@@ -231,13 +231,28 @@ la administración revisa antes de habilitarlo.
 **Actor:** pasajero autenticado.
 
 1. El pasajero abre **Métodos de pago** desde su cuenta.
-2. Registra efectivo, transferencia o DeUna, elige su opción principal o
-   elimina una opción que no tenga pagos asociados.
-3. Al pagar con DeUna, solicita al servidor la orden, el QR y el enlace; las
-   tarjetas siguen requiriendo una futura pasarela de tokenización.
+2. Registra efectivo o transferencia, elige su opción principal o elimina una
+   opción que no tenga pagos asociados.
+3. Las tarjetas siguen requiriendo una futura pasarela de tokenización.
 
 **Resultado:** la app no solicita ni almacena números de tarjeta y solo presenta
 métodos respaldados por la base de datos.
+
+### CU-A13b. Pagar el viaje por transferencia
+
+**Actor:** pasajero con transferencia como método principal, y su chofer.
+
+1. Durante el viaje, el pasajero abre **Pagar por transferencia** y ve las
+   cuentas del chofer, con el número listo para copiar.
+2. Transfiere desde la app de su banco, adjunta la foto del comprobante y pulsa
+   **Ya transferí**.
+3. Al chofer le llega el aviso, mira su cuenta y contrasta con el comprobante.
+4. Confirma que le llegó, y solo entonces puede cerrar el viaje.
+
+**Resultado:** el cobro queda comprobado por quien de verdad puede verlo —el
+chofer, en su banco— y con la foto guardada por si más tarde se discute. **Ride
+no toca ese dinero**: va directo de un banco a otro. El detalle está en
+[`docs/PAGOS.md`](docs/PAGOS.md).
 
 ### CU-A14. Configurar la cuenta
 
@@ -444,10 +459,11 @@ de cortesía. El detalle está en [`docs/CUOTA.md`](docs/CUOTA.md).
 - El mapa usa teselas **vectoriales** de OpenFreeMap con estilos propios para
   claro y oscuro, sin claves ni cuotas. Los detalles están en
   [`docs/MAPA.md`](docs/MAPA.md).
-- Efectivo funciona directamente y la transferencia es un proceso manual.
-  DeUna tiene interfaz, modelo y solicitud de cobro al servidor, pero solo debe
-  considerarse productivo después de configurar credenciales, confirmación del
-  proveedor y webhook. La app nunca pide ni almacena un número de tarjeta.
+- Efectivo y transferencia son los dos métodos disponibles. Con transferencia
+  el pasajero paga desde la app de su banco a la cuenta del chofer, adjunta el
+  comprobante y avisa; el chofer revisa su cuenta y confirma, y el viaje no se
+  cierra hasta entonces. **Ride no toca ese dinero.** DeUna se retiró. La app
+  nunca pide ni almacena un número de tarjeta.
 - La cuota mensual del chofer —15 USD para recibir viajes— está aplicada en la
   base de datos y el corte está probado con un rol real. Las dos Edge Functions
   de PayPal están desplegadas y responden 503 **mientras no tengan

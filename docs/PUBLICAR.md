@@ -76,10 +76,10 @@ los de Live y crear allí el plan. Los pasos están en [CUOTA.md](CUOTA.md).
 Mientras siga en sandbox, nadie paga: los choferes trabajan con el mes de
 cortesía, y **cuando venza se bloquean todos a la vez**.
 
-### 4. El cobro con DeUna
+### 4. El cobro del viaje
 
-Sin credenciales, el pasajero solo puede pagar en efectivo. Es una decisión de
-alcance, no un fallo. Está todo escrito y esperando en [PAGOS.md](PAGOS.md).
+Resuelto: efectivo y transferencia, sin depender de ninguna pasarela. DeUna se
+retiró. El detalle está en [PAGOS.md](PAGOS.md).
 
 ### 5. Contraseñas filtradas
 

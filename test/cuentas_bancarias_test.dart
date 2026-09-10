@@ -125,7 +125,6 @@ void main() {
       final m = metodo('transferencia');
       expect(m.esTransferencia, isTrue);
       expect(m.esEfectivo, isFalse);
-      expect(m.esDeuna, isFalse);
       expect(m.label, 'Transferencia');
       expect(m.detalle, isNull,
           reason: 'la cuenta es del chofer, no se guarda nada del pasajero');

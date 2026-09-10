@@ -330,7 +330,7 @@ class PaymentMethod {
 
   final String id;
 
-  /// `tarjeta`, `efectivo`, `deuna` o `transferencia`.
+  /// `tarjeta`, `efectivo` o `transferencia`.
   final String tipo;
   final bool predeterminado;
 
@@ -338,10 +338,6 @@ class PaymentMethod {
   final String? detalle;
 
   bool get esEfectivo => tipo == 'efectivo';
-
-  /// DeUna no guarda nada en el teléfono: cada viaje se paga escaneando su
-  /// propio QR. Por eso es un método sin token, como el efectivo.
-  bool get esDeuna => tipo == 'deuna';
 
   /// El pasajero transfiere desde su banco a la cuenta del chofer.
   ///
@@ -352,14 +348,12 @@ class PaymentMethod {
 
   String get label => switch (tipo) {
         'efectivo' => 'Efectivo',
-        'deuna' => 'DeUna',
         'transferencia' => 'Transferencia',
         _ => 'Tarjeta',
       };
 
   IconData get icon => switch (tipo) {
         'efectivo' => Icons.payments_outlined,
-        'deuna' => Icons.qr_code_2,
         'transferencia' => Icons.account_balance_outlined,
         _ => Icons.credit_card,
       };
@@ -368,7 +362,6 @@ class PaymentMethod {
   /// caracteres: no es un número de tarjeta, pero tampoco hace falta exhibirlo.
   String get descripcion {
     if (esEfectivo) return 'Pagas al llegar';
-    if (esDeuna) return 'Escaneas el QR al terminar';
     if (esTransferencia) return 'Transfieres a la cuenta del chofer';
     final t = detalle ?? '';
     return t.length <= 4 ? 'Tarjeta guardada' : '···· ${t.substring(t.length - 4)}';

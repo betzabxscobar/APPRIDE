@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../core/ride_colors.dart';
 import '../models/fleet.dart';
 import '../services/fleet_service.dart';
+import '../services/payments_service.dart';
 import '../services/ride_service.dart';
 import 'auth_feedback.dart';
 import 'bank_logo.dart';
@@ -15,6 +17,11 @@ import 'bank_logo.dart';
 /// decirlo en la pantalla y no en una nota al pie: cambia quién responde si el
 /// dinero no llega, y el pasajero tiene que saber que Ride no es el
 /// intermediario.
+///
+/// Después de transferir, el pasajero adjunta el comprobante y avisa. Eso **no
+/// da el viaje por pagado**: al chofer le llega el aviso, mira su banco y lo
+/// confirma él, que es el único que puede verlo de verdad. Hasta entonces el
+/// viaje no se cierra.
 Future<void> mostrarHojaTransferencia(
   BuildContext context, {
   required String viajeId,
@@ -52,6 +59,12 @@ class _HojaTransferenciaState extends State<_HojaTransferencia> {
   bool _cargando = true;
   String? _error;
 
+  /// La foto del comprobante, ya subida. Es la prueba que queda si más tarde
+  /// se discute si el dinero se envió o no.
+  String? _comprobante;
+  bool _subiendo = false;
+  bool _avisado = false;
+
   @override
   void initState() {
     super.initState();
@@ -83,6 +96,62 @@ class _HojaTransferenciaState extends State<_HojaTransferencia> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  Future<void> _adjuntar() async {
+    final foto = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      // El comprobante se lee en pantalla, no se imprime: a 1600 px se ve
+      // perfecto y pesa una fracción de lo que sale de la cámara.
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (foto == null) return;
+
+    setState(() {
+      _subiendo = true;
+      _error = null;
+    });
+    try {
+      final bytes = await foto.readAsBytes();
+      final ruta = await PaymentsService.instance
+          .subirComprobante(widget.viajeId, bytes);
+      if (!mounted) return;
+      setState(() {
+        _comprobante = ruta;
+        _subiendo = false;
+      });
+    } on RideException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _subiendo = false;
+        _error = e.message;
+      });
+    }
+  }
+
+  Future<void> _avisar() async {
+    setState(() {
+      _subiendo = true;
+      _error = null;
+    });
+    try {
+      await PaymentsService.instance.reportarTransferencia(
+        widget.viajeId,
+        comprobante: _comprobante,
+      );
+      if (!mounted) return;
+      setState(() {
+        _avisado = true;
+        _subiendo = false;
+      });
+    } on RideException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _subiendo = false;
+        _error = e.message;
+      });
+    }
   }
 
   @override
@@ -178,12 +247,92 @@ class _HojaTransferenciaState extends State<_HojaTransferencia> {
                 _TarjetaCuenta(cuenta: cuenta, onCopiar: _copiar),
                 const SizedBox(height: 12),
               ],
-            const SizedBox(height: 6),
+            // El paso que convierte esto en un cobro comprobable. Solo tiene
+            // sentido si hay una cuenta a la que transferir.
+            if (!_cargando && _error == null && _cuentas.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Divider(color: ride.border),
+              const SizedBox(height: 10),
+              Text(
+                'Cuando ya hayas transferido',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: ride.ink,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Adjunta el comprobante y avisa al chofer. Él revisa su banco y '
+                'confirma; hasta entonces el viaje sigue abierto.',
+                style: TextStyle(fontSize: 12.5, height: 1.4, color: ride.inkMuted),
+              ),
+              const SizedBox(height: 12),
+              if (_avisado)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: ride.successSoft,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle, size: 20, color: ride.success),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Avisamos al chofer. Está revisando su banco.',
+                          style: TextStyle(fontSize: 13, color: ride.ink),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else ...[
+                OutlinedButton.icon(
+                  onPressed: _subiendo ? null : _adjuntar,
+                  icon: Icon(
+                    _comprobante == null
+                        ? Icons.attach_file
+                        : Icons.check_circle_outline,
+                    size: 20,
+                  ),
+                  label: Text(
+                    _comprobante == null
+                        ? 'Adjuntar comprobante'
+                        : 'Comprobante adjunto',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    foregroundColor: _comprobante == null ? null : ride.success,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  // Sin comprobante no se avisa: es lo único que le queda al
+                  // pasajero si luego el chofer dice que no le llegó.
+                  onPressed: _subiendo || _comprobante == null ? null : _avisar,
+                  icon: _subiendo
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send, size: 20),
+                  label: const Text('Ya transferí'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 10),
+            ],
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Listo'),
+                child: Text(_avisado ? 'Cerrar' : 'Ahora no'),
               ),
             ),
           ],

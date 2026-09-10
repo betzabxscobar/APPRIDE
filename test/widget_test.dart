@@ -13,7 +13,6 @@ import 'package:ride/services/geocoding_service.dart';
 import 'package:ride/services/h3_service.dart';
 import 'package:ride/services/ride_service.dart';
 import 'package:ride/services/map_style_service.dart';
-import 'package:ride/services/payments_service.dart';
 import 'package:ride/services/places_service.dart';
 import 'package:ride/services/routing_service.dart';
 import 'package:ride/widgets/ride_map.dart';
@@ -1586,7 +1585,7 @@ void main() {
     });
   });
 
-  group('Cobro con DeUna', () {
+  group('Cobro por transferencia', () {
     PaymentMethod metodo(String tipo, {String? token}) => PaymentMethod.fromMap({
           'id': 'm-1',
           'tipo': tipo,
@@ -1594,12 +1593,14 @@ void main() {
           'detalle_tokenizado': token,
         });
 
-    test('DeUna es un método sin token, como el efectivo', () {
-      final m = metodo('deuna');
-      expect(m.esDeuna, isTrue);
+    test('La transferencia es un metodo sin token, como el efectivo', () {
+      final m = metodo('transferencia');
+      expect(m.esTransferencia, isTrue);
       expect(m.esEfectivo, isFalse);
-      expect(m.label, 'DeUna');
-      expect(m.descripcion, 'Escaneas el QR al terminar');
+      expect(m.label, 'Transferencia');
+      expect(m.descripcion, 'Transfieres a la cuenta del chofer');
+      expect(m.detalle, isNull,
+          reason: 'la cuenta es del chofer; del pasajero no se guarda nada');
     });
 
     test('Cada método tiene su propio icono', () {
@@ -1607,60 +1608,75 @@ void main() {
       // vistazo, que es justo para lo que sirve.
       final iconos = {
         metodo('efectivo').icon,
-        metodo('deuna').icon,
+        metodo('transferencia').icon,
         metodo('tarjeta', token: 'tok_1234').icon,
       };
       expect(iconos.length, 3);
     });
 
-    // Un PNG de 1x1 en base64, que es lo mínimo que decodifica.
-    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4'
-        'zwAAAgEBAF8Q5UcAAAAASUVORK5CYII=';
+    Trip viaje({
+      String? metodo,
+      String? estadoPago,
+      String? comprobante,
+      String? reportado,
+    }) =>
+        Trip.fromMap({
+          'id': 'v-1',
+          'estado': 'EN_CURSO',
+          'pasajero_id': 'p-1',
+          'tarifa_estimada': 4.0,
+          'fecha_solicitud': DateTime.now().toIso8601String(),
+          'pago_estado': estadoPago,
+          'pago_metodo': metodo,
+          'pago_comprobante': comprobante,
+          'pago_reportado_en': reportado,
+        });
 
-    test('El QR llega como data URI y hay que quedarse con el base64', () {
-      // Payválida lo manda pensado para un <img> de una web. `Image.memory`
-      // quiere bytes: con el prefijo delante, no pinta nada.
-      final bytes = DeunaCharge.decodificarQr('data:image/png;base64,$png');
-      expect(bytes, isNotNull);
-      expect(bytes!.length, greaterThan(0));
+    test('Hay algo que revisar solo cuando el pasajero ya aviso', () {
+      // Es lo que decide si al chofer se le ensena el comprobante o no.
+      final avisado = viaje(
+        metodo: 'transferencia',
+        estadoPago: 'pendiente',
+        comprobante: 'p-1/v-1.jpg',
+        reportado: DateTime.now().toIso8601String(),
+      );
+      expect(avisado.transferenciaPorRevisar, isTrue);
+      expect(avisado.pagoEsTransferencia, isTrue);
+
+      // Transferencia elegida pero todavia sin avisar: no hay nada que mirar.
+      final sinAvisar = viaje(metodo: 'transferencia', estadoPago: 'pendiente');
+      expect(sinAvisar.transferenciaPorRevisar, isFalse);
+      expect(sinAvisar.pagoEsTransferencia, isTrue);
     });
 
-    test('Un base64 pelado también vale', () {
-      expect(DeunaCharge.decodificarQr(png), isNotNull);
+    test('Un cobro ya cerrado no vuelve a pedir revision', () {
+      final pagado = viaje(
+        metodo: 'transferencia',
+        estadoPago: 'completado',
+        reportado: DateTime.now().toIso8601String(),
+      );
+      expect(pagado.pagoConfirmado, isTrue);
+      expect(pagado.transferenciaPorRevisar, isFalse);
     });
 
-    test('Un QR roto deja la pantalla sin imagen, no reventada', () {
-      // Todavía queda el deeplink para pagar, así que perder el QR no puede
-      // tumbar la pantalla entera.
-      expect(DeunaCharge.decodificarQr('data:image/png;base64,%%%'), isNull);
-      expect(DeunaCharge.decodificarQr(''), isNull);
-      expect(DeunaCharge.decodificarQr(null), isNull);
+    test('El efectivo no pasa por la revision de la transferencia', () {
+      // El chofer tiene el dinero en la mano: no hay comprobante que mirar ni
+      // motivo para bloquear el cierre del viaje.
+      final efectivo = viaje(metodo: 'efectivo', estadoPago: 'pendiente');
+      expect(efectivo.pagoEsTransferencia, isFalse);
+      expect(efectivo.transferenciaPorRevisar, isFalse);
+      expect(efectivo.pagoPendiente, isTrue);
     });
 
-    test('La respuesta de la función trae orden, monto y deeplink', () {
-      final cobro = DeunaCharge.fromMap({
-        'orden': 'ride7f3a',
-        'monto': 1.75,
-        'qr': 'data:image/png;base64,$png',
-        'deep_link': 'https://pagar.deuna.app/H91/merchant?id=MD1Y7HWEV',
-      });
-
-      expect(cobro.orden, 'ride7f3a');
-      expect(cobro.monto, 1.75);
-      expect(cobro.deepLink, contains('pagar.deuna.app'));
-      expect(cobro.yaPagado, isFalse);
-    });
-
-    test('Un monto entero llega como int y no puede romper el cobro', () {
-      // PostgREST serializa un numeric sin decimales como número pelado: un
-      // viaje de 2,00 llega como 2, no como 2.0.
-      expect(DeunaCharge.fromMap({'orden': 'o', 'monto': 2}).monto, 2.0);
-    });
-
-    test('Un viaje ya pagado no trae QR y se dice', () {
-      final cobro = DeunaCharge.fromMap({'ya_pagado': true, 'estado': 'completado'});
-      expect(cobro.yaPagado, isTrue);
-      expect(cobro.qr, isNull);
+    test('DeUna ya no existe como método', () {
+      // Se retiró: el pasajero transfiere a la cuenta del chofer. Un tipo que
+      // ya no se ofrece no puede quedarse pintando una etiqueta propia, o
+      // reaparecería en cuentas viejas como si siguiera funcionando.
+      final m = metodo('deuna');
+      expect(m.esEfectivo, isFalse);
+      expect(m.esTransferencia, isFalse);
+      expect(m.label, 'Tarjeta',
+          reason: 'cae al caso por defecto, no tiene tratamiento propio');
     });
   });
 

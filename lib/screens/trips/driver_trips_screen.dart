@@ -10,6 +10,7 @@ import '../../core/ride_colors.dart';
 import '../../models/trip.dart';
 import '../../models/vehicle_category.dart';
 import '../../services/location_service.dart';
+import '../../services/payments_service.dart';
 import '../../services/ride_service.dart';
 import '../../services/trip_session_store.dart';
 import '../../widgets/auth_feedback.dart';
@@ -230,6 +231,22 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
   }
 
   Future<void> _finalizar(Trip viaje) async {
+    // Con transferencia el orden se invierte: el servidor no deja cerrar el
+    // viaje mientras el cobro siga pendiente, asi que hay que confirmarlo
+    // ANTES. Con efectivo se pregunta despues, como siempre, porque ahi el
+    // dinero ya esta en la mano y lo que importa es no retrasar el cierre.
+    Trip? actual;
+    try {
+      actual = await RideService.instance.porId(viaje.id);
+    } catch (_) {
+      actual = null;
+    }
+    if (actual != null && actual.pagoEsTransferencia && actual.pagoPendiente) {
+      if (!mounted) return;
+      final confirmo = await _confirmarTransferencia(actual);
+      if (!confirmo) return;
+    }
+
     var cerrado = false;
     await _accion(() async {
       final total = await RideService.instance.finalizar(viaje.id);
@@ -261,11 +278,102 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     }
   }
 
+  /// La transferencia, antes de cerrar el viaje.
+  ///
+  /// Se le ensena el comprobante que subio el pasajero para que lo contraste
+  /// con su banco. El comprobante NO es la prueba de que el dinero llego —una
+  /// transferencia se puede reversar, y una captura se puede trucar—: es lo
+  /// que permite reclamar despues si algo no cuadra. Quien decide es el chofer
+  /// mirando su cuenta.
+  ///
+  /// Devuelve true si confirmo y el cobro quedo cerrado.
+  Future<bool> _confirmarTransferencia(Trip viaje) async {
+    String? enlace;
+    if (viaje.pagoComprobante != null) {
+      enlace = await PaymentsService.instance
+          .enlaceComprobante(viaje.pagoComprobante!);
+    }
+    if (!mounted) return false;
+
+    final recibido = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Te llego la transferencia?'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                viaje.pagoReportadoEn == null
+                    ? 'Son \$${viaje.montoVigente.toStringAsFixed(2)}. El '
+                        'pasajero todavia no ha avisado de que transfirio.'
+                    : 'Son \$${viaje.montoVigente.toStringAsFixed(2)}. El '
+                        'pasajero dice que ya transfirio. Revisa tu cuenta '
+                        'antes de confirmar: el viaje no se cierra hasta que '
+                        'lo hagas, y de aqui sale la comision que le debes a '
+                        'la app.',
+              ),
+              if (enlace != null) ...[
+                const SizedBox(height: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    enlace,
+                    fit: BoxFit.contain,
+                    // Si la imagen no carga no se bloquea la decision: el
+                    // chofer tiene su banco delante, que es lo que manda.
+                    errorBuilder: (_, _, _) => Text(
+                      'No pudimos cargar el comprobante.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.ride.inkMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              ] else if (viaje.pagoReportadoEn != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'No adjunto comprobante.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.ride.inkMuted,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Todavia no'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Si, ya me llego'),
+          ),
+        ],
+      ),
+    );
+
+    if (recibido != true) return false;
+
+    var ok = false;
+    await _accion(() async {
+      await RideService.instance.confirmarPagoRecibido(viaje.id);
+      ok = true;
+    });
+    return ok;
+  }
+
   /// Le pregunta al chofer si recibio el dinero, y solo si el cobro quedo
   /// pendiente.
   ///
-  /// Sirve para efectivo y para transferencia. Un viaje pagado por la pasarela
-  /// no se pregunta: ese lo confirma DeUna, y la base rechaza el intento.
+  /// Para el efectivo. La transferencia se confirma antes de cerrar, en
+  /// `_confirmarTransferencia`. Un cobro de pasarela no se pregunta: la base
+  /// rechaza el intento.
   Future<void> _confirmarCobro(Trip viaje) async {
     final Trip? cerrado;
     try {
