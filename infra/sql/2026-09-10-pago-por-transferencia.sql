@@ -508,3 +508,64 @@ begin
   return v_estimada;
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- 9. `registrar_metodo_pago` tambien deja de conocer 'deuna'
+-- ---------------------------------------------------------------------------
+-- Se le paso en el punto 1: la tabla ya no admitia 'deuna', pero la funcion
+-- si. Pedirlo pasaba su filtro y reventaba despues contra el CHECK con un
+-- error crudo de Postgres, en vez del mensaje claro que la funcion ya tenia
+-- escrito. Las dos listas tienen que decir lo mismo.
+
+create or replace function public.registrar_metodo_pago(
+  p_tipo text,
+  p_token text default null,
+  p_predeterminado boolean default true
+)
+returns uuid
+language plpgsql
+security definer
+set search_path to ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_token text := nullif(trim(coalesce(p_token, '')), '');
+  v_id uuid;
+begin
+  if v_uid is null then
+    raise exception 'Debes iniciar sesion' using errcode = '28000';
+  end if;
+
+  -- Los mismos tres que admite `metodos_pago_tipo_check`.
+  if p_tipo not in ('tarjeta','efectivo','transferencia') then
+    raise exception 'Tipo de pago no valido' using errcode = 'check_violation';
+  end if;
+
+  -- Ni el efectivo ni la transferencia guardan nada del pasajero: uno se paga
+  -- en la mano y el otro desde el banco del propio pasajero.
+  if p_tipo in ('efectivo','transferencia') then
+    v_token := null;
+  elsif v_token is null then
+    raise exception 'La tarjeta necesita el token de la pasarela'
+      using errcode = 'check_violation';
+  else
+    if regexp_replace(v_token, '[\s-]', '', 'g') ~ '^[0-9]{13,19}$' then
+      raise exception 'Eso parece un numero de tarjeta. Guarda solo el token de la pasarela'
+        using errcode = 'check_violation';
+    end if;
+  end if;
+
+  insert into public.pasajeros (id) values (v_uid) on conflict do nothing;
+
+  if p_predeterminado then
+    update public.metodos_pago set predeterminado = false
+     where pasajero_id = v_uid and predeterminado;
+  end if;
+
+  insert into public.metodos_pago (pasajero_id, tipo, detalle_tokenizado, predeterminado)
+  values (v_uid, p_tipo, v_token, p_predeterminado)
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;

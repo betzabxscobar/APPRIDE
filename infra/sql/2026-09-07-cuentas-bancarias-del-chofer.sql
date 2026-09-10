@@ -261,13 +261,13 @@ begin
   if v_uid is null then
     raise exception 'Debes iniciar sesion' using errcode = '28000';
   end if;
-  if p_tipo not in ('tarjeta','efectivo','deuna','transferencia') then
+  if p_tipo not in ('tarjeta','efectivo','transferencia') then
     raise exception 'Tipo de pago no valido' using errcode = 'check_violation';
   end if;
 
   -- La transferencia no guarda nada del pasajero: el dato que importa es la
   -- cuenta del chofer, y esa vive en su ficha, no aqui.
-  if p_tipo in ('efectivo','deuna','transferencia') then
+  if p_tipo in ('efectivo','transferencia') then
     v_token := null;
   elsif v_token is null then
     raise exception 'La tarjeta necesita el token de la pasarela'
@@ -335,7 +335,7 @@ begin
       using errcode = '42501';
   end if;
 
-  -- DeUna la confirma la pasarela, no el chofer a mano: si no, cualquiera
+  -- Un cobro de pasarela lo confirma ella, no el chofer a mano: si no, cualquiera
   -- podria dar por cobrado un QR que nadie pago.
   if v_tipo not in ('efectivo','transferencia') then
     raise exception 'Ese cobro lo confirma la pasarela, no el chofer'

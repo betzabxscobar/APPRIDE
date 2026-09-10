@@ -1,3 +1,18 @@
+-- DEROGADO el 2026-09-10. NO APLICAR.
+-- ------------------------------------------------------------------------
+-- DeUna se retiro: llevaba meses esperando credenciales que no llegaron y con
+-- dos preguntas sin responder —como lleva el QR el importe, y quien avisa de
+-- que el pasajero pago—. En su lugar el pasajero transfiere a la cuenta del
+-- chofer y el cobro se comprueba entre los dos.
+--
+-- Este archivo se conserva como historia de lo que hubo, no como algo que
+-- aplicar: volver a correrlo recrearia `cobro_deuna()`,
+-- `confirmar_cobro_deuna()` y el metodo de pago 'deuna', que
+-- 2026-09-10-pago-por-transferencia.sql se encarga de quitar.
+--
+-- Lo que hay ahora esta en docs/PAGOS.md.
+-- ------------------------------------------------------------------------
+
 -- Cobrar un viaje con DeUna
 -- ------------------------------------------------------------------------
 -- Lo que la documentacion de Payvalida deja claro (docs.payvalida.com/api-deuna):

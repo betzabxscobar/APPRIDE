@@ -132,6 +132,8 @@ void main() {
 
     test('no se confunde con los otros métodos', () {
       expect(metodo('efectivo').esTransferencia, isFalse);
+      // 'deuna' se retiro: aqui solo se comprueba que un tipo desconocido no
+      // se cuela como transferencia.
       expect(metodo('deuna').esTransferencia, isFalse);
       expect(metodo('tarjeta').esTransferencia, isFalse);
     });

@@ -356,8 +356,8 @@ class RideService {
   /// El chofer confirma que le llegó el dinero del pasajero.
   ///
   /// Vale para efectivo y para transferencia: en los dos casos la app no se
-  /// entera sola, y el único que sabe si entró es el chofer. DeUna no pasa por
-  /// aquí —esa la confirma la pasarela—, y la base lo rechaza si se intenta.
+  /// entera sola, y el único que sabe si entró es el chofer. Un cobro de
+  /// pasarela no pasaría por aquí, y la base lo rechaza si se intenta.
   ///
   /// Hasta que lo confirme, el cobro queda `pendiente`. Con la confirmación
   /// entra también la comisión de la app como deuda del chofer.
