@@ -81,12 +81,31 @@ cortesía, y **cuando venza se bloquean todos a la vez**.
 Resuelto: efectivo y transferencia, sin depender de ninguna pasarela. DeUna se
 retiró. El detalle está en [PAGOS.md](PAGOS.md).
 
-### 5. Contraseñas filtradas
+### 5. Contraseñas filtradas: hace falta plan Pro
 
 Supabase Auth puede rechazar contraseñas que ya se filtraron, contrastándolas
-con HaveIBeenPwned. Es un interruptor del panel —*Authentication → Policies*—,
-no código. Para una app que guarda viajes, dirección de casa y método de pago,
-vale la pena.
+con HaveIBeenPwned. **No es un interruptor gratis**: la propia documentación dice
+que está disponible del plan Pro en adelante, y la organización RIDE está en el
+gratuito. Comprobado el 2026-09-10.
+
+El aviso del linter de seguridad de Supabase va a seguir saliendo mientras tanto,
+y no es que esté mal configurado: es que no se puede configurar.
+
+Lo que sí se puede sin pagar, en *Authentication → Providers → Email*:
+
+- **Subir la longitud mínima.** Hoy la app pide 8 caracteres
+  ([`validators.dart`](../lib/core/validators.dart)); menos de 8 no es
+  recomendable y 10 o 12 es mejor.
+- **Exigir tipos de carácter**: dígitos, minúsculas, mayúsculas y símbolos.
+
+> Si se cambia cualquiera de las dos, hay que **cambiar también
+> `Validators.password`** para que la app lo pida antes de enviar. Si no, el
+> usuario escribe una contraseña que la app da por buena y el servidor rechaza
+> con un mensaje que no dice qué falta.
+>
+> A quien ya tenga cuenta no se le echa: puede seguir entrando con su contraseña
+> actual aunque no cumpla lo nuevo. El requisito se aplica al registrarse y al
+> cambiarla.
 
 ## Compilar para publicar
 
