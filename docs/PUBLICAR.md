@@ -91,17 +91,22 @@ gratuito. Comprobado el 2026-09-10.
 El aviso del linter de seguridad de Supabase va a seguir saliendo mientras tanto,
 y no es que esté mal configurado: es que no se puede configurar.
 
-Lo que sí se puede sin pagar, en *Authentication → Providers → Email*:
+Lo que sí se puede sin pagar está **hecho** desde el 2026-09-10, en
+*Authentication → Providers → Email*:
 
-- **Subir la longitud mínima.** Hoy la app pide 8 caracteres
-  ([`validators.dart`](../lib/core/validators.dart)); menos de 8 no es
-  recomendable y 10 o 12 es mejor.
-- **Exigir tipos de carácter**: dígitos, minúsculas, mayúsculas y símbolos.
+- **10 caracteres** como mínimo.
+- **Los cuatro tipos**: minúscula, mayúscula, número y símbolo.
 
-> Si se cambia cualquiera de las dos, hay que **cambiar también
-> `Validators.password`** para que la app lo pida antes de enviar. Si no, el
-> usuario escribe una contraseña que la app da por buena y el servidor rechaza
-> con un mensaje que no dice qué falta.
+`Validators.password` pide exactamente lo mismo, y no por casualidad: la lista
+de símbolos que acepta la app está copiada de la que devuelve el servidor
+—`` !@#$%^&*()_+-=[]{};'\:"|<>?,./`~ ``—, comprobada contra un intento de
+registro real. Si el panel y el validador se separan, el usuario escribe una
+contraseña que la app aprueba y el servidor rechaza con un mensaje que no dice
+qué falta.
+
+> **Si alguien cambia esos ajustes en el panel, hay que cambiar
+> `Validators.password`** en la misma tanda. Las pruebas del grupo
+> «Contrasenas» fijan las cuatro condiciones y el mensaje de cada una.
 >
 > A quien ya tenga cuenta no se le echa: puede seguir entrando con su contraseña
 > actual aunque no cumpla lo nuevo. El requisito se aplica al registrarse y al

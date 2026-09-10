@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart' show LatLng;
 
 import 'package:ride/core/app_theme.dart';
 import 'package:ride/core/busqueda_config.dart';
+import 'package:ride/core/validators.dart';
 import 'package:ride/core/ride_colors.dart';
 import 'package:ride/core/theme_controller.dart';
 import 'package:ride/models/app_user.dart';
@@ -1873,6 +1874,65 @@ void main() {
       });
       expect(s.diasRestantes, 1);
       expect(s.porVencer, isTrue);
+    });
+  });
+
+  group('Contrasenas', () {
+    // Las mismas cuatro condiciones que Supabase Auth tiene configuradas: 10
+    // caracteres, minuscula, mayuscula, numero y simbolo. Si el panel y esto
+    // se separan, el usuario escribe algo que la app aprueba y el servidor
+    // rechaza con un mensaje que no dice que falta.
+
+    test('Una contrasena que cumple las cuatro pasa', () {
+      expect(Validators.password('Ride2026!ok'), isNull);
+      expect(Validators.password(r'Abcdefg1$x'), isNull);
+    });
+
+    test('Corta se rechaza aunque tenga de todo', () {
+      // Nueve caracteres con las cuatro clases: el largo manda.
+      expect(Validators.password(r'Ab1!cdefg'), 'Usa al menos 10 caracteres');
+    });
+
+    test('Dice exactamente que falta, no "contrasena invalida"', () {
+      expect(Validators.password('ride2026!!'), 'Falta una mayúscula');
+      expect(Validators.password('RIDE2026!!'), 'Falta una minúscula');
+      expect(Validators.password('RideRide!!'), 'Falta un número');
+      expect(Validators.password('RideRide12'), 'Falta un símbolo');
+    });
+
+    test('Cuando faltan varias se enumeran en una frase', () {
+      final r = Validators.password('ridemayores');
+      expect(r, 'Faltan una mayúscula, un número y un símbolo');
+    });
+
+    test('El largo se avisa antes que los tipos', () {
+      // Decirle las cinco cosas a la vez a quien escribio "hola" no ayuda.
+      expect(Validators.password('hola'), 'Usa al menos 10 caracteres');
+    });
+
+    test('Vacia se trata como campo requerido, no como debil', () {
+      expect(Validators.password(''), isNotNull);
+      expect(Validators.password(null), isNotNull);
+      expect(Validators.password(''), isNot(contains('Falta')));
+    });
+
+    test('La administrativa exige lo mismo', () {
+      // Dejaron de ser reglas distintas cuando Supabase paso a pedir 10 y los
+      // cuatro tipos a todo el mundo.
+      expect(Validators.adminPassword('Ride2026!ok'), isNull);
+      expect(Validators.adminPassword('ride2026!!'), 'Falta una mayúscula');
+    });
+
+    test('Los simbolos son los que acepta Supabase, ni uno mas', () {
+      // El espacio no esta en su lista: si aqui contara como simbolo, una
+      // contrasena con espacio pasaria el filtro de la app y no el del
+      // servidor.
+      expect(Validators.simbolosPassword.contains(' '), isFalse);
+      expect(Validators.password('Ride 2026 x'), 'Falta un símbolo');
+      for (final s in [r'!', r'@', r'#', r'$', r'%', r'^', r'&', r'*']) {
+        expect(Validators.password('RideRide12$s'), isNull,
+            reason: '$s deberia contar como simbolo');
+      }
     });
   });
 }

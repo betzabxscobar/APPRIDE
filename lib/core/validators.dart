@@ -55,22 +55,55 @@ abstract final class Validators {
     return n.startsWith('0') ? n : '0$n';
   }
 
-  /// Misma regla que `/api/register` en WEB-RIDE: mínimo 8 caracteres.
+  /// Largo mínimo, el mismo que exige Supabase Auth.
+  static const int largoMinimoPassword = 10;
+
+  /// Los símbolos que Supabase da por buenos. La lista es suya, no nuestra:
+  /// si aquí se acepta uno que allí no cuenta, el usuario escribe algo que la
+  /// app aprueba y el servidor rechaza.
+  static const String simbolosPassword =
+      r"""!@#$%^&*()_+-=[]{};'\:"|<>?,./`~""";
+
+  /// Las cuatro condiciones de Supabase Auth, comprobadas por separado para
+  /// poder decir **cuál** falta.
+  ///
+  /// Esto no es la seguridad: la de verdad la aplica el servidor, y por eso
+  /// tiene que decir lo mismo. Si se sube el requisito en el panel de Supabase
+  /// y no aquí, el usuario recibe un error del servidor que no explica qué le
+  /// falta a su contraseña.
+  ///
+  /// A quien ya tiene cuenta no se le echa: puede seguir entrando con la suya
+  /// aunque no cumpla esto. La regla se aplica al registrarse y al cambiarla.
   static String? password(String? value) {
     final vacio = required(value, campo: 'La contraseña');
     if (vacio != null) return vacio;
-    if (value!.length < 8) return 'Usa al menos 8 caracteres';
-    return null;
+
+    final v = value!;
+    final faltan = <String>[
+      if (!RegExp(r'[a-z]').hasMatch(v)) 'una minúscula',
+      if (!RegExp(r'[A-Z]').hasMatch(v)) 'una mayúscula',
+      if (!RegExp(r'[0-9]').hasMatch(v)) 'un número',
+      if (!v.split('').any(simbolosPassword.contains)) 'un símbolo',
+    ];
+
+    // El largo primero: si además es corta, decirle las cinco cosas a la vez
+    // no ayuda a nadie.
+    if (v.length < largoMinimoPassword) {
+      return 'Usa al menos $largoMinimoPassword caracteres';
+    }
+    if (faltan.isEmpty) return null;
+    if (faltan.length == 1) return 'Falta ${faltan.first}';
+    final ultima = faltan.removeLast();
+    return 'Faltan ${faltan.join(', ')} y $ultima';
   }
 
-  /// Contraseña definitiva de una cuenta administrativa: mínimo 10 caracteres,
-  /// igual que `/api/change-password` en WEB-RIDE.
-  static String? adminPassword(String? value) {
-    final vacio = required(value, campo: 'La contraseña');
-    if (vacio != null) return vacio;
-    if (value!.length < 10) return 'Usa al menos 10 caracteres';
-    return null;
-  }
+  /// Contraseña de una cuenta administrativa.
+  ///
+  /// Es la misma regla que la de cualquiera desde que Supabase pide 10
+  /// caracteres y los cuatro tipos: se deja el nombre aparte porque las
+  /// pantallas administrativas lo llaman así y porque el día que se les exija
+  /// más, el sitio donde tocarlo es este.
+  static String? adminPassword(String? value) => password(value);
 
   static String? confirmPassword(String? value, String original) {
     if (value != original) return 'Las contraseñas no coinciden';
