@@ -27,6 +27,7 @@ import 'package:ride/screens/home/welcome_home_screen.dart';
 import 'package:ride/screens/home/account_sheet.dart';
 import 'package:ride/services/auth_service.dart';
 import 'package:ride/widgets/auth_shell.dart';
+import 'package:ride/widgets/auth_widgets.dart';
 import 'package:ride/widgets/panel_switcher.dart';
 
 /// Pruebas de la app tras conectar Supabase.
@@ -199,10 +200,28 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('¿Cómo quieres'), findsOneWidget);
-      expect(find.text('continuar?'), findsOneWidget);
-      expect(find.text('Crear cuenta'), findsOneWidget);
-      expect(find.text('Ya tengo una cuenta'), findsOneWidget);
+      // El titular es copy de marca y ya cambió una vez sin que nadie tocara
+      // esta prueba (ba33156, a3ffcf4 lo pasaron de «¿Cómo quieres
+      // continuar?» a «Tu próximo viaje empieza aquí.»): se comprueba que
+      // haya titular, no qué dice. Lo que sí es contrato son las dos vías de
+      // acceso, que son lo que el usuario toca.
+      expect(find.byType(AuthHeading), findsOneWidget);
+
+      final crear = find.text('Crear cuenta');
+      final entrar = find.text('Ya tengo una cuenta');
+      expect(crear, findsOneWidget);
+      expect(entrar, findsOneWidget);
+
+      // Como en las pruebas de tamaño de arriba, el listón es que las dos
+      // opciones sean alcanzables, no que entren sin desplazar: aquí la
+      // fuente de prueba dibuja cada letra como un cuadrado del tamaño de la
+      // tipografía, así que el texto mide casi el doble que en el teléfono
+      // real y medir el corte contra los 568 px no diría nada.
+      for (final opcion in [crear, entrar]) {
+        await tester.ensureVisible(opcion);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(opcion).bottom, lessThanOrEqualTo(568.0));
+      }
       expect(tester.takeException(), isNull);
     });
   });
