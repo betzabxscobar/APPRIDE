@@ -24,40 +24,29 @@ documentada en [`docs/API.md`](docs/API.md). El mapa, en
 [`docs/CHOFERES.md`](docs/CHOFERES.md). Lo que falta para publicar en Play
 Store, en [`docs/PUBLICAR.md`](docs/PUBLICAR.md).
 
-## Credenciales del equipo administrativo
+## Cuentas del equipo
 
-Las contraseñas temporales **no están en el código**. Se pasan al compilar
-desde `config/credenciales-administrativas.json`, un archivo que git ignora.
+Las cuentas administrativas viven en Supabase Auth, como las de cualquier
+usuario: no hay ninguna contraseña en el código ni en la APK. Cada persona
+cambia la suya desde Ajustes, con la misma regla que exige Supabase: 10
+caracteres y los cuatro tipos.
 
-1. Copia `config/credenciales-administrativas.example.json` como
-   `config/credenciales-administrativas.json`.
-2. Pon las contraseñas que se entregaron por separado.
-3. Compila o corre las pruebas apuntando a ese archivo:
+`config/credenciales-administrativas.json` (ignorado por git) ya solo guarda
+claves de servicios para compilar, hoy `TOMTOM_KEY`, y es opcional:
 
 ```sh
 flutter build apk --release --dart-define-from-file=config/credenciales-administrativas.json
-flutter test --dart-define-from-file=config/credenciales-administrativas.json
 ```
 
-Sin ese archivo la app compila y funciona igual, solo que sin cuentas
-administrativas: quien intente entrar con uno de esos correos recibe el mismo
-mensaje que un correo inexistente. Las pruebas que dependen de ellas se marcan
-como omitidas.
-
-Cuando exista la base de datos, estas cuentas pasan a Supabase, se activa
-`mustChangePassword` y vuelve a usarse la pantalla de primer acceso.
+Sin él la app compila igual, y la búsqueda de direcciones usa Photon. Las
+contraseñas temporales que quedaron en el commit `fdc2b99` se cambiaron el
+2026-09-11: lo que hay en el historial ya no abre nada.
 
 ## Cuentas de prueba
 
-| Rol | Correo | Contraseña |
-|---|---|---|
-| Pasajero | pasajero@ride.app | Ride1234 |
-| Conductor | conductor@ride.app | Ride1234 |
-
-> **Comprobado el 2026-09-09: `conductor@ride.app` ya no entra.** O se borró la
-> cuenta o le cambiaron la contraseña. Hay que recrearla o quitarla de aquí,
-> porque una cuenta de prueba que no funciona hace perder más tiempo del que
-> ahorra.
+No se publican aquí. En producción, una cuenta con la contraseña escrita en un
+repositorio público es una cuenta de cualquiera. Las de prueba se crean y se
+borran desde el panel de Supabase cuando hacen falta.
 
 ## Comandos
 
