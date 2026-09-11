@@ -17,9 +17,9 @@
 // igual para todos, sin forma de saber quien pago ni de renovar solo. Aqui se
 // usa la API de suscripciones, que sí manda `custom_id` con el uuid del chofer.
 //
-// Desplegar (cuando esten las credenciales):
+// Desplegar (con las credenciales Live; `sandbox` solo para probar):
 //   supabase secrets set PAYPAL_CLIENT_ID=... PAYPAL_SECRET=... \
-//                        PAYPAL_PLAN_ID=P-... PAYPAL_ENTORNO=sandbox
+//                        PAYPAL_PLAN_ID=P-... PAYPAL_ENTORNO=produccion
 //   supabase functions deploy suscripcion-paypal
 //
 // Ver docs/CUOTA.md.
@@ -30,13 +30,14 @@ import { createClient } from 'npm:@supabase/supabase-js@2.112.4';
 
 // Las webs a las que se puede volver despues de aprobar el pago. La app no manda
 // nada y vuelve por `ride://`. Lista fija a proposito: aceptar cualquier URL del
-// cliente convertiria esta funcion en un redireccionador abierto.
+// cliente convertiria esta funcion en un redireccionador abierto. El servidor
+// de desarrollo solo vale mientras se prueba contra sandbox.
 const WEBS = [
   'https://rideviajes.com.ec/',
   'https://www.rideviajes.com.ec/',
   'https://betzabxscobar.github.io/WEB-RIDE/',
-  'http://localhost:5173/',
 ];
+const WEBS_DE_PRUEBA = ['http://localhost:5173/'];
 
 const ENTORNOS: Record<string, string> = {
   sandbox: 'https://api-m.sandbox.paypal.com',
@@ -133,10 +134,26 @@ Deno.serve(async (req) => {
     return json({ error: 'Solo un chofer paga la cuota mensual' }, 403);
   }
 
+  // Al que ya pago y le quedan dias no se le abre otra: pagaria dos cuotas al
+  // mes. La pantalla ya lo evita, pero la funcion se puede llamar directo.
+  const { data: pagada } = await comoChofer
+    .from('suscripciones_chofer')
+    .select('vigente_hasta')
+    .eq('conductor_id', uid)
+    .eq('proveedor', 'paypal')
+    .eq('estado', 'activa')
+    .gt('vigente_hasta', new Date().toISOString())
+    .limit(1)
+    .maybeSingle();
+  if (pagada) {
+    return json({ error: 'Tu cuota ya esta pagada y se renueva sola cada mes.' }, 409);
+  }
+
   // Desde la web, volver a `ride://` deja al chofer ante un error del navegador.
   const peticion = await req.json().catch(() => ({})) as { vuelta?: unknown };
   const pedida = typeof peticion.vuelta === 'string' ? peticion.vuelta : '';
-  const vuelta = WEBS.some((w) => pedida.startsWith(w)) ? pedida : null;
+  const permitidas = entorno === 'produccion' ? WEBS : [...WEBS, ...WEBS_DE_PRUEBA];
+  const vuelta = permitidas.some((w) => pedida.startsWith(w)) ? pedida : null;
 
   const acceso = await token(base, clientId, secreto);
   if (!acceso) return json({ error: 'No pudimos contactar con PayPal' }, 502);

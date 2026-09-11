@@ -130,6 +130,27 @@ teléfono, no en las pruebas.
 `vigente_hasta`**: ese mes ya está pagado. El chofer deja de recibir viajes
 cuando llega la fecha, no antes.
 
+Hasta el 2026-09-11 esto solo lo decía el webhook: `suscripcion_vigente()`
+contaba únicamente las filas `activa`, así que al cancelar el chofer se quedaba
+sin viajes en el acto. Ahora cuenta `activa` y `cancelada` mientras no llegue
+`vigente_hasta`.
+
+### Un cobro devuelto quita su mes
+
+`PAYMENT.SALE.REFUNDED` y `PAYMENT.SALE.REVERSED` (un contracargo) restan un mes
+a `vigente_hasta` con `revertir_cobro_paypal()`. Si con eso ya no le queda
+tiempo, la cuota pasa a `vencida`.
+
+### Pagar con el mes de cortesía activo
+
+La base solo admite una cuota `activa` por chofer, y la cortesía es otra fila
+`activa`. El primer cobro de PayPal chocaba con ella: el webhook fallaba, PayPal
+reintentaba, y el chofer pagaba sin que se le activara nada. Ahora cobrar lo
+hace `aplicar_cobro_paypal()` en una sola transacción: cierra la cortesía como
+`vencida` y **encadena el mes pagado al final de la cortesía**, para que no
+pierda los días que le quedaban. Ver
+`infra/sql/2026-09-11-cuota-paypal-con-cortesia.sql`.
+
 ## El enlace de pago suelto no sirve para esto
 
 El primer enlace que se manejó fue
@@ -174,10 +195,11 @@ no hay que volver a desplegar nada, porque las leen en cada llamada.
    https://<proyecto>.supabase.co/functions/v1/webhook-paypal
    ```
 
-   suscrito a estos cinco eventos: `BILLING.SUBSCRIPTION.ACTIVATED`,
+   suscrito a estos siete eventos: `BILLING.SUBSCRIPTION.ACTIVATED`,
    `PAYMENT.SALE.COMPLETED`, `BILLING.SUBSCRIPTION.CANCELLED`,
-   `BILLING.SUBSCRIPTION.SUSPENDED` y `BILLING.SUBSCRIPTION.EXPIRED`. Al
-   guardar da un **Webhook ID**.
+   `BILLING.SUBSCRIPTION.SUSPENDED`, `BILLING.SUBSCRIPTION.EXPIRED`,
+   `PAYMENT.SALE.REFUNDED` y `PAYMENT.SALE.REVERSED`. Al guardar da un
+   **Webhook ID**.
 
 ### En Supabase
 
@@ -197,6 +219,49 @@ Con el CLI instalado y el proyecto enlazado es lo mismo en una línea:
 ```bash
 supabase secrets set PAYPAL_CLIENT_ID=... PAYPAL_SECRET=... PAYPAL_PLAN_ID=P-... PAYPAL_WEBHOOK_ID=... PAYPAL_ENTORNO=sandbox
 ```
+
+### Pasar a producción (Live)
+
+El código ya está listo para Live: las dos funciones leen `PAYPAL_ENTORNO` en
+cada llamada y no hay que volver a desplegarlas. Lo que falta es de la cuenta de
+PayPal del negocio, y **tiene que estar antes del 2026-10-09**, cuando vencen
+las cortesías:
+
+1. En **developer.paypal.com**, con el interruptor en **Live**, crear la app REST
+   y copiar su **Client ID** y **Secret**. La cuenta tiene que ser *business* y
+   estar verificada, o PayPal no deja cobrar.
+2. Crear el plan de 15 USD en Live:
+
+   ```bash
+   python tool/crear_plan_paypal.py
+   ```
+
+   Elegir `produccion` cuando lo pregunte. Imprime el `P-…`.
+3. En esa misma app Live, **Webhooks → Add Webhook** con la URL de arriba y los
+   siete eventos. Copiar el **Webhook ID**.
+4. En Supabase → *Edge Function Secrets*, **reemplazar** los cinco: los de
+   sandbox no valen en Live ni al revés.
+
+   | Nombre | Valor |
+   |---|---|
+   | `PAYPAL_CLIENT_ID` | el de la app **Live** |
+   | `PAYPAL_SECRET` | el de la app **Live** |
+   | `PAYPAL_PLAN_ID` | el `P-…` del paso 2 |
+   | `PAYPAL_WEBHOOK_ID` | el del paso 3 |
+   | `PAYPAL_ENTORNO` | `produccion` |
+
+5. Un pago real de 15 USD con un chofer que tenga cortesía, que es el caso de
+   los cuatro de hoy. Comprobar que su fila de PayPal queda `activa`, con
+   `vigente_hasta` un mes después del final de la cortesía, y que la cortesía
+   pasó a `vencida`. Después, devolver el pago desde PayPal y ver que el mes se
+   descuenta.
+
+Si el webhook falla, el motivo exacto está en *Edge Functions → webhook-paypal →
+Logs*: la función dice ahí si las credenciales son del otro entorno.
+
+Las suscripciones `pendiente` que quedaron de las pruebas en sandbox no molestan:
+al pedir pagar, la función pregunta a PayPal Live por ellas, no las encuentra y
+abre una nueva. `infra/sql/limpiar-datos-de-prueba.sql` las borra.
 
 ### Probar en sandbox, sin dinero real
 
@@ -256,7 +321,9 @@ está configurado», que es la verdad y no un error raro.
 ## Dar cuota a mano
 
 Mientras no haya credenciales —o para un caso de soporte— se puede activar desde
-el SQL editor:
+el SQL editor. Si el chofer ya tiene una cuota `activa` (la cortesía, por
+ejemplo), el `insert` choca con el índice de «una sola activa»: ciérrala antes
+o alárgale `vigente_hasta`.
 
 ```sql
 insert into public.suscripciones_chofer

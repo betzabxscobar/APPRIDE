@@ -12,7 +12,8 @@ La equivalencia funcional con WEB-RIDE se revisó el **8 de septiembre de
 2026**. La web incluye los flujos de pasajero, conductor y administración de la
 app, incluido el detalle completo de un viaje administrativo. Las diferencias
 restantes corresponden al entorno: permisos móviles, enlaces profundos,
-ubicación en segundo plano y notificaciones con la aplicación cerrada.
+ubicación en segundo plano y notificaciones con la aplicación cerrada. Las dos
+muestran al pie del acceso los mismos términos y condiciones.
 
 La superficie que consume la app —funciones, tablas, Realtime y Storage— está
 documentada en [`docs/API.md`](docs/API.md). El mapa, en
@@ -61,9 +62,17 @@ flutter analyze          # análisis estático
 flutter build apk --release
 ```
 
-El APK sale en `build/app/outputs/flutter-apk/app-release.apk`. Hoy se firma
-con la clave de depuración (ver `android/app/build.gradle.kts`): sirve para
-instalarlo a mano, no para publicarlo en Play Store.
+El APK sale en `build/app/outputs/flutter-apk/app-release.apk`. La versión
+actual es **1.0.0+10** (`pubspec.yaml`) con el identificador
+`com.rideviajes.ride`.
+
+Mientras no exista `android/key.properties` se firma con la clave de depuración:
+sirve para instalarla a mano, no para Play Store. La clave de publicación se
+crea una sola vez con `python tool/crear_firma.py` (pide la contraseña sin
+mostrarla), y a partir de ahí `flutter build appbundle --release` firma de
+verdad. Guarda copia del `.jks` y de la contraseña en dos sitios: sin ellos no se
+puede publicar ninguna actualización nunca más. Ver
+[`docs/PUBLICAR.md`](docs/PUBLICAR.md).
 
 ## Casos de uso implementados
 
@@ -255,8 +264,9 @@ no toca ese dinero**: va directo de un banco a otro. El detalle está en
 
 **Resultado:** el perfil queda actualizado. El correo nuevo solo entra en vigor
 cuando el usuario abre el enlace de confirmación; hasta entonces sigue entrando
-con el anterior. El rol no se puede cambiar desde aquí: lo impide el trigger
-`prevent_role_self_edit()`.
+con el anterior. De su perfil, una persona solo puede cambiar el nombre, el
+teléfono y la foto: la base no le deja tocar su rol, su correo en el perfil ni
+si la cuenta está activa, aunque se salte la app.
 
 ### CU-A15. Revisar y aprobar a un conductor
 
@@ -420,6 +430,13 @@ propia cuenta. La función comprueba el rol en el servidor y rebota con 42501
 desde cualquier otra; el vehículo sigue haciendo falta, porque eso no es un
 permiso: un viaje no puede arrancar sin auto asignado.
 
+> **No sirve para dar por probado el flujo del chofer.** Un superadministrador
+> ve todos los perfiles y se salta zona y cuota, así que con él todo funciona
+> aunque para un chofer real no funcione. Pasó de verdad: hasta el 2026-09-11 un
+> chofer de rol `driver` no veía el viaje que aceptaba, y nadie lo notó porque
+> todas las pruebas se hacían como superadmin. Probar siempre con una cuenta de
+> chofer normal.
+
 ### CU-A27. Pagar la cuota mensual para recibir viajes
 
 **Actor:** conductor.
@@ -432,7 +449,10 @@ permiso: un viaje no puede arrancar sin auto asignado.
 **Resultado:** puede ponerse en línea y aceptar viajes. Sin la cuota al día el
 servidor le rebota las tres cosas —encenderse, ver solicitudes y aceptar—, y el
 corte vive en Postgres, no en la app. Los choferes que ya estaban tienen un mes
-de cortesía. El detalle está en [`docs/CUOTA.md`](docs/CUOTA.md).
+de cortesía; si pagan antes de que acabe, el mes pagado empieza donde termina la
+cortesía y no pierden días. Dar de baja la suscripción no quita el mes ya
+pagado, y un pago devuelto sí lo descuenta. El detalle está en
+[`docs/CUOTA.md`](docs/CUOTA.md).
 
 ## Alcance actual
 
@@ -455,10 +475,16 @@ de cortesía. El detalle está en [`docs/CUOTA.md`](docs/CUOTA.md).
   nunca pide ni almacena un número de tarjeta.
 - La cuota mensual del chofer —15 USD para recibir viajes— está aplicada en la
   base de datos y el corte está probado con un rol real. Las dos Edge Functions
-  de PayPal están desplegadas y responden 503 **mientras no tengan
-  credenciales**: falta el `client_secret` y el id del webhook. Mientras tanto
-  nadie puede pagar, y los choferes existentes trabajan con el mes de cortesía.
-  Ver [`docs/CUOTA.md`](docs/CUOTA.md).
+  de PayPal (v22) están desplegadas y **configuradas contra sandbox**: funcionan
+  con dinero de prueba. Para cobrar de verdad hay que poner las credenciales
+  **Live** antes del **2026-10-09**, cuando vencen las cortesías de los choferes
+  actuales. El código ya está listo; los pasos, en
+  [`docs/CUOTA.md`](docs/CUOTA.md#pasar-a-producción-live).
+- Pasajero y chofer no pueden escribir directamente en las tablas del viaje, del
+  cobro ni del chat: todo pasa por funciones de Postgres que deciden precio,
+  estado y quién puede qué. Cada uno ve su perfil y el de la otra persona de sus
+  viajes, nada más. `infra/sql/pruebas/permisos.sql` lo comprueba y hay que
+  pasarlo tras cada migración.
 - El precio siempre se calcula en Supabase; la distancia de OSRM se usa para
   presentar la ruta y no autoriza al cliente a fijar la tarifa.
 - El servidor público de OSRM sirve para desarrollo. Para producción debe
@@ -470,9 +496,11 @@ de cortesía. El detalle está en [`docs/CUOTA.md`](docs/CUOTA.md).
   que cada launcher lo recorte con su forma— y clásico para los anteriores. Los
   PNG se regeneran desde `assets/images/LogoTipo.png` con
   `python tool/generar_iconos_android.py`. iOS sigue con el icono por defecto.
-- El seguimiento del chofer se refresca cada 30 segundos mientras la aplicación
-  está abierta. No hay rastreo en segundo plano: con la app cerrada, el auto
-  deja de reportar posición hasta que se vuelve a abrir.
+- Mientras el chofer está en línea o lleva un viaje, Android mantiene un
+  servicio en primer plano con una notificación fija («Ride está compartiendo tu
+  ubicación»), así que sigue reportando posición con Waze delante o la pantalla
+  apagada. Basta el permiso «mientras se usa la app». En iOS todavía no: allí la
+  posición se detiene con la app en segundo plano.
 
 ## Comprobaciones automáticas
 
@@ -488,27 +516,34 @@ Estas comprobaciones detectan errores de código y regresiones cubiertas por las
 pruebas; no sustituyen una prueba manual del GPS, enlaces de correo, mapas,
 notificaciones, cámara, archivos y permisos en dispositivos Android e iOS reales.
 
-Estado local comprobado el **8 de septiembre de 2026**: `flutter analyze` sin
-problemas y **206 pruebas aprobadas**.
+Estado local comprobado el **11 de septiembre de 2026**, con 1.0.0+10:
+`flutter analyze` sin problemas, **235 pruebas aprobadas** y
+`flutter build apk --release` correcto. En la base,
+`infra/sql/pruebas/permisos.sql` sale vacío.
 
 ## Antes de producción
 
-- Cambiar `com.example.ride` por el identificador definitivo en Android e iOS,
-  configurar el equipo de firma de Apple y firmar Android con una clave de
-  publicación. La versión actual usa firma de depuración.
-- Registrar `ride://login-callback` en las redirecciones permitidas de Supabase y
-  probar recuperación y cambio de correo en ambos sistemas operativos.
-- Aplicar y verificar todas las migraciones en el proyecto correcto de Supabase,
-  incluidos RLS y los asesores de seguridad y rendimiento.
-- Configurar FCM y APNs si se requieren avisos con la aplicación cerrada. Hoy los
-  avisos de Realtime llegan mientras la app está ejecutándose.
-- Usar un servidor OSRM propio o contratado; el servidor público es solo una
-  dependencia provisional para desarrollo.
-- Integrar y validar la función de cobro, credenciales y webhook del proveedor de
-  pagos antes de habilitar un método distinto de efectivo.
-- Añadir un visor de PDF al panel de revisión si se aceptarán documentos en ese
-  formato y probar el rastreo de ubicación con las políticas de segundo plano
-  que finalmente se decidan.
+Revisado en la auditoría del 2026-09-11. En este orden:
+
+1. **Un viaje completo con dos teléfonos y un chofer de rol `driver`**, nunca
+   con un superadmin: aceptar, ver la ruta y el nombre del pasajero, dictar el
+   código, ver al chofer moverse con Waze abierto encima, cerrar en el destino,
+   cobrar en efectivo y por transferencia, calificar y usar el chat.
+2. **Firmar la APK** con `python tool/crear_firma.py` y declarar en Play Console
+   el servicio en primer plano de tipo `location`.
+3. **Supabase → Authentication → URL Configuration**: Site URL
+   `https://rideviajes.com.ec`; redirecciones esa, `www` y `ride://login-callback`.
+   Después, probar recuperación y cambio de correo.
+4. **PayPal Live** antes del 2026-10-09
+   ([`docs/CUOTA.md`](docs/CUOTA.md#pasar-a-producción-live)).
+5. **Limpiar los datos de prueba** con `infra/sql/limpiar-datos-de-prueba.sql`,
+   después de una copia de la base.
+6. Quitar el paso libre del superadmin como chofer (CU-A26) antes de abrir al
+   público.
+
+Para crecer: un servidor OSRM propio ([`infra/osrm`](infra/osrm/README.md)), FCM
+y APNs si hacen falta avisos con la app cerrada, la ubicación en segundo plano
+en iOS y un visor de PDF para la revisión de documentos.
 
 ## Configuración opcional
 

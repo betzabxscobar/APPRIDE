@@ -15,6 +15,13 @@ solo puede decidir una persona.
 | Vuelta de PayPal (`ride://suscripcion/...`) | registrada en el manifiesto |
 | Permisos | los cuatro que se usan, ninguno de más |
 | Escritura anónima en la base | revocada en las 25 tablas |
+| Escritura directa con sesión | cerrada en `viajes`, `ubicaciones`, `pagos`, `mensajes` y demás tablas que solo tocan las funciones; del perfil solo se editan nombre, teléfono y foto |
+| Quién ve qué perfil | cada uno el suyo y el de la otra persona de sus viajes; administración, todos |
+| Cuota con el mes de cortesía | el cobro de PayPal cierra la cortesía y encadena el mes; cancelar respeta lo pagado |
+
+Lo de las tres últimas filas salió de la segunda auditoría del 2026-09-11 y lo
+vigila `infra/sql/pruebas/permisos.sql`. **Falta la prueba con teléfonos**: un
+viaje completo con una cuenta de chofer que **no** sea superadmin (ver §8).
 
 ## Lo que falta, y es una decisión
 
@@ -75,7 +82,8 @@ Si dice `CN=Android Debug`, no es publicable.
 
 La cuota del chofer está configurada contra **sandbox**: funciona, pero con
 dinero de mentira. Para cobrar de verdad hay que cambiar los cinco secretos por
-los de Live y crear allí el plan. Los pasos están en [CUOTA.md](CUOTA.md).
+los de Live y crear allí el plan. El código ya está listo para Live; los pasos
+están en [CUOTA.md](CUOTA.md#pasar-a-producción-live).
 
 Mientras siga en sandbox, nadie paga: los choferes trabajan con el mes de
 cortesía, y **cuando venza se bloquean todos a la vez**.
@@ -152,6 +160,13 @@ estos correos.
 
 ### 8. Antes de abrir al público
 
+- **Un viaje completo con un chofer de rol `driver`**, nunca con un superadmin:
+  los superadmin ven todos los perfiles y se saltan zona y cuota, y por eso
+  nadie vio que un chofer real no llegaba a ver el viaje que aceptaba. Con dos
+  teléfonos: aceptar, ver la ruta y el nombre del pasajero, dictar el código, ver
+  al chofer moverse desde el teléfono del pasajero (con Waze abierto encima),
+  cerrar en el destino, cobrar en efectivo y por transferencia con comprobante,
+  calificar y escribir en el chat. Repetirlo en la web.
 - **`infra/sql/pruebas/permisos.sql`**: pasarlo en el SQL Editor. Vacío quiere
   decir todo en orden. Hay que pasarlo tras cada migración: así se vio que dos
   habían reabierto permisos sin que nadie lo notara.
