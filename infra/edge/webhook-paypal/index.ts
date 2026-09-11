@@ -15,13 +15,21 @@
 //   BILLING.SUBSCRIPTION.CANCELLED   la dio de baja
 //   BILLING.SUBSCRIPTION.SUSPENDED   PayPal la suspendio (tarjeta rechazada)
 //   BILLING.SUBSCRIPTION.EXPIRED     se acabo
+//   PAYMENT.SALE.REFUNDED            se devolvio un cobro: se quita su mes
+//   PAYMENT.SALE.REVERSED            se revirtio un cobro (contracargo): igual
 //
 // Al cancelar NO se corta el mes en marcha: ya esta pagado. Se deja correr
 // `vigente_hasta` y el chofer se apaga solo cuando llega la fecha.
 //
-// Desplegar (cuando esten las credenciales):
+// Activar y cobrar lo hace `aplicar_cobro_paypal()` en la base, en una sola
+// transaccion. Antes era un `upsert` desde aqui, y chocaba con el indice que
+// solo admite una cuota `activa` por chofer cuando el chofer tenia el mes de
+// cortesia: 500, reintento de PayPal, otro 500... y el chofer pagaba sin que se
+// le activara nada. Ver infra/sql/2026-09-11-cuota-paypal-con-cortesia.sql.
+//
+// Desplegar (con las credenciales Live; `sandbox` solo para probar):
 //   supabase secrets set PAYPAL_CLIENT_ID=... PAYPAL_SECRET=... \
-//                        PAYPAL_WEBHOOK_ID=... PAYPAL_ENTORNO=sandbox
+//                        PAYPAL_WEBHOOK_ID=... PAYPAL_ENTORNO=produccion
 //   supabase functions deploy webhook-paypal --no-verify-jwt
 // y en el panel de PayPal, apuntar el webhook a:
 //   https://<proyecto>.supabase.co/functions/v1/webhook-paypal
@@ -95,17 +103,24 @@ async function firmaValida(
   return (await r.json())?.verification_status === 'SUCCESS';
 }
 
-/// Un mes desde hoy, o desde donde iba si todavia le quedaba tiempo.
+/// La suscripcion a la que pertenece un cobro devuelto.
 ///
-/// Renovar antes de que venza no puede regalar dias ni quitarlos: se encadena
-/// al final del periodo que ya tenia pagado.
-function nuevaVigencia(actual: string | null): string {
-  const desde = actual && new Date(actual) > new Date()
-    ? new Date(actual)
-    : new Date();
-  const hasta = new Date(desde);
-  hasta.setMonth(hasta.getMonth() + 1);
-  return hasta.toISOString();
+/// En `PAYMENT.SALE.REFUNDED` el recurso es el reembolso, que trae `sale_id`
+/// pero no siempre `billing_agreement_id`: hay que preguntarle a PayPal por la
+/// venta original para saber de que suscripcion era.
+async function suscripcionDeLaVenta(
+  base: string,
+  acceso: string,
+  ventaId: string,
+): Promise<string | null> {
+  const r = await fetch(`${base}/v1/payments/sale/${encodeURIComponent(ventaId)}`, {
+    headers: { Authorization: `Bearer ${acceso}` },
+  });
+  if (!r.ok) {
+    console.error(`PayPal /payments/sale/${ventaId} respondio ${r.status}`);
+    return null;
+  }
+  return (await r.json())?.billing_agreement_id ?? null;
 }
 
 Deno.serve(async (req) => {
@@ -165,12 +180,17 @@ Deno.serve(async (req) => {
 
   const tipo = String(evento.event_type ?? '');
   const recurso = (evento.resource ?? {}) as Record<string, unknown>;
+  const esDevolucion = tipo === 'PAYMENT.SALE.REFUNDED' || tipo === 'PAYMENT.SALE.REVERSED';
 
-  // En los eventos de suscripcion la referencia es `resource.id`; en el cobro
-  // recurrente (`PAYMENT.SALE.COMPLETED`) viene en `billing_agreement_id`.
-  const referencia = String(
-    recurso.billing_agreement_id ?? recurso.id ?? '',
-  );
+  // En los eventos de suscripcion la referencia es `resource.id`; en los cobros
+  // (`PAYMENT.SALE.*`) viene en `billing_agreement_id`. En un reembolso el
+  // `resource.id` es el del reembolso, no el de la suscripcion: si no trae
+  // `billing_agreement_id`, se busca por la venta original.
+  let referencia = String(recurso.billing_agreement_id ?? '');
+  if (!referencia && esDevolucion && recurso.sale_id) {
+    referencia = await suscripcionDeLaVenta(base, acceso, String(recurso.sale_id)) ?? '';
+  }
+  if (!referencia && !esDevolucion) referencia = String(recurso.id ?? '');
   if (!referencia) return json({ ok: true, ignorado: 'sin referencia' });
 
   const db = createClient(
@@ -198,51 +218,70 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   // `custom_id` es el uuid del chofer que puso `suscripcion-paypal`. Se usa
-  // cuando el evento llega antes de que se guardara la fila, que pasa.
-  const conductor = fila?.conductor_id ?? (recurso.custom_id as string | undefined);
+  // cuando el evento llega antes de que se guardara la fila, que pasa. En los
+  // cobros el mismo dato viaja como `custom`.
+  const conductor = fila?.conductor_id ??
+    (recurso.custom_id as string | undefined) ??
+    (recurso.custom as string | undefined);
   if (!conductor) return json({ ok: true, ignorado: 'no sabemos de quien es' });
 
-  const comun = {
-    conductor_id: conductor,
-    proveedor: 'paypal',
-    referencia_externa: referencia,
-    actualizado_en: new Date().toISOString(),
-    datos: evento,
-  };
-
-  let cambio: Record<string, unknown>;
+  let error: { message: string } | null = null;
   switch (tipo) {
-    case 'BILLING.SUBSCRIPTION.ACTIVATED':
+    case 'BILLING.SUBSCRIPTION.ACTIVATED': {
       // Activar no es cobrar. PayPal manda el cobro del primer mes como un
       // PAYMENT.SALE.COMPLETED aparte: si esto tambien sumara un mes, cada chofer
       // recibiria dos por un pago. Sin fecha todavia no hay nada que activar
       // (la tabla exige fecha a una cuota `activa`); con fecha, es una
       // reactivacion y se respeta la que habia.
       if (!fila?.vigente_hasta) return json({ ok: true, esperando: 'el cobro' });
-      cambio = { ...comun, estado: 'activa' };
-      break;
-
-    case 'PAYMENT.SALE.COMPLETED': {
-      const importe = (recurso.amount ?? {}) as { total?: string; currency?: string };
-      cambio = {
-        ...comun,
-        estado: 'activa',
-        vigente_hasta: nuevaVigencia(fila?.vigente_hasta ?? null),
-        monto: Number(importe.total ?? 15),
-        moneda: importe.currency ?? 'USD',
-      };
+      ({ error } = await db.rpc('aplicar_cobro_paypal', {
+        p_conductor: conductor,
+        p_referencia: referencia,
+        p_sumar_mes: false,
+        p_monto: null,
+        p_moneda: null,
+        p_evento: evento,
+      }));
       break;
     }
 
-    case 'BILLING.SUBSCRIPTION.CANCELLED':
-    case 'BILLING.SUBSCRIPTION.SUSPENDED':
-      // El mes que ya pago se respeta: se marca cancelada pero `vigente_hasta`
-      // no se toca. Deja de recibir viajes cuando llegue esa fecha, no antes.
-      cambio = { ...comun, estado: 'cancelada' };
+    case 'PAYMENT.SALE.COMPLETED': {
+      const importe = (recurso.amount ?? {}) as { total?: string; currency?: string };
+      ({ error } = await db.rpc('aplicar_cobro_paypal', {
+        p_conductor: conductor,
+        p_referencia: referencia,
+        p_sumar_mes: true,
+        p_monto: Number(importe.total ?? 15),
+        p_moneda: importe.currency ?? 'USD',
+        p_evento: evento,
+      }));
+      break;
+    }
+
+    case 'PAYMENT.SALE.REFUNDED':
+    case 'PAYMENT.SALE.REVERSED':
+      // Sin fila no hay mes que quitar: nunca se activo.
+      if (!fila) return json({ ok: true, ignorado: 'devolucion de algo que no activamos' });
+      ({ error } = await db.rpc('revertir_cobro_paypal', {
+        p_referencia: referencia,
+        p_evento: evento,
+      }));
       break;
 
+    case 'BILLING.SUBSCRIPTION.CANCELLED':
+    case 'BILLING.SUBSCRIPTION.SUSPENDED':
     case 'BILLING.SUBSCRIPTION.EXPIRED':
-      cambio = { ...comun, estado: 'vencida' };
+      // El mes que ya pago se respeta: se marca cancelada pero `vigente_hasta`
+      // no se toca. Deja de recibir viajes cuando llegue esa fecha, no antes.
+      // Ninguno de estos estados es `activa`, asi que no choca con la cortesia.
+      ({ error } = await db.from('suscripciones_chofer').upsert({
+        conductor_id: conductor,
+        proveedor: 'paypal',
+        referencia_externa: referencia,
+        estado: tipo === 'BILLING.SUBSCRIPTION.EXPIRED' ? 'vencida' : 'cancelada',
+        actualizado_en: new Date().toISOString(),
+        datos: evento,
+      }, { onConflict: 'referencia_externa' }));
       break;
 
     default:
@@ -250,10 +289,6 @@ Deno.serve(async (req) => {
       // que no los reintente eternamente.
       return json({ ok: true, ignorado: tipo });
   }
-
-  const { error } = await db
-    .from('suscripciones_chofer')
-    .upsert(cambio, { onConflict: 'referencia_externa' });
 
   if (error) {
     // 500 a proposito: PayPal reintenta, y es lo que se quiere si la base
