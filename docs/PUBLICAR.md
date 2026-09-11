@@ -147,10 +147,18 @@ Los correos de acceso salen por Brevo (SMTP configurado en Supabase: 300 al día
 en el plan gratuito, unos 9000 al mes). Pero **a dónde vuelve el enlace lo
 decide Supabase**, no Brevo: *Authentication → URL Configuration*.
 
-- **Site URL:** `https://rideviajes.com.ec`
-- **Redirect URLs:** `https://rideviajes.com.ec/**`,
-  `https://www.rideviajes.com.ec/**` y `ride://login-callback`, que es el de la
-  app.
+- **Site URL:** la dirección por la que de verdad se entra hoy. Mientras el
+  servidor no tenga certificado es **http**: `http://rideviajes.com.ec` si el
+  dominio ya resuelve, o `http://192.168.0.254` si solo se entra desde la red.
+  Cuando haya certificado, `https://rideviajes.com.ec`.
+- **Redirect URLs:** todas estas, para no tener que volver cuando cambie:
+  - `http://192.168.0.254/**`
+  - `http://rideviajes.com.ec/**` y `http://www.rideviajes.com.ec/**`
+  - `https://rideviajes.com.ec/**` y `https://www.rideviajes.com.ec/**`
+  - `ride://login-callback`, que es el de la app.
+
+  La web pide volver a la dirección desde la que se abrió (`auth.ts`), así que
+  basta con que esa dirección esté en la lista.
 
 Si una dirección no está en la lista, Supabase manda al Site URL y la
 recuperación de contraseña acaba en una página que no es. Después, pedir una
