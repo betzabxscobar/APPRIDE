@@ -92,8 +92,8 @@ revisión nueva, no la anterior con una nota.
 ## Las fotos
 
 - **Tamaño y tipo** los limita el bucket: 5 MB y `jpeg`, `png`, `webp` o `pdf`.
-- **Resolución mínima**: 600 píxeles de lado, comprobado en la app antes de
-  subir. Un tope sin suelo deja pasar una foto de 40×30 que nadie puede leer, y
+- **Resolución mínima**: 600 píxeles de lado, comprobado en la app y en la web
+  antes de subir. Un tope sin suelo deja pasar una foto de 40×30 que nadie puede leer, y
   esa se rechaza igual, solo que tres días más tarde. Postgres no puede
   comprobarlo: no sabe abrir una imagen.
 - La foto de perfil que revisa la administración y la que ve el pasajero **son

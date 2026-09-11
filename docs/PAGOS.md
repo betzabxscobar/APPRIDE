@@ -73,7 +73,8 @@ comprobante lleva número de cuenta, nombre y monto.
 - Cada pasajero escribe solo en su carpeta (`<uuid>/<viaje>.jpg`).
 - Lo leen tres: quien lo subió, el chofer de ese viaje y la administración.
 - Se sirve con enlace firmado de una hora, no con URL pública.
-- Máximo 5 MB, y solo imágenes o PDF.
+- Máximo 5 MB, y **solo imágenes**: el chofer lo ve con `Image.network`, y un
+  PDF ahí no se pinta. Las dos apps lo suben ya reducido a 1600 px de ancho.
 
 Se puede volver a subir: si la primera foto salió movida, la segunda pisa a la
 primera en vez de acumular basura.

@@ -131,6 +131,22 @@ class FleetService {
       'p_caduca_el': caducaEl?.toIso8601String().split('T').first,
     });
 
+    // Si el anterior tenia otra extension —un .png, o un .pdf subido desde la
+    // web—, `upsert` no lo piso: sigue en el bucket y ninguna fila lo nombra.
+    // Se borra despues de registrar el nuevo, no antes, para no quedarse sin
+    // ninguno si el registro falla.
+    final carpeta = ruta.substring(0, ruta.lastIndexOf('/'));
+    final viejos = _extensionesDeDocumento
+        .where((otra) => otra != ext)
+        .map((otra) => '$carpeta/${tipo.id}.$otra')
+        .toList();
+    try {
+      await _client.storage.from('documentos').remove(viejos);
+    } catch (_) {
+      // El documento nuevo ya quedo bien; un archivo viejo de mas no rompe
+      // nada.
+    }
+
     // La foto que revisa la administración y la que ve el pasajero son la
     // misma. Tener dos sería pedirle al chofer que suba su cara dos veces, y
     // dejaría la puerta abierta a que le aprueben una y enseñe otra.
@@ -189,6 +205,10 @@ class FleetService {
 
   /// Por debajo de esto no se lee un número de placa ni el de una póliza.
   static const int _ladoMinimo = 600;
+
+  /// Las extensiones con las que un documento ha podido quedar guardado, entre
+  /// lo que sube la app y lo que sube la web.
+  static const _extensionesDeDocumento = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
 
   /// Lo que hay registrado hoy de su identidad.
   ///

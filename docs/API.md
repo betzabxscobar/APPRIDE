@@ -276,14 +276,69 @@ el `dispose`.
 
 ## Storage
 
-| Bucket | Acceso | Cómo se lee |
-|---|---|---|
-| `avatares` | público | `getPublicUrl()` |
-| `documentos` | privado | `createSignedUrl(ruta, 3600)` |
+| Bucket | Acceso | Cómo se lee | Qué acepta |
+|---|---|---|---|
+| `avatares` | público | `getPublicUrl()` | foto, 2 MB |
+| `documentos` | privado | `createSignedUrl(ruta, 3600)` | foto o PDF, 5 MB |
+| `comprobantes` | privado | `createSignedUrl(ruta, 3600)` | solo foto, 5 MB |
 
 Los documentos de un chofer —los suyos y los de cada vehículo— no pueden ser
 públicos: son documentos de identidad. Se abren con un enlace firmado que
-caduca en una hora.
+caduca en una hora. Los comprobantes, igual: llevan número de cuenta, nombre y
+monto. Y no aceptan PDF porque el chofer los ve con `Image.network`, que no los
+pinta.
+
+### Las fotos se reducen antes de subir, en las dos apps
+
+Los topes del bucket son un respaldo, no el tamaño normal. Ninguna foto sale
+del teléfono tal cual:
+
+| Qué | Ancho máx. | Alto máx. | Calidad | Lado mínimo |
+|---|---|---|---|---|
+| Avatar | 800 | 800 | 82 | — |
+| Documento | 1600 | — | 80 | 600 |
+| Comprobante | 1600 | — | 85 | — |
+
+En la app lo hace `image_picker`; en la web, `src/lib/image-upload.ts` con los
+mismos números. **Si se cambia uno, se cambia el otro.**
+
+Con el plan gratuito, 1 GB. A unos 150 kB por foto reducida caben miles; a los
+5 MB que la web dejaba subir antes, unas doscientas.
+
+### Las coordenadas GPS de las fotos
+
+Una foto de cámara lleva en sus metadatos (EXIF) dónde se tomó, si el teléfono
+tiene activada esa opción.
+
+- **La web las quita**: vuelve a dibujar la foto en un canvas y la codifica de
+  nuevo, y lo nuevo no lleva metadatos.
+- **La app no.** `image_picker` en Android, al reducir, copia a la foto nueva
+  todas las etiquetas GPS de la original (`ExifDataCopier.java`, comprobado en
+  `image_picker_android` 0.8.13+19). Una foto de perfil tomada en casa puede
+  llevar dentro dónde está esa casa, en un bucket público. **Pendiente**:
+  arreglarlo pide recodificar la foto sin EXIF, y eso es una dependencia nueva.
+
+### Archivos que se quedan sin dueño
+
+Storage no se entera de lo que pasa en las tablas. Dos casos:
+
+- **Un documento que cambia de extensión** (`cedula.png` → `cedula.jpg`) son
+  dos archivos: `upsert` solo pisa la misma ruta. Las dos apps borran el viejo
+  después de registrar el nuevo.
+- **Un usuario borrado desde *Authentication***: sus carpetas se quedan en los
+  tres buckets, con su cédula y su licencia dentro. Desde SQL no se pueden
+  borrar —Supabase lo impide con el disparador `protect_objects_delete`—: hay
+  que entrar a *Storage* y borrar la carpeta con su uuid en cada bucket.
+
+Para ver cuáles hay:
+
+```sql
+select bucket_id, name, pg_size_pretty((metadata->>'size')::bigint) as tamano
+from storage.objects o
+where not exists (
+  select 1 from auth.users u where u.id::text = (storage.foldername(o.name))[1]
+);
+```
 
 ## Autenticación
 
