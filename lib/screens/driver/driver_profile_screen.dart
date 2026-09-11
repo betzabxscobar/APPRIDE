@@ -261,12 +261,13 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
 
     try {
       final picker = ImagePicker();
-      // Se reduce antes de subir: una foto de 12 MP pasaría del límite de 5 MB
-      // del bucket y no aporta nada para leer una licencia.
+      // Se achica aquí, que en el teléfono es rápido: una foto de 12 MP
+      // decodificada en Dart serían segundos. La calidad y quitarle los
+      // metadatos los pone `prepararFoto` al subir; sin `imageQuality` aquí,
+      // para no comprimirla dos veces.
       final foto = await picker.pickImage(
         source: origen,
         maxWidth: 1600,
-        imageQuality: 80,
       );
       if (foto == null) {
         if (mounted) setState(() => _subiendo = null);

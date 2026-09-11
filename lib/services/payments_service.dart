@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+import '../core/fotos.dart';
 import 'ride_service.dart' show RideException;
 
 /// Una suscripción recién abierta en PayPal, todavía sin aprobar.
@@ -111,11 +112,20 @@ class PaymentsService {
     if (uid == null) {
       throw const RideException('Debes iniciar sesión para subir el comprobante.');
     }
+    // Como las demas fotos: a 1600 de ancho, en JPEG y sin metadatos. Antes
+    // una captura de pantalla podia llegar como PNG con nombre `.jpg`.
+    final Uint8List foto;
+    try {
+      foto = await prepararFoto(bytes, LimitesFoto.comprobante);
+    } on FotoInvalida catch (e) {
+      throw RideException(e.message);
+    }
+
     final ruta = '$uid/$viajeId.jpg';
     try {
       await _client.storage.from('comprobantes').uploadBinary(
             ruta,
-            bytes,
+            foto,
             fileOptions: const sb.FileOptions(
               contentType: 'image/jpeg',
               // Se puede volver a subir: si la primera foto salió movida, la

@@ -68,7 +68,9 @@ comment on column public.pagos.reportado_en is
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'comprobantes', 'comprobantes', false, 5242880,
-  array['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+  -- Sin PDF: el chofer lo ve con Image.network. Ver
+  -- 2026-09-10-comprobantes-solo-imagenes.sql.
+  array['image/jpeg', 'image/png', 'image/webp']
 )
 on conflict (id) do update
   set public = false,
