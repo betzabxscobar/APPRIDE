@@ -63,7 +63,7 @@ flutter build apk --release
 ```
 
 El APK sale en `build/app/outputs/flutter-apk/app-release.apk`. La versión
-actual es **1.0.0+10** (`pubspec.yaml`) con el identificador
+actual es **1.0.0+11** (`pubspec.yaml`) con el identificador
 `com.rideviajes.ride`.
 
 Mientras no exista `android/key.properties` se firma con la clave de depuración:
@@ -516,7 +516,7 @@ Estas comprobaciones detectan errores de código y regresiones cubiertas por las
 pruebas; no sustituyen una prueba manual del GPS, enlaces de correo, mapas,
 notificaciones, cámara, archivos y permisos en dispositivos Android e iOS reales.
 
-Estado local comprobado el **11 de septiembre de 2026**, con 1.0.0+10:
+Estado local comprobado el **11 de septiembre de 2026**, con 1.0.0+11:
 `flutter analyze` sin problemas, **235 pruebas aprobadas** y
 `flutter build apk --release` correcto. En la base,
 `infra/sql/pruebas/permisos.sql` sale vacío.
