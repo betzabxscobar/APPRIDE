@@ -31,9 +31,14 @@ const ENTORNOS: Record<string, string> = {
   produccion: 'https://api-m.paypal.com',
 };
 
+// `apikey` y `x-client-info` las manda supabase-js en toda peticion; si no
+// estan aqui, el navegador aprueba el preflight y luego bloquea el POST sin
+// decir nada util. Se vio desde la web: en los registros solo llegaban OPTIONS
+// y ni un POST. Desde la app no se notaba porque Flutter no pasa por CORS.
 const cors = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 function json(cuerpo: unknown, status = 200): Response {
