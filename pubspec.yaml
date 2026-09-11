@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+8
+version: 1.0.0+9
 
 environment:
   sdk: ^3.11.0
@@ -79,13 +79,13 @@ flutter:
     # para las teselas. Se regeneran con tool/generar_estilos_mapa.dart.
     - assets/mapa/claro.json
     - assets/mapa/oscuro.json
-    - assets/images/fondo.png
-    - assets/images/fondoInicio.jpeg
-    - assets/images/fondoInicioOscuro-v2.png
+    - assets/images/fondo.webp
+    - assets/images/fondoInicio.webp
+    - assets/images/fondoInicioOscuro-v2.webp
     - assets/images/LogoTipo.png
-    - assets/images/ChicaDibujo.png
-    - assets/images/ChicoDibujo.png
-    - assets/images/carroDibujo.png
+    - assets/images/ChicaDibujo.webp
+    - assets/images/ChicoDibujo.webp
+    - assets/images/carroDibujo.webp
     # Logos de los bancos a los que el pasajero puede transferir.
     - assets/images/bancos/
 

@@ -285,7 +285,7 @@ class _CapaBaseState extends State<_CapaBase> {
     // mapa de noche bajo una app de día se lee como una app rota.
     return TileLayer(
       urlTemplate: _urlTeselas,
-      userAgentPackageName: 'com.example.ride',
+      userAgentPackageName: 'com.rideviajes.ride',
       // `maxNativeZoom` (19 por defecto) es el tope de lo que sirve OSM: a
       // partir de ahí flutter_map reutiliza la tesela de z19 y la escala.
       //

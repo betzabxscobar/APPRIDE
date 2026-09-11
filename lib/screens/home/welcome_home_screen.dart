@@ -331,7 +331,7 @@ class _HeroVisualState extends State<_HeroVisual>
               children: [
                 if (dark)
                   Image.asset(
-                    'assets/images/fondoInicioOscuro-v2.png',
+                    'assets/images/fondoInicioOscuro-v2.webp',
                     fit: BoxFit.cover,
                     alignment: Alignment.center,
                   )
@@ -342,7 +342,7 @@ class _HeroVisualState extends State<_HeroVisual>
                       BlendMode.screen,
                     ),
                     child: Image.asset(
-                      'assets/images/fondoInicio.jpeg',
+                      'assets/images/fondoInicio.webp',
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -470,7 +470,7 @@ class _RideScene extends StatelessWidget {
                 animation: girlAnimation,
                 from: const Offset(-0.55, 0),
                 child: _TrimmedAsset(
-                  asset: 'assets/images/ChicaDibujo.png',
+                  asset: 'assets/images/ChicaDibujo.webp',
                   sourceLeft: 405,
                   sourceTop: 226,
                   sourceWidth: 619,
@@ -487,7 +487,7 @@ class _RideScene extends StatelessWidget {
                 animation: boyAnimation,
                 from: const Offset(0.55, 0),
                 child: _TrimmedAsset(
-                  asset: 'assets/images/ChicoDibujo.png',
+                  asset: 'assets/images/ChicoDibujo.webp',
                   sourceLeft: 417,
                   sourceTop: 233,
                   sourceWidth: 607,
@@ -504,7 +504,7 @@ class _RideScene extends StatelessWidget {
                 animation: carAnimation,
                 from: const Offset(0.75, 0),
                 child: _TrimmedAsset(
-                  asset: 'assets/images/carroDibujo.png',
+                  asset: 'assets/images/carroDibujo.webp',
                   sourceLeft: 89,
                   sourceTop: 940,
                   sourceWidth: 1186,
