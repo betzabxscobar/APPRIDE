@@ -117,8 +117,8 @@ class _SplashScreenState extends State<SplashScreen>
             },
             child: Image.asset(
               dark
-                  ? 'assets/images/fondoInicioOscuro-v2.png'
-                  : 'assets/images/fondo.png',
+                  ? 'assets/images/fondoInicioOscuro-v2.webp'
+                  : 'assets/images/fondo.webp',
               fit: BoxFit.cover,
               alignment: Alignment.center,
               width: double.infinity,

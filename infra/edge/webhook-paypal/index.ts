@@ -28,7 +28,9 @@
 //
 // Ver docs/CUOTA.md.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// Version exacta, la misma que usa la web: con `@2` cada despliegue podia traer
+// una 2.x distinta sin que nadie la probara, justo en el codigo que cobra.
+import { createClient } from 'npm:@supabase/supabase-js@2.112.4';
 
 const ENTORNOS: Record<string, string> = {
   sandbox: 'https://api-m.sandbox.paypal.com',
@@ -176,6 +178,19 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
+  // PayPal entrega cada aviso «al menos una vez»: reintenta los que no confirma
+  // a tiempo, y un reintento sumaba otro mes. El id del evento se apunta antes
+  // de tocar nada; si ya estaba, este aviso ya se proceso.
+  const eventoId = String(evento.id ?? '');
+  if (eventoId) {
+    const { error: yaVisto } = await db.from('eventos_paypal').insert({ id: eventoId, tipo });
+    if (yaVisto?.code === '23505') return json({ ok: true, ignorado: 'repetido' });
+    if (yaVisto) {
+      console.error(`No se pudo apuntar el evento ${eventoId}: ${yaVisto.message}`);
+      return json({ error: 'No pudimos procesar el aviso' }, 500);
+    }
+  }
+
   const { data: fila } = await db
     .from('suscripciones_chofer')
     .select('id, conductor_id, vigente_hasta')
@@ -198,15 +213,26 @@ Deno.serve(async (req) => {
   let cambio: Record<string, unknown>;
   switch (tipo) {
     case 'BILLING.SUBSCRIPTION.ACTIVATED':
-    case 'PAYMENT.SALE.COMPLETED':
+      // Activar no es cobrar. PayPal manda el cobro del primer mes como un
+      // PAYMENT.SALE.COMPLETED aparte: si esto tambien sumara un mes, cada chofer
+      // recibiria dos por un pago. Sin fecha todavia no hay nada que activar
+      // (la tabla exige fecha a una cuota `activa`); con fecha, es una
+      // reactivacion y se respeta la que habia.
+      if (!fila?.vigente_hasta) return json({ ok: true, esperando: 'el cobro' });
+      cambio = { ...comun, estado: 'activa' };
+      break;
+
+    case 'PAYMENT.SALE.COMPLETED': {
+      const importe = (recurso.amount ?? {}) as { total?: string; currency?: string };
       cambio = {
         ...comun,
         estado: 'activa',
         vigente_hasta: nuevaVigencia(fila?.vigente_hasta ?? null),
-        monto: 15,
-        moneda: 'USD',
+        monto: Number(importe.total ?? 15),
+        moneda: importe.currency ?? 'USD',
       };
       break;
+    }
 
     case 'BILLING.SUBSCRIPTION.CANCELLED':
     case 'BILLING.SUBSCRIPTION.SUSPENDED':
@@ -231,9 +257,11 @@ Deno.serve(async (req) => {
 
   if (error) {
     // 500 a proposito: PayPal reintenta, y es lo que se quiere si la base
-    // fallo un momento. El `upsert` sobre `referencia_externa` hace que el
-    // reintento no duplique nada.
-    return json({ error: error.message }, 500);
+    // fallo un momento. Se borra la marca del evento para que ese reintento se
+    // procese. El detalle va al registro, no a quien llama: el webhook es publico.
+    if (eventoId) await db.from('eventos_paypal').delete().eq('id', eventoId);
+    console.error(`No se pudo guardar la suscripcion (${tipo}): ${error.message}`);
+    return json({ error: 'No pudimos guardar el aviso' }, 500);
   }
 
   return json({ ok: true, evento: tipo });

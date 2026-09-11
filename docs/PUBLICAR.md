@@ -33,6 +33,10 @@ haya en el teléfono, en vez de actualizarla. Conviene desinstalar la vieja.
 
 ### 2. La clave de firma
 
+**La forma corta:** `python tool/crear_firma.py`. Pide la contraseña sin
+mostrarla, crea `android/ride-publicacion.jks` y `android/key.properties`, y se
+niega a pisar una clave que ya exista. Lo de abajo es lo mismo, a mano.
+
 Hasta ahora las APK van firmadas con la clave de depuración. Sirve para repartir
 entre el equipo; Play Store la rechaza. Y una firmada en depuración no deja
 actualizar encima de una firmada de verdad: hay que desinstalar.
@@ -111,6 +115,49 @@ qué falta.
 > A quien ya tenga cuenta no se le echa: puede seguir entrando con su contraseña
 > actual aunque no cumpla lo nuevo. El requisito se aplica al registrarse y al
 > cambiarla.
+
+### 6. La ubicación del chofer en segundo plano: declararla en Play Console
+
+Desde la 1.0.0+9, mientras el chofer está en línea o lleva un viaje, la app
+mantiene un servicio en primer plano de tipo `location` con una notificación
+fija («Ride está compartiendo tu ubicación»). Sin él, Android suspendía la app
+al abrir Waze o apagar la pantalla, y el chofer dejaba de enviar su posición.
+
+- **No pide la ubicación «todo el tiempo»** (`ACCESS_BACKGROUND_LOCATION`): le
+  basta el permiso «mientras se usa», porque el servicio arranca con la app
+  delante.
+- **Play Console lo pregunta.** En *Contenido de la app → Permisos de servicio
+  en primer plano* hay que declarar el tipo `location`, explicar para qué es y,
+  normalmente, subir un vídeo corto: ponerse en línea, cambiar a otra app y
+  enseñar la notificación. Sin esa declaración la revisión rechaza la versión.
+- **Probarlo en un teléfono antes de publicar:** ponerse en línea, abrir Waze
+  cinco minutos y comprobar en la web que la posición siguió moviéndose.
+
+### 7. Los correos y a dónde vuelven
+
+Los correos de acceso salen por Brevo (SMTP configurado en Supabase: 300 al día
+en el plan gratuito, unos 9000 al mes). Pero **a dónde vuelve el enlace lo
+decide Supabase**, no Brevo: *Authentication → URL Configuration*.
+
+- **Site URL:** `https://rideviajes.com.ec`
+- **Redirect URLs:** `https://rideviajes.com.ec/**`,
+  `https://www.rideviajes.com.ec/**` y `ride://login-callback`, que es el de la
+  app.
+
+Si una dirección no está en la lista, Supabase manda al Site URL y la
+recuperación de contraseña acaba en una página que no es. Después, pedir una
+recuperación real y abrir el enlace: si Brevo tiene el seguimiento de clics
+activado, reescribe los enlaces por un dominio suyo, y conviene apagarlo para
+estos correos.
+
+### 8. Antes de abrir al público
+
+- **`infra/sql/pruebas/permisos.sql`**: pasarlo en el SQL Editor. Vacío quiere
+  decir todo en orden. Hay que pasarlo tras cada migración: así se vio que dos
+  habían reabierto permisos sin que nadie lo notara.
+- **`infra/sql/limpiar-datos-de-prueba.sql`**: borra los viajes, pagos y avisos
+  de las pruebas. Termina en `ROLLBACK`; se cambia por `COMMIT` cuando los
+  números cuadren, y siempre después de una copia.
 
 ## Compilar para publicar
 

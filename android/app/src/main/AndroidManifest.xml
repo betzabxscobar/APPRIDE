@@ -7,6 +7,10 @@
     <!-- Avisos de viaje. Desde Android 13 hay que pedirlo en marcha, no basta
          con declararlo: lo hace PushService al iniciar sesion. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- El servicio en primer plano de geolocator (LocationService.seguirEnSegundoPlano).
+         Sin FOREGROUND_SERVICE_LOCATION, Android 14 cierra la app al ponerse en linea. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <application
         android:label="Ride"
         android:name="${applicationName}"

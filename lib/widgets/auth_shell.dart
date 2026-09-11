@@ -252,7 +252,7 @@ class BrandPanel extends StatelessWidget {
                 if (ride.isDark)
                   Positioned.fill(
                     child: Image.asset(
-                      'assets/images/fondoInicioOscuro-v2.png',
+                      'assets/images/fondoInicioOscuro-v2.webp',
                       fit: BoxFit.cover,
                       alignment: Alignment.center,
                     ),

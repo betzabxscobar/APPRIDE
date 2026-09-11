@@ -5,6 +5,10 @@
 	<!-- Ubicacion: punto de recogida del pasajero y posicion del chofer. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Ride usa tu ubicacion para saber donde recogerte y seguir el viaje en tiempo real.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Para fotografiar tus documentos y tu foto de perfil.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Para elegir la foto de un documento o de un comprobante.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

@@ -81,10 +81,21 @@ poder probar el flujo de chofer (CU-A26).
    chofer, sacado del JWT y nunca del cuerpo de la petición. Guarda la fila en
    `pendiente`, que todavía no sirve para trabajar.
 4. La app abre en el navegador el enlace donde el chofer aprueba el cobro.
-5. PayPal cobra y avisa a `webhook-paypal`, que verifica la firma contra la API
-   de PayPal y marca la suscripción `activa` con un mes de vigencia.
+5. PayPal avisa dos veces a `webhook-paypal`, que verifica la firma de cada aviso
+   contra su API: la activación, que no suma nada, y el cobro del primer mes
+   (`PAYMENT.SALE.COMPLETED`), que es el que da el mes de vigencia. Hasta el
+   2026-09-11 los dos sumaban un mes: dos meses por un pago.
 6. Cada mes PayPal vuelve a cobrar y a avisar (`PAYMENT.SALE.COMPLETED`), y la
    vigencia se encadena al final del periodo que ya tenía pagado.
+
+Cada aviso se apunta en `eventos_paypal` antes de tocar nada. PayPal entrega «al
+menos una vez» y reintenta lo que no confirma a tiempo: sin esa marca, cada
+reintento sumaba otro mes. Si guardar falla, la marca se borra para que el
+reintento sí se procese.
+
+Desde la web, la vuelta de PayPal es la propia web, y no `ride://`: la manda la
+web y la función solo la acepta si es una de las suyas (`WEBS` en
+`suscripcion-paypal`).
 
 **Volver de PayPal no activa nada.** El `return_url` es solo la vuelta del
 navegador; quien da la cuota por pagada es el webhook. Por eso el panel ofrece
