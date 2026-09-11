@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+import '../core/fotos.dart';
 import '../models/app_user.dart';
 import 'push_service.dart';
 import 'trip_session_store.dart';
@@ -412,11 +413,24 @@ class AuthService extends ChangeNotifier {
       final user = _currentUser;
       if (user == null) throw const AuthException('Debes iniciar sesión');
 
+      // Derecha, a 800×800 y sin metadatos: el bucket es público, y
+      // image_picker copia a la foto reducida las coordenadas GPS de la
+      // original. Ver lib/core/fotos.dart.
+      final Uint8List foto;
+      try {
+        foto = await prepararFoto(
+          await archivo.readAsBytes(),
+          LimitesFoto.avatar,
+        );
+      } on FotoInvalida catch (error) {
+        throw AuthException(error.message);
+      }
+
       final ruta = '${user.id}/perfil.jpg';
       try {
-        await _client.storage.from(_bucketAvatares).upload(
+        await _client.storage.from(_bucketAvatares).uploadBinary(
               ruta,
-              archivo,
+              foto,
               fileOptions: const sb.FileOptions(
                 upsert: true,
                 contentType: 'image/jpeg',

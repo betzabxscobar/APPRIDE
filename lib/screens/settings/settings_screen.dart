@@ -58,6 +58,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ///
   /// La imagen se reduce antes de subir: una foto de 12 MP pasaría del límite
   /// de 2 MB del bucket, y para un avatar de 60 px no aporta nada.
+  ///
+  /// Aquí solo se achica, que en el teléfono es rápido. La calidad, el giro y
+  /// quitarle los metadatos los pone `prepararFoto` al subir: si la calidad se
+  /// aplicara también aquí, la foto se comprimiría dos veces.
   Future<void> _cambiarFoto(ImageSource origen) async {
     setState(() {
       _subiendoFoto = true;
@@ -68,7 +72,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         source: origen,
         maxWidth: 800,
         maxHeight: 800,
-        imageQuality: 82,
       );
       if (foto == null) return;
 

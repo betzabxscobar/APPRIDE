@@ -102,9 +102,9 @@ class _HojaTransferenciaState extends State<_HojaTransferencia> {
     final foto = await ImagePicker().pickImage(
       source: ImageSource.gallery,
       // El comprobante se lee en pantalla, no se imprime: a 1600 px se ve
-      // perfecto y pesa una fracción de lo que sale de la cámara.
+      // perfecto. La calidad y quitarle los metadatos los pone `prepararFoto`
+      // al subir.
       maxWidth: 1600,
-      imageQuality: 85,
     );
     if (foto == null) return;
 

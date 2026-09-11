@@ -299,8 +299,10 @@ del teléfono tal cual:
 | Documento | 1600 | — | 80 | 600 |
 | Comprobante | 1600 | — | 85 | — |
 
-En la app lo hace `image_picker`; en la web, `src/lib/image-upload.ts` con los
-mismos números. **Si se cambia uno, se cambia el otro.**
+En la app, `lib/core/fotos.dart` (`image_picker` solo la achica antes, que en
+el teléfono es rápido); en la web, `src/lib/image-upload.ts`. Los mismos números
+en los dos: **si se cambia uno, se cambia el otro.** Las pruebas de cada lado
+fijan los valores.
 
 Con el plan gratuito, 1 GB. A unos 150 kB por foto reducida caben miles; a los
 5 MB que la web dejaba subir antes, unas doscientas.
@@ -310,13 +312,21 @@ Con el plan gratuito, 1 GB. A unos 150 kB por foto reducida caben miles; a los
 Una foto de cámara lleva en sus metadatos (EXIF) dónde se tomó, si el teléfono
 tiene activada esa opción.
 
-- **La web las quita**: vuelve a dibujar la foto en un canvas y la codifica de
-  nuevo, y lo nuevo no lleva metadatos.
-- **La app no.** `image_picker` en Android, al reducir, copia a la foto nueva
-  todas las etiquetas GPS de la original (`ExifDataCopier.java`, comprobado en
-  `image_picker_android` 0.8.13+19). Una foto de perfil tomada en casa puede
-  llevar dentro dónde está esa casa, en un bucket público. **Pendiente**:
-  arreglarlo pide recodificar la foto sin EXIF, y eso es una dependencia nueva.
+Las dos apps las quitan: vuelven a dibujar la foto, derecha, y la codifican de
+nuevo en JPEG sin metadatos. La web con un canvas; la app con el paquete
+`image`, en otro isolate para no congelar la pantalla.
+
+En la app hacía más falta que en ninguna parte. `image_picker` en Android, al
+reducir, copia a la foto nueva todas las etiquetas GPS de la original
+(`ExifDataCopier.java`, comprobado en `image_picker_android` 0.8.13+19). Y la
+orientación también, sin girar los píxeles: por eso se gira la foto antes de
+quitarle el EXIF, o las verticales saldrían tumbadas. Ojo con el paquete
+`image`: ni `decodeImage` ni `bakeOrientation` quitan el EXIF. Los dos
+enderezan la foto y borran la orientación, pero **copian todo lo demás**, GPS
+incluido. Hay que vaciarlo aparte.
+
+Las tres fotos de perfil que había en el bucket el 2026-09-10 no llevaban
+coordenadas: se miró cuántas etiquetas GPS tenían, sin leer ninguna.
 
 ### Archivos que se quedan sin dueño
 

@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'dart:ui' as ui;
+import 'dart:typed_data';
 
-import 'package:flutter/painting.dart' show decodeImageFromList;
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+import '../core/fotos.dart';
 import '../models/fleet.dart';
 import 'auth_service.dart';
 import 'ride_service.dart';
@@ -103,9 +103,28 @@ class FleetService {
       throw const RideException('Ese documento necesita su fecha de caducidad');
     }
 
-    await _comprobarImagen(archivo);
+    // Las fotos salen derechas, a 1600 de ancho y sin metadatos —tampoco las
+    // coordenadas de donde se tomaron, que image_picker copia—. Siempre en
+    // JPEG, asi que la ruta ya no cambia de extension segun el telefono.
+    final esPdf = _extension(archivo.path) == 'pdf';
+    final Uint8List contenido;
+    if (esPdf) {
+      contenido = await archivo.readAsBytes();
+      if (contenido.lengthInBytes > _topeArchivo) {
+        throw const RideException('El PDF pesa más de 5 MB.');
+      }
+    } else {
+      try {
+        contenido = await prepararFoto(
+          await archivo.readAsBytes(),
+          LimitesFoto.documento,
+        );
+      } on FotoInvalida catch (e) {
+        throw RideException(e.message);
+      }
+    }
 
-    final ext = _extension(archivo.path);
+    final ext = esPdf ? 'pdf' : 'jpg';
     // El vehículo va en la ruta: sin eso, la matrícula del segundo auto
     // sobrescribiría el archivo de la del primero, que es exactamente el
     // problema que se acaba de arreglar en la base.
@@ -114,10 +133,13 @@ class FleetService {
         : '$_uid/$vehiculoId/${tipo.id}.$ext';
 
     try {
-      await _client.storage.from('documentos').upload(
+      await _client.storage.from('documentos').uploadBinary(
             ruta,
-            archivo,
-            fileOptions: const sb.FileOptions(upsert: true),
+            contenido,
+            fileOptions: sb.FileOptions(
+              upsert: true,
+              contentType: esPdf ? 'application/pdf' : 'image/jpeg',
+            ),
           );
     } on sb.StorageException catch (e) {
       throw RideException(_traducirStorage(e.message));
@@ -163,48 +185,9 @@ class FleetService {
     }
   }
 
-  /// Rechaza antes de subir lo que no se va a poder revisar.
-  ///
-  /// El bucket ya limita tamaño y tipo, pero eso no distingue una foto legible
-  /// de uno de 40x30 píxeles: el tope de arriba no tiene suelo. Una matrícula
-  /// que no se puede leer se rechaza igual, solo que tres días después.
-  ///
-  /// Se mide con [decodeImageFromList] en vez de traer una librería: solo hace
-  /// falta el tamaño, y eso ya lo sabe Flutter.
-  Future<void> _comprobarImagen(File archivo) async {
-    if (_extension(archivo.path) == 'pdf') return;
-
-    final bytes = await archivo.readAsBytes();
-    if (bytes.lengthInBytes > _topeArchivo) {
-      throw const RideException(
-        'La foto pesa más de 5 MB. Vuelve a tomarla con menos resolución.',
-      );
-    }
-
-    final ui.Image imagen;
-    try {
-      imagen = await decodeImageFromList(bytes);
-    } catch (_) {
-      throw const RideException('Ese archivo no es una foto que podamos leer.');
-    }
-    final ancho = imagen.width;
-    final alto = imagen.height;
-    imagen.dispose();
-
-    if (ancho < _ladoMinimo || alto < _ladoMinimo) {
-      throw RideException(
-        'Esa foto es demasiado pequeña ($ancho×$alto). Tiene que medir al '
-        'menos $_ladoMinimo píxeles de lado para que se lea.',
-      );
-    }
-  }
-
   /// Lo mismo que acepta el bucket `documentos`. Repetirlo aquí es para dar el
   /// mensaje antes de gastar la subida, no para sustituirlo.
   static const int _topeArchivo = 5 * 1024 * 1024;
-
-  /// Por debajo de esto no se lee un número de placa ni el de una póliza.
-  static const int _ladoMinimo = 600;
 
   /// Las extensiones con las que un documento ha podido quedar guardado, entre
   /// lo que sube la app y lo que sube la web.
