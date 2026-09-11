@@ -24,7 +24,19 @@
 //
 // Ver docs/CUOTA.md.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// Version exacta, la misma que usa la web: con `@2` cada despliegue podia traer
+// una 2.x distinta sin que nadie la probara, justo en el codigo que cobra.
+import { createClient } from 'npm:@supabase/supabase-js@2.112.4';
+
+// Las webs a las que se puede volver despues de aprobar el pago. La app no manda
+// nada y vuelve por `ride://`. Lista fija a proposito: aceptar cualquier URL del
+// cliente convertiria esta funcion en un redireccionador abierto.
+const WEBS = [
+  'https://rideviajes.com.ec/',
+  'https://www.rideviajes.com.ec/',
+  'https://betzabxscobar.github.io/WEB-RIDE/',
+  'http://localhost:5173/',
+];
 
 const ENTORNOS: Record<string, string> = {
   sandbox: 'https://api-m.sandbox.paypal.com',
@@ -121,6 +133,11 @@ Deno.serve(async (req) => {
     return json({ error: 'Solo un chofer paga la cuota mensual' }, 403);
   }
 
+  // Desde la web, volver a `ride://` deja al chofer ante un error del navegador.
+  const peticion = await req.json().catch(() => ({})) as { vuelta?: unknown };
+  const pedida = typeof peticion.vuelta === 'string' ? peticion.vuelta : '';
+  const vuelta = WEBS.some((w) => pedida.startsWith(w)) ? pedida : null;
+
   const acceso = await token(base, clientId, secreto);
   if (!acceso) return json({ error: 'No pudimos contactar con PayPal' }, 502);
 
@@ -182,8 +199,8 @@ Deno.serve(async (req) => {
         // A donde vuelve el navegador. Son deeplinks de la app; si no estan
         // registrados, PayPal igual cobra: quien activa es el webhook, no esta
         // vuelta. Por eso no se usa la vuelta para dar por pagado nada.
-        return_url: 'ride://suscripcion/ok',
-        cancel_url: 'ride://suscripcion/cancelada',
+        return_url: vuelta ?? 'ride://suscripcion/ok',
+        cancel_url: vuelta ?? 'ride://suscripcion/cancelada',
       },
     }),
   });
@@ -192,7 +209,6 @@ Deno.serve(async (req) => {
   if (!r.ok || !cuerpo?.id) {
     return json({
       error: cuerpo?.message ?? 'PayPal rechazo la suscripcion',
-      detalle: cuerpo?.details ?? null,
     }, 502);
   }
 
