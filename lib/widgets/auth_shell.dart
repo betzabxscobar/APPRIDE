@@ -149,7 +149,7 @@ class _MobileSheet extends StatelessWidget {
           ),
           child: Align(
             alignment: Alignment.topCenter,
-            child: _AuthSurface(child: child),
+            child: _AuthContent(child: child),
           ),
         );
       },
@@ -185,11 +185,80 @@ class _FormPanel extends StatelessWidget {
                 horizontal: constraints.maxWidth < 540 ? 28 : 48,
                 vertical: constraints.maxHeight < 650 ? 24 : 40,
               ),
-              child: Center(child: _AuthSurface(child: child)),
+              child: Center(child: _AuthContent(child: child)),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AuthContent extends StatelessWidget {
+  const _AuthContent({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _AuthSurface(child: child),
+        const SizedBox(height: 16),
+        const _LegalFooter(),
+      ],
+    );
+  }
+}
+
+class _LegalFooter extends StatelessWidget {
+  const _LegalFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    final ride = context.ride;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextButton(
+          onPressed: () => showDialog<void>(
+            context: context,
+            builder: (_) => const _TermsDialog(),
+          ),
+          child: const Text('Términos y condiciones'),
+        ),
+        Text(
+          '© 2026 Ride. Todos los derechos reservados.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: ride.inkMuted, fontSize: AppText.micro),
+        ),
+      ],
+    );
+  }
+}
+
+class _TermsDialog extends StatelessWidget {
+  const _TermsDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Términos y condiciones'),
+      content: const SingleChildScrollView(
+        child: Text(
+          'Al crear una cuenta o utilizar Ride, aceptas proporcionar información veraz y usar la plataforma de forma segura, respetuosa y conforme a la ley.\n\n'
+          'Los viajes, pagos, rutas y comunicaciones se gestionan según la disponibilidad del servicio. Cada persona usuaria es responsable de proteger sus credenciales y revisar la información de cada viaje.\n\n'
+          'Ride puede actualizar estos términos para mejorar el servicio o cumplir obligaciones legales. Te avisaremos cuando un cambio relevante requiera tu atención.',
+          style: TextStyle(height: 1.5),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Entendido'),
+        ),
+      ],
     );
   }
 }
