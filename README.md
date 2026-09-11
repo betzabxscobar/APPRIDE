@@ -531,9 +531,12 @@ Revisado en la auditoría del 2026-09-11. En este orden:
    cobrar en efectivo y por transferencia, calificar y usar el chat.
 2. **Firmar la APK** con `python tool/crear_firma.py` y declarar en Play Console
    el servicio en primer plano de tipo `location`.
-3. **Supabase → Authentication → URL Configuration**: Site URL
-   `https://rideviajes.com.ec`; redirecciones esa, `www` y `ride://login-callback`.
-   Después, probar recuperación y cambio de correo.
+3. **Supabase → Authentication → URL Configuration**: la web se sirve por
+   **http** mientras el servidor no tenga certificado. Site URL la dirección por
+   la que se entra hoy, y en las redirecciones las versiones http y https del
+   dominio, `http://192.168.0.254/**` y `ride://login-callback`
+   ([`docs/PUBLICAR.md`](docs/PUBLICAR.md) §7). Después, probar recuperación y
+   cambio de correo.
 4. **PayPal Live** antes del 2026-10-09
    ([`docs/CUOTA.md`](docs/CUOTA.md#pasar-a-producción-live)).
 5. **Limpiar los datos de prueba** con `infra/sql/limpiar-datos-de-prueba.sql`,

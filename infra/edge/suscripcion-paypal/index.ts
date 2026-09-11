@@ -35,6 +35,12 @@ import { createClient } from 'npm:@supabase/supabase-js@2.112.4';
 const WEBS = [
   'https://rideviajes.com.ec/',
   'https://www.rideviajes.com.ec/',
+  // Mientras el servidor no tenga certificado, la web se sirve por http: por el
+  // dominio y por la IP de la red. Sin estas, la vuelta desde http se descartaba,
+  // PayPal devolvia al chofer a `ride://` y el navegador se quedaba en un error.
+  'http://rideviajes.com.ec/',
+  'http://www.rideviajes.com.ec/',
+  'http://192.168.0.254/',
   'https://betzabxscobar.github.io/WEB-RIDE/',
 ];
 const WEBS_DE_PRUEBA = ['http://localhost:5173/'];
@@ -194,7 +200,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  const r = await fetch(`${base}/v1/billing/subscriptions`, {
+  const crear = (vueltaWeb: string | null) => fetch(`${base}/v1/billing/subscriptions`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${acceso}`,
@@ -216,11 +222,20 @@ Deno.serve(async (req) => {
         // A donde vuelve el navegador. Son deeplinks de la app; si no estan
         // registrados, PayPal igual cobra: quien activa es el webhook, no esta
         // vuelta. Por eso no se usa la vuelta para dar por pagado nada.
-        return_url: vuelta ?? 'ride://suscripcion/ok',
-        cancel_url: vuelta ?? 'ride://suscripcion/cancelada',
+        return_url: vueltaWeb ?? 'ride://suscripcion/ok',
+        cancel_url: vueltaWeb ?? 'ride://suscripcion/cancelada',
       },
     }),
   });
+
+  let r = await crear(vuelta);
+  // Si PayPal no admitiera una vuelta por http, mejor volver a la app que no
+  // dejar pagar: el cobro lo activa el webhook igual, vuelva a donde vuelva.
+  if (!r.ok && r.status < 500 && vuelta?.startsWith('http://')) {
+    console.error(`PayPal rechazo la vuelta ${vuelta} (${r.status}); se reintenta sin ella`);
+    await r.body?.cancel();
+    r = await crear(null);
+  }
 
   const cuerpo = await r.json().catch(() => null);
   if (!r.ok || !cuerpo?.id) {
