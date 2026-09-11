@@ -23,7 +23,20 @@ rpc_clientes(nombre) as (values
 ),
 cerradas(nombre) as (values
   ('conductores_cercanos'), ('conductores_en_celdas'), ('saldo_chofer'),
-  ('current_user_must_change_password'), ('confirmar_pago_efectivo'), ('suscripcion_vigente')
+  ('current_user_must_change_password'), ('confirmar_pago_efectivo'), ('suscripcion_vigente'),
+  ('aplicar_cobro_paypal'), ('revertir_cobro_paypal')
+),
+-- Tablas que solo escriben las funciones security definer. Si `authenticated`
+-- recupera un permiso de escritura, cualquier politica nueva mal escrita las
+-- abre: asi se podia cambiar el precio de un viaje con un PATCH (auditoria 2,
+-- C2).
+solo_funciones(nombre) as (values
+  ('viajes'), ('ubicaciones'), ('pagos'), ('suscripciones_chofer'), ('codigos_viaje'),
+  ('mensajes'), ('pasajeros'), ('notificaciones'), ('eventos_paypal')
+),
+-- Lo unico que un usuario puede cambiar de su propio perfil.
+perfil_editable(columna) as (values
+  ('full_name'), ('phone'), ('foto_url'), ('must_change_password'), ('updated_at')
 ),
 funciones as (
   select p.oid, p.proname, p.prosecdef, p.proconfig, p.prorettype
@@ -75,6 +88,36 @@ from pg_class c
 where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
   and (has_table_privilege('anon', c.oid, 'INSERT') or has_table_privilege('anon', c.oid, 'UPDATE')
        or has_table_privilege('anon', c.oid, 'DELETE'))
+
+union all
+select 'authenticated escribe directo en una tabla que solo tocan las funciones', c.relname
+from pg_class c join solo_funciones s on s.nombre = c.relname
+where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
+  and (has_table_privilege('authenticated', c.oid, 'INSERT')
+       or has_table_privilege('authenticated', c.oid, 'UPDATE')
+       or has_table_privilege('authenticated', c.oid, 'DELETE'))
+
+union all
+select 'Un usuario puede cambiar esta columna de su perfil', 'profiles.' || a.attname
+from pg_attribute a
+where a.attrelid = 'public.profiles'::regclass and a.attnum > 0 and not a.attisdropped
+  and has_column_privilege('authenticated', 'public.profiles'::regclass, a.attnum, 'UPDATE')
+  and a.attname not in (select columna from perfil_editable)
+
+union all
+-- Un pasajero no ve a los demas pasajeros ni un chofer a los demas choferes:
+-- solo a la contraparte de sus viajes (auditoria 2, C1 y A1).
+select 'can_view_role deja ver perfiles del mismo rol', 'can_view_role'
+from funciones f
+where f.proname = 'can_view_role'
+  and pg_get_functiondef(f.oid) ~ $$when '(driver|passenger)'$$
+
+union all
+-- Un disparador de validacion que corre con los permisos de quien escribe no
+-- ve lo que el RLS le esconde, y una comparacion con NULL lo deja pasar todo.
+select 'Disparador de validacion sin security definer', f.proname
+from funciones f
+where f.proname in ('validar_calificacion') and not f.prosecdef
 
 union all
 select 'Los avisos de PayPal se ven desde la app', 'eventos_paypal'
