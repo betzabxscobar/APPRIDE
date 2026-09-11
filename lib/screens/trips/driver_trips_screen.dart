@@ -73,6 +73,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
   @override
   void dispose() {
     _rastreo?.cancel();
+    LocationService.instance.seguirEnSegundoPlano('viaje', false);
     final canal = _canal;
     if (canal != null) RideService.instance.cerrarCanal(canal);
     super.dispose();
@@ -94,6 +95,10 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
         _solicitudes = solicitudes;
         _cargando = false;
       });
+
+      // Con un viaje encima, la posición tiene que seguir saliendo aunque el
+      // chofer cambie a Waze para navegar.
+      LocationService.instance.seguirEnSegundoPlano('viaje', activo != null);
 
       // Que el viaje siga ahí aunque se cierre la app.
       await TripSessionStore.instance.guardar(activo);

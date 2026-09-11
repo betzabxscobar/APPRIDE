@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 /// Ubicación del dispositivo.
@@ -38,6 +39,57 @@ class LocationService {
   /// kilómetros. Mostrarla deja ver de un vistazo si el punto es de fiar.
   ///
   /// Nunca se queda esperando para siempre: ver [_tope].
+  /// Lo que mantiene viva la app con la pantalla apagada o con Waze delante.
+  ///
+  /// Android suspende una app que no está en pantalla, y con ella los `Timer`
+  /// que mandan la posición: el pasajero veía al chofer congelado y el chofer
+  /// salía del emparejamiento. Un flujo de posiciones con notificación fija
+  /// arranca el servicio en primer plano de `geolocator`, que mantiene vivo el
+  /// proceso con el permiso «mientras se usa la app»: no hace falta pedir la
+  /// ubicación «todo el tiempo». Los permisos del servicio están en el
+  /// manifiesto; sin `FOREGROUND_SERVICE_LOCATION`, Android 14 cierra la app.
+  ///
+  /// Varias pantallas pueden necesitarlo a la vez —en línea, o con un viaje en
+  /// curso—, así que cada una lo pide con su motivo y sigue mientras quede
+  /// alguno.
+  final Set<String> _motivos = {};
+  StreamSubscription<Position>? _enSegundoPlano;
+
+  void seguirEnSegundoPlano(String motivo, bool activo) {
+    if (activo) {
+      _motivos.add(motivo);
+    } else {
+      _motivos.remove(motivo);
+    }
+    if (_motivos.isEmpty) {
+      _enSegundoPlano?.cancel();
+      _enSegundoPlano = null;
+      return;
+    }
+    if (_enSegundoPlano != null) return;
+    // Solo Android: iOS necesita otro modo y otro permiso, y aún no se publica.
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+
+    _enSegundoPlano = Geolocator.getPositionStream(
+      locationSettings: AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 25,
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'Ride está compartiendo tu ubicación',
+          notificationText:
+              'Mientras estés en línea o en un viaje, tus pasajeros te ven en el mapa.',
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
+      ),
+    ).listen(
+      (p) => _ultima = (lat: p.latitude, lng: p.longitude),
+      // Un fallo puntual del GPS no tumba la jornada: el latido de la pantalla
+      // sigue pidiendo la posición por su cuenta.
+      onError: (Object _) {},
+    );
+  }
+
   Future<({double lat, double lng, double precision})> posicionActual() {
     return _leer().timeout(_tope, onTimeout: () {
       throw const LocationUnavailable(

@@ -109,6 +109,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   @override
   void dispose() {
     _latido?.cancel();
+    LocationService.instance.seguirEnSegundoPlano('en_linea', false);
     final canal = _canal;
     if (canal != null) RideService.instance.cerrarCanal(canal);
     super.dispose();
@@ -299,6 +300,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   /// latido, se pondría «en línea» y no le llegaría ningún viaje.
   void _ajustarLatido() {
     final debeReportar = _estado.disponible && _estado.puedeTrabajar;
+    LocationService.instance.seguirEnSegundoPlano('en_linea', debeReportar);
 
     if (!debeReportar) {
       _latido?.cancel();
